@@ -21,7 +21,7 @@ import json
 import math
 from dataclasses import dataclass, asdict
 from pathlib import Path
-from typing import Dict, List, Sequence, Tuple
+from typing import Any, Dict, List, Sequence, Tuple
 
 import matplotlib
 matplotlib.use("Agg")
@@ -125,7 +125,12 @@ def params_to_geometry(params: Array, n_per_obstacle: int, n_obstacles: int = 3)
         normals.append(nrm)
         dss.append(ds)
         ids.append(np.full(n_per_obstacle, j, dtype=int))
-    return BoundaryGeometry(x=np.vstack(xs), normal=np.vstack(normals), ds=np.concatenate(dss), obs_id=np.concatenate(ids))
+    return BoundaryGeometry(
+        x=np.vstack(xs),
+        normal=np.vstack(normals),
+        ds=np.concatenate(dss),
+        obs_id=np.concatenate(ids).astype(np.int64, copy=False),
+    )
 
 
 def dense_boundary_points(params_obs: Array, n: int = 400) -> Array:
@@ -283,9 +288,9 @@ def gauss_newton_reconstruct(
     coeff_bounds: Tuple[float, float],
     min_gap: float,
     center_extent: float,
-) -> Tuple[Array, List[Dict[str, float]]]:
+) -> Tuple[Array, List[Dict[str, Any]]]:
     params = enforce_constraints(init_params, min_gap, radius_bounds, coeff_bounds, center_extent)
-    history: List[Dict[str, float]] = []
+    history: List[Dict[str, Any]] = []
     pscale = np.tile(np.array([1.0, 1.0, 0.3, 0.18, 0.18, 0.14, 0.14], dtype=float), 3)
 
     def flatten(z: CArray) -> Array:
