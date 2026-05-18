@@ -45,6 +45,7 @@ from numpy.typing import NDArray
 from scipy.integrate import quad
 from scipy.linalg import solve, svd
 from scipy.special import hankel1
+from sampling_imaging import direction_vectors, normalize_indicator
 
 # 类型别名，让函数签名里的实数组/复数组更直观。
 Array = NDArray[np.float64]
@@ -273,7 +274,15 @@ def empirical_snr(clean: CArray, noisy: CArray) -> float:
     return float(np.linalg.norm(clean) / max(np.linalg.norm(noisy - clean), 1e-14))
 
 
-def music_indicator(farfield_matrix: CArray, k: float, obs_angles: Array, x_grid: Array, y_grid: Array, rank_signal: int) -> Array:
+def music_indicator(
+    farfield_matrix: CArray,
+    k: float,
+    obs_angles: Array,
+    x_grid: Array,
+    y_grid: Array,
+    rank_signal: int,
+    block_size: int = 32768,
+) -> Array:
     """计算 MUSIC 指标图，用于从远场数据中定位中心初值。
 
     前 rank_signal 个奇异向量看作信号子空间，其余看作噪声子空间。
@@ -283,20 +292,27 @@ def music_indicator(farfield_matrix: CArray, k: float, obs_angles: Array, x_grid
     U, _, _ = svd(farfield_matrix, full_matrices=False)
     rank = max(1, min(int(rank_signal), U.shape[1]))
     U_noise = U[:, rank:]
-    xhat = np.column_stack([np.cos(obs_angles), np.sin(obs_angles)])
+    xhat = direction_vectors(obs_angles)
     X, Y = np.meshgrid(x_grid, y_grid, indexing="xy")
     pts = np.column_stack([X.ravel(), Y.ravel()])
-    phase = np.exp(-1j * k * (xhat @ pts.T)) / np.sqrt(len(obs_angles))
+    if block_size <= 0:
+        raise ValueError("block_size must be positive")
+
+    denom = np.empty(pts.shape[0], dtype=float)
     if U_noise.size == 0:
         # 极端情况下没有噪声子空间，给一个很小的分母以避免除零。
-        denom = np.full(pts.shape[0], 1e-12, dtype=float)
+        denom.fill(1e-12)
     else:
-        proj = U_noise.conj().T @ phase
-        denom = np.linalg.norm(proj, axis=0)
+        scale = np.sqrt(len(obs_angles))
+        U_noise_h = U_noise.conj().T
+        for start in range(0, pts.shape[0], block_size):
+            stop = min(start + block_size, pts.shape[0])
+            phase = np.exp(-1j * k * (xhat @ pts[start:stop].T)) / scale
+            proj = U_noise_h @ phase
+            denom[start:stop] = np.linalg.norm(proj, axis=0)
     ind = 1.0 / (denom + 1e-12)
     ind = ind.reshape(X.shape)
-    ind /= np.max(ind)
-    return ind
+    return normalize_indicator(ind)
 
 
 def select_peaks_2d(image: Array, x_grid: Array, y_grid: Array, n_peaks: int, exclusion_radius: float) -> Array:
@@ -628,7 +644,7 @@ def run_experiment(args: argparse.Namespace) -> Dict[str, str]:
             # 添加噪声并用 MUSIC 指标图寻找中心初值。
             rng = np.random.default_rng(int(args.seed) + 1000 * j + i)
             ff_noisy = add_relative_noise(ff_clean, float(noise), rng)
-            img = music_indicator(ff_noisy, k, obs_angles, x_grid, y_grid, rank_signal=3)
+            img = music_indicator(ff_noisy, k, obs_angles, x_grid, y_grid, rank_signal=3, block_size=int(args.music_block_size))
             centers_init = select_peaks_2d(img, x_grid, y_grid, n_peaks=3, exclusion_radius=max(0.08, 0.45 * float(spacing)))
 
             # MUSIC 只给中心；半径用 init_radius，形状扰动从 0 开始。
@@ -723,6 +739,7 @@ def run_experiment(args: argparse.Namespace) -> Dict[str, str]:
             "d_rayleigh": d_rayleigh,
             "requested_spacings": spacings.tolist(),
             "noise_levels": noises.tolist(),
+            "music_block_size": int(args.music_block_size),
             "metrics": [asdict(m) for m in all_metrics],
         }, f, indent=2)
 
@@ -749,6 +766,7 @@ def build_argparser() -> argparse.ArgumentParser:
     p.add_argument("--n-obs", type=int, default=10)
     p.add_argument("--grid-extent", type=float, default=0.45)
     p.add_argument("--grid-size", type=int, default=41)
+    p.add_argument("--music-block-size", type=int, default=32768)
     p.add_argument("--center-extent", type=float, default=0.22)
     p.add_argument("--init-radius", type=float, default=0.05)
     p.add_argument("--min-radius", type=float, default=0.03)

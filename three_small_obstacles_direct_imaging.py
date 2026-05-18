@@ -34,6 +34,7 @@ from three_small_obstacles_joint_gn_random_centers import (
     parse_float_list,
     solve_forward_farfield,
 )
+from sampling_imaging import direct_sampling_indicator, plot_indicator_image
 
 # 实数/复数 numpy 数组类型别名，让函数签名更清楚。
 Array = NDArray[np.float64]
@@ -75,6 +76,7 @@ def orthogonality_sampling_indicator_md(
     x_grid: Array,
     y_grid: Array,
     power: float = 1.0,
+    block_size: int = 32768,
 ) -> Array:
     """计算多入射方向的正交采样指标函数。
 
@@ -85,48 +87,29 @@ def orthogonality_sampling_indicator_md(
         sum_d | sum_xhat exp(i*k*xhat·y) u_inf(xhat,d) |^power
     再归一化到最大值为 1。指标值越大，说明该点越像散射体所在位置。
     """
-    # 观测方向 xhat=(cos theta, sin theta)。
-    xhat = np.column_stack([np.cos(obs_angles), np.sin(obs_angles)])
-
-    # 构造成像平面上的二维采样点，并展平成 (网格点数, 2)。
-    X, Y = np.meshgrid(x_grid, y_grid, indexing="xy")
-    pts = np.column_stack([X.ravel(), Y.ravel()])
-
-    # 用均匀求积权重近似单位圆上的积分。
-    obs_weight = PI2 / len(obs_angles)
-    inc_weight = PI2 / len(incident_angles)
-
-    # phase[m, n] = exp(i*k*xhat_m · y_n)，用于把远场数据反传播到采样点。
-    phase = np.exp(1j * k * (xhat @ pts.T))
-
-    # 对观测方向积分；farfield_matrix.T 让每个入射方向独立得到一个反传播场。
-    reduced_fields = obs_weight * (farfield_matrix.T @ phase)
-
-    # 对所有入射方向累加，得到每个采样点的指标值。
-    indicator = inc_weight * np.sum(np.abs(reduced_fields) ** float(power), axis=0)
-    indicator = indicator.reshape(X.shape).astype(float, copy=False)
-
-    # 归一化，便于不同噪声/实验之间比较颜色尺度。
-    indicator /= max(np.max(indicator), 1e-14)
-    return indicator
+    return direct_sampling_indicator(
+        farfield_matrix,
+        k,
+        obs_angles,
+        incident_angles,
+        x_grid,
+        y_grid,
+        aperture_length=PI2,
+        power=power,
+        block_size=block_size,
+    )
 
 
 def save_imaging_plot(path: Path, image: Array, x_grid: Array, y_grid: Array, p_true: Array, title: str) -> None:
     """保存直接成像指标图，并把真实障碍物边界叠加在图上。"""
     fig, ax = plt.subplots(figsize=(6.0, 5.2), constrained_layout=True)
 
-    # pcolormesh 显示指标函数；颜色越亮，表示越可能存在障碍物。
-    m = ax.pcolormesh(x_grid, y_grid, image, shading="auto", cmap="RdYlBu_r")
+    im = plot_indicator_image(ax, image, x_grid, y_grid, title=title)
     for j in range(3):
         # dense_boundary_points 把参数化边界采样成密集点，用虚线画真实轮廓。
         pts = dense_boundary_points(p_true[obstacle_param_slice(j)])
         ax.plot(pts[:, 0], pts[:, 1], "k--", lw=1.2)
-    ax.set_aspect("equal")
-    ax.set_xlabel("x")
-    ax.set_ylabel("y")
-    ax.set_title(title)
-    ax.grid(True, alpha=0.15)
-    cbar = fig.colorbar(m, ax=ax)
+    cbar = fig.colorbar(im, ax=ax)
     cbar.set_label("normalized indicator")
     fig.savefig(path, dpi=180)
     plt.close(fig)
@@ -157,6 +140,7 @@ def main() -> None:
     p.add_argument("--center-extent", type=float, default=0.22)
     p.add_argument("--min-gap", type=float, default=0.008)
     p.add_argument("--indicator-power", type=float, default=1.0)
+    p.add_argument("--block-size", type=int, default=32768)
     p.add_argument("--true1-a2c", type=float, default=0.12)
     p.add_argument("--true1-a2s", type=float, default=-0.08)
     p.add_argument("--true1-a3c", type=float, default=0.06)
@@ -204,6 +188,7 @@ def main() -> None:
         x_grid,
         y_grid,
         power=float(args.indicator_power),
+        block_size=int(args.block_size),
     )
     # ---------- 保存图片和数据 ----------
     save_imaging_plot(
@@ -228,6 +213,7 @@ def main() -> None:
             x_grid,
             y_grid,
             power=float(args.indicator_power),
+            block_size=int(args.block_size),
         )
         noisy_plot = out_dir / f"direct_imaging_noisy_{float(noise_level):.2f}.png"
         save_imaging_plot(
@@ -264,7 +250,8 @@ def main() -> None:
         "method": "multi-direction orthogonality sampling",
         "indicator_formula": "mu_MD(y,k)=sum_d |sum_xhat exp(i*k*(xhat dot y)) u_inf(xhat,d,k)|",
         "indicator_power": float(args.indicator_power),
-        "colormap": "RdYlBu_r",
+        "block_size": int(args.block_size),
+        "colormap": "jet",
         "k": k,
         "noise_levels": noise_levels.tolist(),
         "seed": int(args.seed),

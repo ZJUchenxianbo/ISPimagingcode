@@ -44,6 +44,7 @@ from three_small_obstacles_direct_imaging import (
     build_true_params,
     orthogonality_sampling_indicator_md,
 )
+from sampling_imaging import plot_indicator_image
 
 # 复用 Gauss-Newton 脚本里的前向求解、约束、峰值选择和误差评估工具。
 from three_small_obstacles_joint_gn_random_centers import (
@@ -228,8 +229,7 @@ def save_direct_prior_plot(
     """保存“直接成像指标图 + 真实边界 + 初始先验边界”的对比图。"""
     fig, ax = plt.subplots(figsize=(6.0, 5.2), constrained_layout=True)
 
-    # pcolormesh 显示归一化指标图：亮/暖色区域表示直接成像认为目标更可能存在。
-    m = ax.pcolormesh(x_grid, y_grid, image, shading="auto", cmap="RdYlBu_r", vmin=0.0, vmax=1.0)
+    im = plot_indicator_image(ax, image, x_grid, y_grid, title=title)
     for j in range(3):
         # 将参数化边界离散成较密的点，便于画出障碍物轮廓。
         pts_true = dense_boundary_points(p_true[obstacle_param_slice(j)])
@@ -239,17 +239,12 @@ def save_direct_prior_plot(
         # label 只在第一个障碍物上设置，避免图例重复三次。
         ax.plot(pts_true[:, 0], pts_true[:, 1], "k--", lw=1.2, label="true" if j == 0 else None)
         ax.plot(pts_init[:, 0], pts_init[:, 1], "w:", lw=1.4, label="prior from direct imaging" if j == 0 else None)
-    ax.set_aspect("equal")
-    ax.set_xlabel("x")
-    ax.set_ylabel("y")
-    ax.set_title(title)
-    ax.grid(True, alpha=0.15)
 
     # 去除重复 label，得到更干净的图例。
     handles, labels = ax.get_legend_handles_labels()
     by_label = dict(zip(labels, handles))
     ax.legend(by_label.values(), by_label.keys(), loc="best")
-    cbar = fig.colorbar(m, ax=ax)
+    cbar = fig.colorbar(im, ax=ax)
     cbar.set_label("normalized indicator")
     fig.savefig(path, dpi=180)
     plt.close(fig)
@@ -308,17 +303,12 @@ def save_summary_panels(
     for col, noise in enumerate(noise_levels):
         # 上排：定性直接成像结果。
         ax_img = axes[0, col]
-        m = ax_img.pcolormesh(x_grid, y_grid, images[col], shading="auto", cmap="RdYlBu_r", vmin=0.0, vmax=1.0)
+        im = plot_indicator_image(ax_img, images[col], x_grid, y_grid, title=f"Direct imaging prior, noise={noise:.2f}")
         for j in range(3):
             pts_true = dense_boundary_points(p_true[obstacle_param_slice(j)])
             pts_init = dense_boundary_points(init_params_list[col][obstacle_param_slice(j)])
             ax_img.plot(pts_true[:, 0], pts_true[:, 1], "k--", lw=1.0)
             ax_img.plot(pts_init[:, 0], pts_init[:, 1], "w:", lw=1.2)
-        ax_img.set_aspect("equal")
-        ax_img.set_title(f"Direct imaging prior, noise={noise:.2f}")
-        ax_img.set_xlabel("x")
-        ax_img.set_ylabel("y")
-        ax_img.grid(True, alpha=0.15)
 
         # 下排：定量迭代结果对比。
         ax_rec = axes[1, col]
@@ -337,7 +327,7 @@ def save_summary_panels(
         ax_rec.grid(True, alpha=0.15)
 
     # 对整张上排图共享同一个色条，表示归一化指标值。
-    cbar = fig.colorbar(m, ax=axes[0, :].ravel().tolist(), shrink=0.85)
+    cbar = fig.colorbar(im, ax=axes[0, :].ravel().tolist(), shrink=0.85)
     cbar.set_label("normalized indicator")
     fig.savefig(path, dpi=180)
     plt.close(fig)
@@ -396,6 +386,7 @@ def main() -> None:
 
     # indicator-power：正交采样指标中 |reduced field| 的幂次。
     p.add_argument("--indicator-power", type=float, default=1.0)
+    p.add_argument("--block-size", type=int, default=32768)
 
     # prior-threshold：提取先验时，只使用超过该比例峰值的高亮区域。
     p.add_argument("--prior-threshold", type=float, default=0.60)
@@ -502,6 +493,7 @@ def main() -> None:
             x_grid,
             y_grid,
             power=float(args.indicator_power),
+            block_size=int(args.block_size),
         )
         prior_images.append(image)
 
@@ -666,6 +658,8 @@ def main() -> None:
         "grid_size": int(args.grid_size),
         "n_obs": int(args.n_obs),
         "n_per_obstacle": int(args.n_per_obstacle),
+        "indicator_power": float(args.indicator_power),
+        "block_size": int(args.block_size),
         "prior_threshold": float(args.prior_threshold),
         "prior_radius_scale": float(args.prior_radius_scale),
         "summary_panel": str(out_dir / "summary_panel.png"),

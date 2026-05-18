@@ -2,8 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.special import hankel1, jv
 from scipy.linalg import solve
-from matplotlib.colors import Normalize
 import warnings
+from sampling_imaging import normalize_indicator, plot_indicator_image
 warnings.filterwarnings('ignore')
 
 # 设置中文字体
@@ -286,44 +286,47 @@ def plot_results(z_grid_large, I_large1, I_large2, I_small,
     # 图(b): 第一次成像结果 (z10 = (-1, -5))
     ax = axes[0, 1]
     extent = [-12, 2, -12, 2]
-    im = ax.imshow(I_large1.T, extent=extent, origin='lower', 
-                   cmap='hot', norm=Normalize(vmin=0, vmax=np.max(I_large1)*0.8))
+    im = plot_indicator_image(
+        ax,
+        normalize_indicator(I_large1.T),
+        extent=extent,
+        title='(b) 成像结果 I_{z10}(z), z0 = (-1, -5)',
+    )
     ax.plot(obstacle_points[:, 0], obstacle_points[:, 1], 'b-', linewidth=2, label='实际边界')
     ax.plot(z0_list[0][0], z0_list[0][1], 'r*', markersize=15, label=f'z0 = {z0_list[0]}')
     ax.set_xlim([-12, 2])
     ax.set_ylim([-12, 2])
-    ax.set_aspect('equal')
-    ax.set_title('(b) 成像结果 I_{z10}(z), z0 = (-1, -5)')
     ax.legend()
-    ax.grid(True, alpha=0.3)
     plt.colorbar(im, ax=ax)
     
     # 图(c): 第二次成像结果 (z20 = (-5, -4))
     ax = axes[1, 0]
-    im = ax.imshow(I_large2.T, extent=extent, origin='lower',
-                   cmap='hot', norm=Normalize(vmin=0, vmax=np.max(I_large2)*0.8))
+    im = plot_indicator_image(
+        ax,
+        normalize_indicator(I_large2.T),
+        extent=extent,
+        title='(c) 成像结果 I_{z20}(z), z0 = (-5, -4)',
+    )
     ax.plot(obstacle_points[:, 0], obstacle_points[:, 1], 'b-', linewidth=2, label='实际边界')
     ax.plot(z0_list[1][0], z0_list[1][1], 'r*', markersize=15, label=f'z0 = {z0_list[1]}')
     ax.set_xlim([-12, 2])
     ax.set_ylim([-12, 2])
-    ax.set_aspect('equal')
-    ax.set_title('(c) 成像结果 I_{z20}(z), z0 = (-5, -4)')
     ax.legend()
-    ax.grid(True, alpha=0.3)
     plt.colorbar(im, ax=ax)
     
     # 图(d): 小区域成像结果
     ax = axes[1, 1]
     extent_small = [-1, 1, -1, 1]
-    im = ax.imshow(I_small.T, extent=extent_small, origin='lower',
-                   cmap='hot', norm=Normalize(vmin=0, vmax=np.max(I_small)*0.8))
+    im = plot_indicator_image(
+        ax,
+        normalize_indicator(I_small.T),
+        extent=extent_small,
+        title='(d) 小区域成像结果 (实际障碍物)',
+    )
     ax.plot(obstacle_points[:, 0], obstacle_points[:, 1], 'b-', linewidth=2, label='实际边界')
     ax.set_xlim([-1, 1])
     ax.set_ylim([-1, 1])
-    ax.set_aspect('equal')
-    ax.set_title('(d) 小区域成像结果 (实际障碍物)')
     ax.legend()
-    ax.grid(True, alpha=0.3)
     plt.colorbar(im, ax=ax)
     
     plt.tight_layout()
@@ -354,24 +357,28 @@ def plot_comparison(obstacle_points, I_small, I_small_clean,
     
     # 无噪声 - 无相位数据
     ax = axes[0, 1]
-    im = ax.imshow(I_small_clean.T, extent=extent, origin='lower',
-                   cmap='hot', norm=Normalize(vmin=0, vmax=np.max(I_small_clean)*0.8))
+    im = plot_indicator_image(
+        ax,
+        normalize_indicator(I_small_clean.T),
+        extent=extent,
+        title='无相位数据 (无噪声)',
+    )
     ax.plot(obstacle_points[:, 0], obstacle_points[:, 1], 'b-', linewidth=1.5)
     ax.set_xlim([-1, 1])
     ax.set_ylim([-1, 1])
-    ax.set_aspect('equal')
-    ax.set_title('无相位数据 (无噪声)')
     plt.colorbar(im, ax=ax)
     
     # 无噪声 - 全数据
     ax = axes[0, 2]
-    im = ax.imshow(I_full.T, extent=extent, origin='lower',
-                   cmap='hot', norm=Normalize(vmin=0, vmax=np.max(I_full)*0.8))
+    im = plot_indicator_image(
+        ax,
+        normalize_indicator(I_full.T),
+        extent=extent,
+        title='全数据 (无噪声)',
+    )
     ax.plot(obstacle_points[:, 0], obstacle_points[:, 1], 'b-', linewidth=1.5)
     ax.set_xlim([-1, 1])
     ax.set_ylim([-1, 1])
-    ax.set_aspect('equal')
-    ax.set_title('全数据 (无噪声)')
     plt.colorbar(im, ax=ax)
     
     # 第二行: 带噪声
@@ -386,25 +393,29 @@ def plot_comparison(obstacle_points, I_small, I_small_clean,
     
     # 带噪声 - 无相位数据
     ax = axes[1, 1]
-    im = ax.imshow(I_small.T, extent=extent, origin='lower',
-                   cmap='hot', norm=Normalize(vmin=0, vmax=np.max(I_small)*0.8))
+    im = plot_indicator_image(
+        ax,
+        normalize_indicator(I_small.T),
+        extent=extent,
+        title=f'无相位数据 ({noise_level*100:.0f}% 噪声)',
+    )
     ax.plot(obstacle_points[:, 0], obstacle_points[:, 1], 'b-', linewidth=1.5)
     ax.set_xlim([-1, 1])
     ax.set_ylim([-1, 1])
-    ax.set_aspect('equal')
-    ax.set_title(f'无相位数据 ({noise_level*100:.0f}% 噪声)')
     plt.colorbar(im, ax=ax)
     
     # 带噪声 - 全数据
     ax = axes[1, 2]
     # 这里需要全数据带噪声的结果
-    im = ax.imshow(I_full.T, extent=extent, origin='lower',
-                   cmap='hot', norm=Normalize(vmin=0, vmax=np.max(I_full)*0.8))
+    im = plot_indicator_image(
+        ax,
+        normalize_indicator(I_full.T),
+        extent=extent,
+        title=f'全数据 ({noise_level*100:.0f}% 噪声)',
+    )
     ax.plot(obstacle_points[:, 0], obstacle_points[:, 1], 'b-', linewidth=1.5)
     ax.set_xlim([-1, 1])
     ax.set_ylim([-1, 1])
-    ax.set_aspect('equal')
-    ax.set_title(f'全数据 ({noise_level*100:.0f}% 噪声)')
     plt.colorbar(im, ax=ax)
     
     plt.tight_layout()
