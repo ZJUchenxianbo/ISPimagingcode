@@ -29,6 +29,7 @@ from scipy.linalg import solve
 
 # 复用三小障碍物 GN 脚本中的边界离散、单层势矩阵、远场算子等基础工具。
 from three_small_obstacles_joint_gn_random_centers import (
+    PI2,
     BoundaryGeometry,
     add_relative_noise,
     build_single_layer_matrix,
@@ -39,7 +40,6 @@ from three_small_obstacles_joint_gn_random_centers import (
     plane_wave,
     single_layer_farfield_operator,
 )
-from sampling_imaging import aperture_angles, aperture_measure, direct_sampling_indicator, plot_indicator_image
 
 Array = NDArray[np.float64]
 CArray = NDArray[np.complex128]
@@ -110,7 +110,13 @@ def limited_aperture_angles(center: float, alpha: float, n_obs: int) -> Array:
     center 是孔径中心方向，alpha 是半孔径角。
     当 alpha=pi 时退化为全孔径，即 [0, 2pi) 上均匀观测。
     """
-    return aperture_angles(center, alpha, n_obs)
+    if not (0.0 < alpha <= math.pi):
+        raise ValueError("--alpha must be in (0, pi]")
+    if n_obs < 2:
+        raise ValueError("--n-obs must be at least 2 for a finite aperture")
+    if abs(alpha - math.pi) < 1e-14:
+        return np.linspace(0.0, PI2, n_obs, endpoint=False)
+    return center + np.linspace(-alpha, alpha, n_obs)
 
 
 def solve_forward_farfield_variable(
@@ -159,7 +165,6 @@ def direct_sampling_indicator_limited_aperture(
     y_grid: Array,
     aperture_length: float,
     power: float = 1.0,
-    block_size: int = 32768,
 ) -> Array:
     """计算有限孔径多方向直接采样指标。
 
@@ -168,17 +173,29 @@ def direct_sampling_indicator_limited_aperture(
     对每个采样点 y，先把远场数据按 exp(i*k*xhat·y) 反传播，
     再对入射方向求和，得到归一化指标图。
     """
-    return direct_sampling_indicator(
-        farfield_matrix,
-        k,
-        obs_angles,
-        incident_angles,
-        x_grid,
-        y_grid,
-        aperture_length=aperture_length,
-        power=power,
-        block_size=block_size,
-    )
+    xhat = np.column_stack([np.cos(obs_angles), np.sin(obs_angles)])
+
+    # 成像网格展平成点列表，便于矩阵化计算相位项。
+    X, Y = np.meshgrid(x_grid, y_grid, indexing="xy")
+    pts = np.column_stack([X.ravel(), Y.ravel()])
+
+    # 有限孔径上的梯形/矩形求积近似权重。
+    obs_weight = aperture_length / max(len(obs_angles) - 1, 1)
+    inc_weight = PI2 / len(incident_angles)
+
+    # phase[m,n] = exp(i*k*xhat_m · y_n)。
+    phase = np.exp(1j * k * (xhat @ pts.T))
+
+    # 对观测方向做反传播积分。
+    backpropagated = obs_weight * (farfield_matrix.T @ phase)
+
+    # 对多个入射方向累加，得到最终采样指标。
+    indicator = inc_weight * np.sum(np.abs(backpropagated) ** float(power), axis=0)
+    indicator = indicator.reshape(X.shape).astype(float, copy=False)
+
+    # 归一化到最大值为 1，方便统一颜色条。
+    indicator /= max(float(np.max(indicator)), 1e-14)
+    return indicator
 
 
 def boundary_sets(case: TargetCase) -> list[Array]:
@@ -192,10 +209,15 @@ def boundary_sets(case: TargetCase) -> list[Array]:
 def save_case_plot(path: Path, image: Array, x_grid: Array, y_grid: Array, case: TargetCase, title: str) -> None:
     """保存单个案例的指标图，并叠加真实目标边界。"""
     fig, ax = plt.subplots(figsize=(6.0, 5.2), constrained_layout=True)
-    im = plot_indicator_image(ax, image, x_grid, y_grid, title=title)
+    m = ax.pcolormesh(x_grid, y_grid, image, shading="auto", cmap="RdYlBu_r", vmin=0.0, vmax=1.0)
     for pts in boundary_sets(case):
         ax.plot(pts[:, 0], pts[:, 1], "k--", lw=1.25)
-    cbar = fig.colorbar(im, ax=ax)
+    ax.set_aspect("equal")
+    ax.set_xlabel("x")
+    ax.set_ylabel("y")
+    ax.set_title(title)
+    ax.grid(True, alpha=0.15)
+    cbar = fig.colorbar(m, ax=ax)
     cbar.set_label("normalized indicator")
     fig.savefig(path, dpi=180)
     plt.close(fig)
@@ -211,10 +233,15 @@ def save_summary_plot(
     """把多个目标案例并排画在同一张总览图中。"""
     fig, axes = plt.subplots(1, len(cases), figsize=(15.0, 4.7), constrained_layout=True)
     for ax, image, (x_grid, y_grid), case in zip(axes, images, grids, cases):
-        im = plot_indicator_image(ax, image, x_grid, y_grid, title=case.label)
+        m = ax.pcolormesh(x_grid, y_grid, image, shading="auto", cmap="RdYlBu_r", vmin=0.0, vmax=1.0)
         for pts in boundary_sets(case):
             ax.plot(pts[:, 0], pts[:, 1], "k--", lw=1.1)
-    cbar = fig.colorbar(im, ax=axes.ravel().tolist(), shrink=0.85)
+        ax.set_aspect("equal")
+        ax.set_title(case.label)
+        ax.set_xlabel("x")
+        ax.set_ylabel("y")
+        ax.grid(True, alpha=0.15)
+    cbar = fig.colorbar(m, ax=axes.ravel().tolist(), shrink=0.85) # type: ignore
     cbar.set_label("normalized indicator")
     fig.suptitle(title)
     fig.savefig(path, dpi=180)
@@ -242,7 +269,6 @@ def main() -> None:
     p.add_argument("--noise-levels", type=str, default="0.05,0.10,0.20")
     p.add_argument("--noise-level", type=float, default=None, help="deprecated single-noise override")
     p.add_argument("--indicator-power", type=float, default=1.0)
-    p.add_argument("--block-size", type=int, default=32768)
     p.add_argument("--seed", type=int, default=20260426)
     args = p.parse_args()
 
@@ -255,7 +281,7 @@ def main() -> None:
     alpha = float(args.alpha)
 
     # alpha=pi 表示全孔径，孔径长度为 2pi；否则有限孔径长度为 2alpha。
-    aperture_length = aperture_measure(alpha)
+    aperture_length = PI2 if abs(alpha - math.pi) < 1e-14 else 2.0 * alpha
     obs_angles = limited_aperture_angles(float(args.aperture_center), alpha, int(args.n_obs))
     incident_angles = parse_float_list(args.incident_angles)
     noise_levels = np.asarray([float(args.noise_level)], dtype=float) if args.noise_level is not None else parse_float_list(args.noise_levels)
@@ -291,7 +317,6 @@ def main() -> None:
             y_grid,
             aperture_length,
             power=float(args.indicator_power),
-            block_size=int(args.block_size),
         )
         clean_images.append(image_clean)
 
@@ -319,7 +344,6 @@ def main() -> None:
                 y_grid,
                 aperture_length,
                 power=float(args.indicator_power),
-                block_size=int(args.block_size),
             )
             noisy_plot = out_dir / f"{case.name}_noisy_{float(noise_level):.2f}.png"
             save_case_plot(
@@ -399,7 +423,6 @@ def main() -> None:
         "incident_angles": incident_angles.tolist(),
         "noise_levels": noise_levels.tolist(),
         "indicator_power": float(args.indicator_power),
-        "block_size": int(args.block_size),
         "cases": metadata_cases,
         "summary_clean": str(out_dir / "summary_clean.png"),
         "summary_noisy": summary_noisy_paths,
