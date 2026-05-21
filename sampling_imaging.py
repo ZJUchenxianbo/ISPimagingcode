@@ -139,17 +139,50 @@ def direct_sampling_indicator(
     Computation is chunked over imaging points, so larger grids do not require
     storing the full observation-by-grid phase matrix at once.
     """
-    farfield = np.asarray(farfield_matrix, dtype=np.complex128)
+    return direct_sampling_indicators(
+        [farfield_matrix],
+        k,
+        obs_angles,
+        incident_angles,
+        x_grid,
+        y_grid,
+        aperture_length,
+        power,
+        block_size,
+        phase_sign,
+        normalize,
+    )[0]
+
+
+def direct_sampling_indicators(
+    farfield_matrices: Iterable[CArray],
+    k: float,
+    obs_angles: Array,
+    incident_angles: Array,
+    x_grid: Array,
+    y_grid: Array,
+    aperture_length: float = PI2,
+    power: float = 1.0,
+    block_size: int = 32768,
+    phase_sign: float = 1.0,
+    normalize: bool = True,
+) -> list[Array]:
+    """Compute several indicators while reusing the same observation phases."""
+    farfields = [np.asarray(item, dtype=np.complex128) for item in farfield_matrices]
+    if not farfields:
+        raise ValueError("farfield_matrices must contain at least one matrix")
     obs = np.asarray(obs_angles, dtype=float)
     inc = np.asarray(incident_angles, dtype=float)
     x_grid = np.asarray(x_grid, dtype=float)
     y_grid = np.asarray(y_grid, dtype=float)
 
-    if farfield.shape != (obs.size, inc.size):
-        raise ValueError(
-            "farfield_matrix shape must be (len(obs_angles), len(incident_angles)); "
-            f"got {farfield.shape}, expected {(obs.size, inc.size)}"
-        )
+    expected_shape = (obs.size, inc.size)
+    for farfield in farfields:
+        if farfield.shape != expected_shape:
+            raise ValueError(
+                "each farfield matrix shape must be (len(obs_angles), len(incident_angles)); "
+                f"got {farfield.shape}, expected {expected_shape}"
+            )
     if block_size <= 0:
         raise ValueError("block_size must be positive")
 
@@ -159,18 +192,19 @@ def direct_sampling_indicator(
 
     X, Y = np.meshgrid(x_grid, y_grid, indexing="xy")
     pts = np.column_stack([X.ravel(), Y.ravel()])
-    values = np.empty(pts.shape[0], dtype=float)
+    values_list = [np.empty(pts.shape[0], dtype=float) for _ in farfields]
 
-    weighted_farfield_t = farfield.T * obs_w[None, :]
+    weighted_farfield_ts = [farfield.T * obs_w[None, :] for farfield in farfields]
     sign = 1.0 if phase_sign >= 0.0 else -1.0
     for start in range(0, pts.shape[0], block_size):
         stop = min(start + block_size, pts.shape[0])
         phase = np.exp(1j * sign * k * (xhat @ pts[start:stop].T))
-        reduced = weighted_farfield_t @ phase
-        values[start:stop] = inc_weight * np.sum(np.abs(reduced) ** float(power), axis=0)
+        for values, weighted_farfield_t in zip(values_list, weighted_farfield_ts):
+            reduced = weighted_farfield_t @ phase
+            values[start:stop] = inc_weight * np.sum(np.abs(reduced) ** float(power), axis=0)
 
-    image = values.reshape(X.shape)
-    return normalize_indicator(image) if normalize else image
+    images = [values.reshape(X.shape) for values in values_list]
+    return [normalize_indicator(image) for image in images] if normalize else images
 
 
 def point_scatterer_farfield(
