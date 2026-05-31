@@ -39,51 +39,24 @@ import matplotlib.pyplot as plt
 import numpy as np
 from numpy.typing import NDArray
 
-# 复用直接成像脚本中的“真实参数构造”和“多入射方向正交采样指标函数”。
-from three_small_obstacles_direct_imaging import (
-    build_true_params,
-    orthogonality_sampling_indicator_md,
-)
-from sampling_imaging import plot_indicator_image
 
-# 复用 Gauss-Newton 脚本里的前向求解、约束、峰值选择和误差评估工具。
-from three_small_obstacles_joint_gn_random_centers import (
-    PI2,
-    add_relative_noise,
-    dense_boundary_points,
-    empirical_snr,
+from sampling_imaging import direct_sampling_indicator, plot_indicator_image
+
+# 公共前向散射、噪声和边界绘图工具。
+from scattering_common import PI2, Array, CArray, add_relative_noise, empirical_snr, parse_float_list
+from target_cases import deduplicate_legend, obstacle_param_slice, plot_obstacle_boundaries
+from forward_scattering import solve_forward_farfield
+
+# 复用重建模块中的约束、峰值选择和误差评估工具。
+from obstacle_reconstruction import (
+    build_true_params,
+    centers_from_params,
     enforce_constraints,
     gauss_newton_reconstruct,
-    obstacle_param_slice,
     pairwise_min_distance,
-    parse_float_list,
     resolved_from_centers,
     select_peaks_2d,
-    solve_forward_farfield,
 )
-
-# 为 numpy 数组起别名，便于阅读函数签名。
-# Array 表示实数数组，CArray 表示复数数组；本脚本中 CArray 只保留作类型约定。
-Array = NDArray[np.float64]
-CArray = NDArray[np.complex128]
-
-
-def centers_from_params(params: Array) -> Array:
-    """从完整参数向量中抽取三个障碍物的中心坐标。
-
-    参数向量按障碍物分块排列，每块长度为 7：
-        [x, y, r, a2c, a2s, a3c, a3s]
-    这里仅取每个分块的前两个分量，即中心坐标 (x, y)。
-    """
-    return np.array(
-        [
-            # obstacle_param_slice(j) 返回第 j 个障碍物在完整参数向量中的切片。
-            # .start 是该障碍物参数块的起始索引，因此 start 和 start+1 分别是 x/y。
-            [params[obstacle_param_slice(j).start], params[obstacle_param_slice(j).start + 1]]
-            for j in range(3)
-        ],
-        dtype=float,
-    )
 
 
 def estimate_prior_from_indicator(
@@ -230,20 +203,11 @@ def save_direct_prior_plot(
     fig, ax = plt.subplots(figsize=(6.0, 5.2), constrained_layout=True)
 
     im = plot_indicator_image(ax, image, x_grid, y_grid, title=title)
-    for j in range(3):
-        # 将参数化边界离散成较密的点，便于画出障碍物轮廓。
-        pts_true = dense_boundary_points(p_true[obstacle_param_slice(j)])
-        pts_init = dense_boundary_points(p_init[obstacle_param_slice(j)])
-
-        # 黑色虚线：真实障碍物；白色点线：由直接成像提取出的先验初值。
-        # label 只在第一个障碍物上设置，避免图例重复三次。
-        ax.plot(pts_true[:, 0], pts_true[:, 1], "k--", lw=1.2, label="true" if j == 0 else None)
-        ax.plot(pts_init[:, 0], pts_init[:, 1], "w:", lw=1.4, label="prior from direct imaging" if j == 0 else None)
+    plot_obstacle_boundaries(ax, p_true, 3, "k--", lw=1.2, label="true")
+    plot_obstacle_boundaries(ax, p_init, 3, "w:", lw=1.4, label="prior from direct imaging")
 
     # 去除重复 label，得到更干净的图例。
-    handles, labels = ax.get_legend_handles_labels()
-    by_label = dict(zip(labels, handles))
-    ax.legend(by_label.values(), by_label.keys(), loc="best")
+    deduplicate_legend(ax)
     cbar = fig.colorbar(im, ax=ax)
     cbar.set_label("normalized indicator")
     fig.savefig(path, dpi=180)
@@ -263,9 +227,7 @@ def save_reconstruction_plot(path: Path, p_true: Array, p_init: Array, p_rec: Ar
         (p_init, "b:", "direct-imaging prior"),
         (p_rec, "r-", "iterative reconstruction"),
     ]:
-        for j in range(3):
-            pts = dense_boundary_points(params[obstacle_param_slice(j)])
-            ax.plot(pts[:, 0], pts[:, 1], style, lw=1.4, label=label if j == 0 else None)
+        plot_obstacle_boundaries(ax, params, 3, style, lw=1.4, label=label)
     ax.set_aspect("equal")
     ax.set_xlabel("x")
     ax.set_ylabel("y")
@@ -273,9 +235,7 @@ def save_reconstruction_plot(path: Path, p_true: Array, p_init: Array, p_rec: Ar
     ax.grid(True, alpha=0.18)
 
     # 合并重复图例项。
-    handles, labels = ax.get_legend_handles_labels()
-    by_label = dict(zip(labels, handles))
-    ax.legend(by_label.values(), by_label.keys(), loc="best")
+    deduplicate_legend(ax)
     fig.savefig(path, dpi=180)
     plt.close(fig)
 
@@ -304,11 +264,8 @@ def save_summary_panels(
         # 上排：定性直接成像结果。
         ax_img = axes[0, col]
         im = plot_indicator_image(ax_img, images[col], x_grid, y_grid, title=f"Direct imaging prior, noise={noise:.2f}")
-        for j in range(3):
-            pts_true = dense_boundary_points(p_true[obstacle_param_slice(j)])
-            pts_init = dense_boundary_points(init_params_list[col][obstacle_param_slice(j)])
-            ax_img.plot(pts_true[:, 0], pts_true[:, 1], "k--", lw=1.0)
-            ax_img.plot(pts_init[:, 0], pts_init[:, 1], "w:", lw=1.2)
+        plot_obstacle_boundaries(ax_img, p_true, 3, "k--", lw=1.0)
+        plot_obstacle_boundaries(ax_img, init_params_list[col], 3, "w:", lw=1.2)
 
         # 下排：定量迭代结果对比。
         ax_rec = axes[1, col]
@@ -317,9 +274,7 @@ def save_summary_panels(
             (init_params_list[col], "b:"),
             (rec_params_list[col], "r-"),
         ]:
-            for j in range(3):
-                pts = dense_boundary_points(params[obstacle_param_slice(j)])
-                ax_rec.plot(pts[:, 0], pts[:, 1], style, lw=1.2)
+            plot_obstacle_boundaries(ax_rec, params, 3, style, lw=1.2)
         ax_rec.set_aspect("equal")
         ax_rec.set_title(f"Quantitative iteration, noise={noise:.2f}")
         ax_rec.set_xlabel("x")
@@ -341,7 +296,7 @@ def main() -> None:
 
     # ---------- 实验和物理参数 ----------
     # out-dir：所有图片、npz、json、csv 结果的输出目录。
-    p.add_argument("--out-dir", type=str, default="outputs_three_small_obstacles_hybrid_direct_iterative")
+    p.add_argument("--out-dir", type=str, default="outputs_obstacle_hybrid_imaging")
 
     # k：波数。Rayleigh 长度在本脚本中取 pi/k，用于报告障碍物间距相对分辨率。
     p.add_argument("--k", type=float, default=8.0)
@@ -485,13 +440,14 @@ def main() -> None:
         farfield_noisy = add_relative_noise(farfield_clean, float(noise), rng_noise)
 
         # 多方向正交采样指标函数。输出 image 为二维归一化指标图。
-        image = orthogonality_sampling_indicator_md(
+        image = direct_sampling_indicator(
             farfield_noisy,
             k,
             obs_angles,
             incident_angles,
             x_grid,
             y_grid,
+            aperture_length=PI2,
             power=float(args.indicator_power),
             block_size=int(args.block_size),
         )

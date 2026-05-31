@@ -24,32 +24,23 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 
-# 复用核心 GN 模块中的前向求解、MUSIC 指标、约束、评估和绘图函数。
-from three_small_obstacles_joint_gn_random_centers import (
-    PI2,
-    CaseMetrics,
-    add_relative_noise,
-    build_argparser as _unused_build_argparser,
-    dense_boundary_points,
-    empirical_snr,
+# 公共前向散射和噪声工具。
+from scattering_common import PI2, add_relative_noise, empirical_snr, parse_float_list
+from target_cases import obstacle_param_slice, plot_obstacle_boundaries
+from forward_scattering import solve_forward_farfield
+
+# 复用重建模块中的 MUSIC 指标、约束、评估和绘图函数。
+from obstacle_reconstruction import (
+    centers_from_params,
     enforce_constraints,
     gauss_newton_reconstruct,
     generate_random_centers,
     music_indicator,
-    obstacle_param_slice,
     pairwise_min_distance,
-    params_to_geometry,
-    parse_float_list,
     resolved_from_centers,
-    save_case_plot,
+    save_gn_case_plot,
     select_peaks_2d,
-    solve_forward_farfield,
 )
-
-
-def centers_from_params(p: np.ndarray) -> np.ndarray:
-    """从完整参数向量中提取三个障碍物中心坐标。"""
-    return np.array([[p[obstacle_param_slice(j).start], p[obstacle_param_slice(j).start + 1]] for j in range(3)], dtype=float)
 
 
 def make_init_params(mode: str, img: np.ndarray, x_grid: np.ndarray, y_grid: np.ndarray, spacing: float,
@@ -116,9 +107,7 @@ def save_panel(path: Path, p_true: np.ndarray, init_map: Dict[str, np.ndarray], 
         for j, mode in enumerate(modes):
             ax = axes[i, j]
             for p, style, lw in [(p_true, 'k--', 1.3), (init_map[mode], 'b:', 1.0), (rec_map[(mode, float(noise))], 'r-', 1.3)]:
-                for q in range(3):
-                    pts = dense_boundary_points(p[obstacle_param_slice(q)])
-                    ax.plot(pts[:,0], pts[:,1], style, lw=lw)
+                plot_obstacle_boundaries(ax, p, 3, style, lw=lw)
             ax.set_aspect('equal')
             ax.grid(True, alpha=0.15)
             ax.set_xlabel('x')
@@ -134,7 +123,7 @@ def main() -> None:
     p = argparse.ArgumentParser(description='Prior sensitivity for three-obstacle joint GN reconstruction')
 
     # ---------- 命令行参数 ----------
-    p.add_argument('--out-dir', type=str, default='outputs_three_prior_sensitivity')
+    p.add_argument('--out-dir', type=str, default='outputs_obstacle_prior_sensitivity')
     p.add_argument('--k', type=float, default=8.0)
     p.add_argument('--radius', type=float, default=0.045)
     p.add_argument('--spacing', type=float, default=0.18)
@@ -267,7 +256,7 @@ def main() -> None:
             with open(mode_dir / 'history.json', 'w', encoding='utf-8') as f:
                 json.dump(history, f, indent=2)
             np.savez_compressed(mode_dir / 'reconstruction_result.npz', p_true=p_true, p_init=p_init, p_rec=p_rec, centers_true=centers_true)
-            save_case_plot(mode_dir / 'reconstruction.png', p_true, p_init, p_rec,
+            save_gn_case_plot(mode_dir / 'reconstruction.png', p_true, p_init, p_rec,
                            title=(f'{mode}, noise={noise:.2f}\ntrue d_min={pairwise_min_distance(centers_true):.3f} ({pairwise_min_distance(centers_true)/d_rayleigh:.2f} d_R)\n'
                                   f'resolved={resolved}, d_rec_min={pairwise_min_distance(centers_rec):.3f}, err_max={max_err:.3f}'))
 

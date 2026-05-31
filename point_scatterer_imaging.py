@@ -14,17 +14,15 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
+from scattering_common import PI2, Array, add_relative_noise, safe_slug
+from forward_scattering import solve_point_scatterer_farfield
 from sampling_imaging import (
-    PI2,
-    Array,
-    add_relative_complex_noise,
     aperture_angles,
     aperture_measure,
     direct_sampling_indicators,
     plot_indicator_image,
-    point_scatterer_farfield,
-    safe_slug,
 )
+from target_cases import point_scatterer_cases
 from unet_imaging import (
     PointScattererUNetConfig,
     predict_unet_images,
@@ -69,12 +67,13 @@ def plot_summary(
 
 def main() -> None:
     p = argparse.ArgumentParser(description="Fixed-frequency limited-aperture imaging for point scatterers.")
-    p.add_argument("--out-dir", type=str, default="outputs_point_scatterers_limited_aperture")
+    p.add_argument("--out-dir", type=str, default="outputs_point_scatterer_imaging")
+    p.add_argument("--case", type=str, default="three_point_scatterers")
     p.add_argument("--k", type=float, default=2*PI2)
     p.add_argument("--n-obs", type=int, default=121)
     p.add_argument("--noise-level", type=float, default=0.10)
     p.add_argument("--aperture-center", type=float, default=0.0)
-    p.add_argument("--grid-extent", type=float, default=0.42)
+    p.add_argument("--grid-extent", type=float, default=None)
     p.add_argument("--grid-size", type=int, default=321)
     p.add_argument("--block-size", type=int, default=32768)
     p.add_argument("--seed", type=int, default=20260518)
@@ -98,18 +97,16 @@ def main() -> None:
     noise_level = float(args.noise_level)
     aperture_center = float(args.aperture_center)
     incident_angles = np.linspace(math.pi/2,3*math.pi/2,3,endpoint=False)
-    points = np.array(
-        [
-            [-0.20, -0.10],
-            [0.30, -0.10],
-            [-0.20,0.20],
-        ],
-        dtype=float,
-    )
-    strengths = np.array([1.0 + 0.0j, 0.85 * np.exp(0.4j),1.15*np.exp(-0.7j)], dtype=complex)
+    try:
+        target_case = point_scatterer_cases([args.case])[0]
+    except ValueError as exc:
+        p.error(str(exc))
+    points = target_case.points
+    strengths = target_case.strengths
+    grid_extent = target_case.grid_extent if args.grid_extent is None else float(args.grid_extent)
 
-    x_grid = np.linspace(-float(args.grid_extent), float(args.grid_extent), int(args.grid_size))
-    y_grid = np.linspace(-float(args.grid_extent), float(args.grid_extent), int(args.grid_size))
+    x_grid = np.linspace(-grid_extent, grid_extent, int(args.grid_size))
+    y_grid = np.linspace(-grid_extent, grid_extent, int(args.grid_size))
 
     apertures = [
         ("full aperture", math.pi),
@@ -124,8 +121,8 @@ def main() -> None:
         print(f"computing {label} ({idx + 1}/{len(apertures)})...", flush=True)
         aperture_length = aperture_measure(alpha)
         obs_angles = aperture_angles(aperture_center, alpha, n_obs)
-        farfield_clean = point_scatterer_farfield(points, strengths, k, incident_angles, obs_angles)
-        farfield_noisy = add_relative_complex_noise(farfield_clean, noise_level, int(args.seed) + idx)
+        farfield_clean = solve_point_scatterer_farfield(points, strengths, k, incident_angles, obs_angles)
+        farfield_noisy = add_relative_noise(farfield_clean, noise_level, int(args.seed) + idx)
 
         image_clean, image_noisy = direct_sampling_indicators(
             [farfield_clean, farfield_noisy],
@@ -191,7 +188,7 @@ def main() -> None:
             aperture_center=aperture_center,
             aperture_half_widths=tuple(alpha for _, alpha in apertures),
             noise_level=noise_level,
-            grid_extent=float(args.grid_extent),
+            grid_extent=grid_extent,
             grid_size=int(args.unet_size),
             n_obs=int(args.unet_train_n_obs),
             n_samples=int(args.unet_samples),
@@ -259,6 +256,8 @@ def main() -> None:
     metadata = {
         "model": "u_inf(xhat,d)=sum_j q_j exp(-i*k*xhat dot z_j) exp(i*k*d dot z_j)",
         "indicator": "sum_d |int_Gamma u_inf(xhat,d) exp(i*k*xhat dot y) ds(xhat)|",
+        "case": target_case.name,
+        "case_label": target_case.label,
         "summary_plot": str(summary_path),
         "unet_summary_plot": str(unet_summary_path) if unet_summary_path is not None else None,
         "unet_history": unet_history,

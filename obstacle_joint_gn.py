@@ -41,27 +41,25 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
-from numpy.typing import NDArray
-from scipy.integrate import quad
 from scipy.linalg import solve, svd
-from scipy.special import hankel1
-from sampling_imaging import direction_vectors, normalize_indicator
-
-# 类型别名，让函数签名里的实数组/复数组更直观。
-Array = NDArray[np.float64]
-CArray = NDArray[np.complex128]
-
-# 单位圆一周角度。
-PI2 = 2.0 * np.pi
-
-
-@dataclass
-class BoundaryGeometry:
-    """边界离散后的几何数据。"""
-    x: Array
-    normal: Array
-    ds: Array
-    obs_id: NDArray[np.int64]
+from scattering_common import PI2, Array, CArray, add_relative_noise, direction_vectors, empirical_snr, parse_float_list
+from target_cases import (
+    BoundaryGeometry,
+    deduplicate_legend,
+    obstacle_param_slice,
+    params_to_geometry,
+    plot_obstacle_boundaries,
+    star_boundary,
+    star_radius,
+    star_radius_derivative,
+)
+from forward_scattering import (
+    build_single_layer_matrix,
+    plane_wave,
+    single_layer_farfield_operator,
+    solve_forward_farfield,
+)
+from sampling_imaging import normalize_indicator
 
 
 @dataclass
@@ -83,196 +81,6 @@ class CaseMetrics:
     true_centers: List[List[float]]
     init_centers: List[List[float]]
     rec_centers: List[List[float]]
-
-
-def parse_float_list(text: str) -> Array:
-    """把逗号分隔字符串解析成 float 数组。"""
-    vals = [float(s.strip()) for s in text.split(",") if s.strip()]
-    if not vals:
-        raise ValueError("expected at least one float")
-    return np.asarray(vals, dtype=float)
-
-
-def star_radius(theta: Array, r0: float, a2c: float, a2s: float, a3c: float, a3s: float) -> Array:
-    """星形障碍物边界的径向函数 r(theta)。"""
-    return r0 * (
-        1.0
-        + a2c * np.cos(2.0 * theta)
-        + a2s * np.sin(2.0 * theta)
-        + a3c * np.cos(3.0 * theta)
-        + a3s * np.sin(3.0 * theta)
-    )
-
-
-def star_radius_derivative(theta: Array, r0: float, a2c: float, a2s: float, a3c: float, a3s: float) -> Array:
-    """径向函数 r(theta) 对角度 theta 的导数。"""
-    return r0 * (
-        -2.0 * a2c * np.sin(2.0 * theta)
-        + 2.0 * a2s * np.cos(2.0 * theta)
-        - 3.0 * a3c * np.sin(3.0 * theta)
-        + 3.0 * a3s * np.cos(3.0 * theta)
-    )
-
-
-def star_boundary(center: Tuple[float, float], coeffs: Array, n_pts: int) -> Tuple[Array, Array, Array]:
-    """把一个星形障碍物离散成边界点、法向和弧长权重。"""
-    r0, a2c, a2s, a3c, a3s = [float(v) for v in coeffs]
-
-    # 均匀角度离散；endpoint=False 避免 0 和 2pi 重复。
-    t = np.linspace(0.0, PI2, n_pts, endpoint=False)
-    r = star_radius(t, r0, a2c, a2s, a3c, a3s)
-    rp = star_radius_derivative(t, r0, a2c, a2s, a3c, a3s)
-    ct = np.cos(t)
-    st = np.sin(t)
-    x = np.column_stack([center[0] + r * ct, center[1] + r * st])
-
-    # 参数曲线导数，用于计算弧长元素和法向。
-    dx = rp * ct - r * st
-    dy = rp * st + r * ct
-    speed = np.sqrt(dx * dx + dy * dy)
-    ds = speed * (PI2 / n_pts)
-
-    # 对参数曲线旋转切向量得到法向量。
-    normal = np.column_stack([dy / speed, -dx / speed])
-    return x, normal, ds
-
-
-def obstacle_param_slice(j: int) -> slice:
-    """返回第 j 个障碍物在完整参数向量中的切片。"""
-    return slice(7 * j, 7 * (j + 1))
-
-
-def params_to_geometry(params: Array, n_per_obstacle: int, n_obstacles: int = 3) -> BoundaryGeometry:
-    """把完整参数向量转换为所有障碍物的边界离散几何。"""
-    xs: List[Array] = []
-    normals: List[Array] = []
-    dss: List[Array] = []
-    ids: List[Array] = []
-    for j in range(n_obstacles):
-        block = params[obstacle_param_slice(j)]
-        center = (float(block[0]), float(block[1]))
-        coeffs = block[2:7]
-        # 每个障碍物独立离散，然后在函数末尾拼接。
-        x, nrm, ds = star_boundary(center, coeffs, n_per_obstacle)
-        xs.append(x)
-        normals.append(nrm)
-        dss.append(ds)
-        ids.append(np.full(n_per_obstacle, j, dtype=int))
-    return BoundaryGeometry(
-        x=np.vstack(xs),
-        normal=np.vstack(normals),
-        ds=np.concatenate(dss),
-        obs_id=np.concatenate(ids).astype(np.int64, copy=False),
-    )
-
-
-def dense_boundary_points(params_obs: Array, n: int = 400) -> Array:
-    """生成密集边界点，主要用于绘图。"""
-    center = (float(params_obs[0]), float(params_obs[1]))
-    return star_boundary(center, params_obs[2:7], n)[0]
-
-
-def plane_wave(x: Array, k: float, d: Array) -> CArray:
-    """入射平面波 exp(i*k*d·x) 在点集 x 上的值。"""
-    return np.exp(1j * k * (x @ d))
-
-
-def _diag_single_layer_integral(k: float, h: float) -> complex:
-    """近似单层势矩阵的对角奇异积分。
-
-    二维 Helmholtz 基本解在零距离处有对数奇异性，不能直接代入 hankel1(0, 0)。
-    这里在一个代表性小面元上做一维积分，作为对角元的稳定替代。
-    """
-    if h <= 0.0:
-        return 0.0 + 0.0j
-
-    def f_re(s: float) -> float:
-        return float(np.real(0.25j * hankel1(0, k * s)))
-
-    def f_im(s: float) -> float:
-        return float(np.imag(0.25j * hankel1(0, k * s)))
-
-    a, b = 0.0, 0.5 * h
-    re_val = quad(f_re, a, b, points=[0.0], limit=200, epsabs=1e-10, epsrel=1e-10)[0]
-    im_val = quad(f_im, a, b, points=[0.0], limit=200, epsabs=1e-10, epsrel=1e-10)[0]
-    return re_val + 1j * im_val
-
-
-def build_single_layer_matrix(geom: BoundaryGeometry, k: float) -> CArray:
-    """构造单层势边界积分方程矩阵。
-
-    对声软障碍物，边界条件为 u_inc + S rho = 0，
-    因此前向求解时需要解 A rho = -u_inc。
-    """
-    n = geom.x.shape[0]
-    A = np.empty((n, n), dtype=complex)
-    for i in range(n):
-        # 第 i 个边界观测点到所有边界源点的距离。
-        diff = geom.x[i][None, :] - geom.x
-        rho = np.linalg.norm(diff, axis=1)
-
-        # 非对角项：二维 Helmholtz 基本解 i/4 H_0^(1)(k*r)，乘弧长权重。
-        row = 0.25j * hankel1(0, k * rho) * geom.ds
-
-        # 对角项单独处理奇异积分。
-        row[i] = _diag_single_layer_integral(k, float(geom.ds[i]))
-        A[i, :] = row
-    return A
-
-
-def single_layer_farfield_operator(geom: BoundaryGeometry, k: float, obs_angles: Array) -> CArray:
-    """构造从边界密度 rho 到远场模式 u_inf 的线性算子。"""
-    # 观测方向单位向量。
-    xhat = np.column_stack([np.cos(obs_angles), np.sin(obs_angles)])
-
-    # 二维单层势远场渐近常数。
-    const = np.exp(1j * np.pi / 4.0) / np.sqrt(8.0 * np.pi * k)
-
-    # 远场相位 exp(-i*k*xhat·y)。
-    phase = np.exp(-1j * k * (xhat @ geom.x.T))
-    return const * phase * geom.ds[None, :]
-
-
-def solve_forward_farfield(params: Array, k: float, n_per_obstacle: int, incident_angles: Array, obs_angles: Array) -> CArray:
-    """根据障碍物参数计算远场矩阵。
-
-    返回数组形状为 (观测方向数, 入射方向数)，元素是复远场值。
-    """
-    geom = params_to_geometry(params, n_per_obstacle, n_obstacles=3)
-    A = build_single_layer_matrix(geom, k)
-    Ainf = single_layer_farfield_operator(geom, k, obs_angles)
-
-    # 加极小对角稳定项，减轻矩阵病态的影响。
-    eye = np.eye(A.shape[0], dtype=complex)
-    stab = 1e-12 * max(np.linalg.norm(A, ord=2), 1.0)
-    farfield = np.empty((len(obs_angles), len(incident_angles)), dtype=complex)
-    for j, ang in enumerate(incident_angles):
-        d = np.array([math.cos(float(ang)), math.sin(float(ang))], dtype=float)
-
-        # 声软边界条件 u_total=0，因此右端是 -u_inc。
-        rhs = -plane_wave(geom.x, k, d)
-        density = solve(A + stab * eye, rhs, assume_a="gen")
-
-        # 将边界密度映射到所有观测方向上的远场。
-        farfield[:, j] = Ainf @ density
-    return farfield
-
-
-def add_relative_noise(data: CArray, rel_noise: float, rng: np.random.Generator) -> CArray:
-    """添加相对强度为 rel_noise 的复随机噪声。"""
-    if rel_noise <= 0.0:
-        return data.copy()
-    # 先把噪声归一化，再缩放到 rel_noise * ||data||。
-    noise = rng.normal(size=data.shape) + 1j * rng.normal(size=data.shape)
-    noise /= max(np.linalg.norm(noise), 1e-14)
-    amp = rel_noise * np.linalg.norm(data)
-    return data + amp * noise
-
-
-def empirical_snr(clean: CArray, noisy: CArray) -> float:
-    """计算经验信噪比 ||clean|| / ||noisy-clean||。"""
-    return float(np.linalg.norm(clean) / max(np.linalg.norm(noisy - clean), 1e-14))
-
 
 def music_indicator(
     farfield_matrix: CArray,
@@ -457,16 +265,12 @@ def save_case_plot(path: Path, p_true: Array, p_init: Array, p_rec: Array, title
     """保存真实边界、初值边界和重建边界的对比图。"""
     fig, ax = plt.subplots(figsize=(5.4, 4.8), constrained_layout=True)
     for p, style, label in [(p_true, "k--", "true"), (p_init, "b:", "init"), (p_rec, "r-", "reconstructed")]:
-        for j in range(3):
-            pts = dense_boundary_points(p[obstacle_param_slice(j)])
-            ax.plot(pts[:, 0], pts[:, 1], style, lw=1.5, label=label if j == 0 else None)
+        plot_obstacle_boundaries(ax, p, 3, style, lw=1.5, label=label)
     ax.set_aspect("equal")
     ax.set_xlabel("x")
     ax.set_ylabel("y")
     ax.set_title(title)
-    handles, labels = ax.get_legend_handles_labels()
-    by_label = dict(zip(labels, handles))
-    ax.legend(by_label.values(), by_label.keys(), loc="best")
+    deduplicate_legend(ax)
     ax.grid(True, alpha=0.2)
     fig.savefig(path, dpi=180)
     plt.close(fig)
@@ -486,9 +290,7 @@ def save_panel(path: Path, true_params_by_spacing: List[Array], init_map: Dict[T
         for j, spacing in enumerate(spacings):
             ax = axes_arr[i, j]
             for p, style in [(true_params_by_spacing[j], "k--"), (init_map[(j, i)], "b:"), (rec_map[(j, i)], "r-")]:
-                for q in range(3):
-                    pts = dense_boundary_points(p[obstacle_param_slice(q)])
-                    ax.plot(pts[:, 0], pts[:, 1], style, lw=1.0)
+                plot_obstacle_boundaries(ax, p, 3, style, lw=1.0)
             ax.set_aspect("equal")
             ax.grid(True, alpha=0.15)
             ax.set_xlabel("x")
@@ -756,7 +558,7 @@ def run_experiment(args: argparse.Namespace) -> Dict[str, str]:
 def build_argparser() -> argparse.ArgumentParser:
     """构造命令行参数解析器。"""
     p = argparse.ArgumentParser(description="Three general star-like obstacles with random irregular centers: joint Gauss-Newton")
-    p.add_argument("--out-dir", type=str, default="outputs_three_small_obstacles_joint_gn_random_centers")
+    p.add_argument("--out-dir", type=str, default="outputs_obstacle_joint_gn")
     p.add_argument("--k", type=float, default=8.0)
     p.add_argument("--radius", type=float, default=0.045)
     p.add_argument("--spacing-list", type=str, default="0.30,0.18")

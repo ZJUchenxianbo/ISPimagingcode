@@ -24,80 +24,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 from numpy.typing import NDArray
 
-# 从联合 Gauss-Newton 脚本复用几何、前向散射、噪声和绘图辅助函数。
-from three_small_obstacles_joint_gn_random_centers import (
-    PI2,
-    add_relative_noise,
-    dense_boundary_points,
-    generate_random_centers,
-    obstacle_param_slice,
-    parse_float_list,
-    solve_forward_farfield,
-)
+from scattering_common import PI2, Array, CArray, parse_float_list
+from target_cases import plot_obstacle_boundaries
+from obstacle_direct_sampling import compute_direct_sampling_result
+from obstacle_reconstruction import build_true_params
 from sampling_imaging import direct_sampling_indicator, plot_indicator_image
-
-# 实数/复数 numpy 数组类型别名，让函数签名更清楚。
-Array = NDArray[np.float64]
-CArray = NDArray[np.complex128]
-
-
-def build_true_params(args: argparse.Namespace) -> tuple[Array, Array]:
-    """根据命令行参数构造三个真实障碍物的完整参数向量。
-
-    真实中心由 generate_random_centers 随机产生，但受 seed 控制，因此可复现。
-    每个障碍物共 7 个参数：中心 2 个、半径 1 个、形状 Fourier 系数 4 个。
-    返回：
-        p_true: 拼接后的完整参数向量，长度 21。
-        centers_true: 三个真实中心坐标，形状为 (3, 2)。
-    """
-    center_extent = float(args.center_extent)
-    rng_cent = np.random.default_rng(int(args.seed))
-
-    # 生成三个彼此至少相隔 spacing、且不超出中心范围的随机中心。
-    centers_true = generate_random_centers(float(args.spacing), rng_cent, center_extent, float(args.min_gap))
-
-    # 三个障碍物的真实形状系数。radius 是基准半径，后四项控制边界非圆形扰动。
-    coeffs_true = [
-        np.array([float(args.radius), float(args.true1_a2c), float(args.true1_a2s), float(args.true1_a3c), float(args.true1_a3s)], dtype=float),
-        np.array([float(args.radius), float(args.true2_a2c), float(args.true2_a2s), float(args.true2_a3c), float(args.true2_a3s)], dtype=float),
-        np.array([float(args.radius), float(args.true3_a2c), float(args.true3_a2s), float(args.true3_a3c), float(args.true3_a3s)], dtype=float),
-    ]
-
-    # 每个障碍物块为 [center_x, center_y, radius, a2c, a2s, a3c, a3s]。
-    p_true = np.concatenate([np.concatenate([centers_true[j], coeffs_true[j]]) for j in range(3)]).astype(float)
-    return p_true, centers_true
-
-
-def orthogonality_sampling_indicator_md(
-    farfield_matrix: CArray,
-    k: float,
-    obs_angles: Array,
-    incident_angles: Array,
-    x_grid: Array,
-    y_grid: Array,
-    power: float = 1.0,
-    block_size: int = 32768,
-) -> Array:
-    """计算多入射方向的正交采样指标函数。
-
-    farfield_matrix 的维度通常是：
-        (观测方向数, 入射方向数)
-
-    对每个采样点 y，代码近似计算
-        sum_d | sum_xhat exp(i*k*xhat·y) u_inf(xhat,d) |^power
-    再归一化到最大值为 1。指标值越大，说明该点越像散射体所在位置。
-    """
-    return direct_sampling_indicator(
-        farfield_matrix,
-        k,
-        obs_angles,
-        incident_angles,
-        x_grid,
-        y_grid,
-        aperture_length=PI2,
-        power=power,
-        block_size=block_size,
-    )
 
 
 def save_imaging_plot(path: Path, image: Array, x_grid: Array, y_grid: Array, p_true: Array, title: str) -> None:
@@ -105,10 +36,7 @@ def save_imaging_plot(path: Path, image: Array, x_grid: Array, y_grid: Array, p_
     fig, ax = plt.subplots(figsize=(6.0, 5.2), constrained_layout=True)
 
     im = plot_indicator_image(ax, image, x_grid, y_grid, title=title)
-    for j in range(3):
-        # dense_boundary_points 把参数化边界采样成密集点，用虚线画真实轮廓。
-        pts = dense_boundary_points(p_true[obstacle_param_slice(j)])
-        ax.plot(pts[:, 0], pts[:, 1], "k--", lw=1.2)
+    plot_obstacle_boundaries(ax, p_true, 3, "k--", lw=1.2)
     cbar = fig.colorbar(im, ax=ax)
     cbar.set_label("normalized indicator")
     fig.savefig(path, dpi=180)
@@ -122,7 +50,7 @@ def main() -> None:
     )
 
     # ---------- 命令行参数 ----------
-    p.add_argument("--out-dir", type=str, default="outputs_three_small_obstacles_direct_imaging")
+    p.add_argument("--out-dir", type=str, default="outputs_obstacle_direct_imaging")
     p.add_argument("--k", type=float, default=8.0)
     p.add_argument("--radius", type=float, default=0.045)
     p.add_argument("--spacing", type=float, default=0.18)
@@ -175,21 +103,25 @@ def main() -> None:
     # ---------- 生成远场数据 ----------
     p_true, centers_true = build_true_params(args)
 
-    # 无噪声远场数据。
-    farfield_clean = solve_forward_farfield(p_true, k, int(args.n_per_obstacle), incident_angles, obs_angles)
-
-    # 使用固定 seed 的随机数生成器添加相对噪声。
-    # ---------- 计算无噪声/有噪声直接成像指标 ----------
-    image_clean = orthogonality_sampling_indicator_md(
-        farfield_clean,
+    # ---------- 生成远场数据，并计算无噪声/有噪声直接成像指标 ----------
+    result = compute_direct_sampling_result(
+        p_true,
+        3,
+        int(args.n_per_obstacle),
         k,
-        obs_angles,
         incident_angles,
+        obs_angles,
         x_grid,
         y_grid,
-        power=float(args.indicator_power),
+        PI2,
+        noise_levels,
+        int(args.seed) + 999,
+        indicator_power=float(args.indicator_power),
         block_size=int(args.block_size),
+        noise_seed_stride=1,
     )
+    image_clean = result.image_clean
+
     # ---------- 保存图片和数据 ----------
     save_imaging_plot(
         out_dir / "direct_imaging_clean.png",
@@ -199,22 +131,8 @@ def main() -> None:
         p_true,
         title=f"Direct imaging (orthogonality sampling, p={args.indicator_power:g}), clean data",
     )
-    farfield_noisy_list = []
-    image_noisy_list = []
     noisy_plot_paths = []
-    for idx, noise_level in enumerate(noise_levels):
-        rng_noise = np.random.default_rng(int(args.seed) + 999 + idx)
-        farfield_noisy = add_relative_noise(farfield_clean, float(noise_level), rng_noise)
-        image_noisy = orthogonality_sampling_indicator_md(
-            farfield_noisy,
-            k,
-            obs_angles,
-            incident_angles,
-            x_grid,
-            y_grid,
-            power=float(args.indicator_power),
-            block_size=int(args.block_size),
-        )
+    for noise_level, image_noisy in zip(noise_levels, result.image_noisy_list):
         noisy_plot = out_dir / f"direct_imaging_noisy_{float(noise_level):.2f}.png"
         save_imaging_plot(
             noisy_plot,
@@ -224,8 +142,6 @@ def main() -> None:
             p_true,
             title=f"Direct imaging (orthogonality sampling, p={args.indicator_power:g}), noise={float(noise_level):.2f}",
         )
-        farfield_noisy_list.append(farfield_noisy)
-        image_noisy_list.append(image_noisy)
         noisy_plot_paths.append(str(noisy_plot))
 
     # npz 文件保存所有核心数组，便于后续不重跑前向问题直接分析。
@@ -233,10 +149,10 @@ def main() -> None:
         out_dir / "direct_imaging_result.npz",
         p_true=p_true,
         centers_true=centers_true,
-        farfield_clean=farfield_clean,
-        farfield_noisy=np.stack(farfield_noisy_list, axis=0),
+        farfield_clean=result.farfield_clean,
+        farfield_noisy=np.stack(result.farfield_noisy_list, axis=0),
         image_clean=image_clean,
-        image_noisy=np.stack(image_noisy_list, axis=0),
+        image_noisy=np.stack(result.image_noisy_list, axis=0),
         x_grid=x_grid,
         y_grid=y_grid,
         obs_angles=obs_angles,

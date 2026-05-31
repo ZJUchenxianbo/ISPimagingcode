@@ -12,16 +12,8 @@ import math
 from typing import Iterable
 
 import numpy as np
-from numpy.typing import NDArray
 
-PI2 = 2.0 * math.pi
-Array = NDArray[np.float64]
-CArray = NDArray[np.complex128]
-
-
-def direction_vectors(angles: Array) -> Array:
-    """Map polar angles to unit vectors (cos(theta), sin(theta))."""
-    return np.column_stack([np.cos(angles), np.sin(angles)])
+from scattering_common import PI2, Array, CArray, direction_vectors
 
 
 def aperture_measure(alpha: float) -> float:
@@ -207,53 +199,4 @@ def direct_sampling_indicators(
     return [normalize_indicator(image) for image in images] if normalize else images
 
 
-def point_scatterer_farfield(
-    points: Array,
-    strengths: CArray,
-    k: float,
-    incident_angles: Array,
-    obs_angles: Array,
-) -> CArray:
-    """Far-field matrix for isotropic point scatterers.
 
-    Uses u_inf(xhat,d)=sum_j q_j exp(-i*k*xhat.z_j) exp(i*k*d.z_j).
-    """
-    points = np.asarray(points, dtype=float)
-    strengths = np.asarray(strengths, dtype=np.complex128)
-    if points.ndim != 2 or points.shape[1] != 2:
-        raise ValueError("points must have shape (n_points, 2)")
-    if strengths.shape != (points.shape[0],):
-        raise ValueError("strengths must have shape (n_points,)")
-
-    xhat = direction_vectors(np.asarray(obs_angles, dtype=float))
-    dhat = direction_vectors(np.asarray(incident_angles, dtype=float))
-    receive_phase = np.exp(-1j * k * (xhat @ points.T))
-    incident_phase = np.exp(1j * k * (dhat @ points.T))
-    return receive_phase @ (strengths[None, :] * incident_phase).T
-
-
-def add_relative_complex_noise(
-    data: CArray,
-    rel_noise: float,
-    rng_or_seed: np.random.Generator | int | None = None,
-) -> CArray:
-    """Add complex Gaussian noise scaled to rel_noise * ||data||_2."""
-    if rel_noise <= 0.0:
-        return np.asarray(data, dtype=np.complex128).copy()
-    rng = rng_or_seed if isinstance(rng_or_seed, np.random.Generator) else np.random.default_rng(rng_or_seed)
-    data = np.asarray(data, dtype=np.complex128)
-    noise = rng.normal(size=data.shape) + 1j * rng.normal(size=data.shape)
-    noise_norm = max(float(np.linalg.norm(noise)), 1e-14)
-    return data + float(rel_noise) * float(np.linalg.norm(data)) * noise / noise_norm
-
-
-def safe_slug(parts: Iterable[object]) -> str:
-    """Build a conservative filename slug from display-label parts."""
-    text = "_".join(str(part) for part in parts)
-    chars = []
-    for ch in text.strip().lower():
-        chars.append(ch if ch.isalnum() else "_")
-    slug = "".join(chars).strip("_")
-    while "__" in slug:
-        slug = slug.replace("__", "_")
-    return slug or "item"

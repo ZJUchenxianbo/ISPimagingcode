@@ -23,14 +23,13 @@ except ImportError:  # pragma: no cover - exercised only when torch is absent.
     DataLoader = None
     TensorDataset = None
 
+from scattering_common import Array, add_relative_noise
+from forward_scattering import solve_point_scatterer_farfield
 from sampling_imaging import (
-    Array,
-    add_relative_complex_noise,
     aperture_angles,
     aperture_measure,
     direct_sampling_indicator,
     normalize_indicator,
-    point_scatterer_farfield,
 )
 
 CArray = NDArray[np.complex128]
@@ -184,9 +183,9 @@ def build_point_scatterer_unet_dataset(config: PointScattererUNetConfig) -> tupl
 
         alpha = half_widths[int(rng.integers(0, len(half_widths)))]
         obs_angles = aperture_angles(float(config.aperture_center), alpha, int(config.n_obs))
-        farfield = point_scatterer_farfield(points, strengths, float(config.k), config.incident_angles, obs_angles)
+        farfield = solve_point_scatterer_farfield(points, strengths, float(config.k), config.incident_angles, obs_angles)
         rel_noise = rng.uniform(0.0, float(config.noise_level))
-        noisy_farfield = add_relative_complex_noise(farfield, rel_noise, rng)
+        noisy_farfield = add_relative_noise(farfield, rel_noise, rng)
         indicator = direct_sampling_indicator(
             noisy_farfield,
             float(config.k),
