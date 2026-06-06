@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt; import numpy as np
 from common import (
     ExperimentConfig, ball_quadrature_nodes, collect_alpha_pairs_cached,
     farfield_fourier_nodes, interior_ball_nodes,
-    match_mock_quadrature_nodes, modal_matrix,
+    make_table, match_mock_quadrature_nodes, modal_matrix,
     quadrature_modal_coefficients, recover_polarimetric_coefficients,
     reference_tensor, solve_ball_gpswf, sphere_quadrature,
     tensor_coefficients_from_matrix,
@@ -115,7 +115,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
     fig.savefig(config.out_dir / "figure2_frequency_contrast.png", dpi=200)
     plt.close(fig)
     print(f"Saved {config.out_dir / 'figure2_frequency_contrast.png'}")
-    return __import__('common').utils.make_table([{"figure": 2, "status": "ok"}])
+    return make_table([{"figure": 2, "status": "ok"}])
 
 
 def _imshow(ax, img, title, cmap, vmin, vmax):

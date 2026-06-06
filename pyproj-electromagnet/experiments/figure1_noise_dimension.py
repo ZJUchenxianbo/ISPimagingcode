@@ -17,10 +17,10 @@ import numpy as np
 from common import (
     ExperimentConfig, ball_quadrature_nodes, collect_alpha_pairs_cached,
     farfield_fourier_nodes, interior_ball_nodes, make_table,
-    match_mock_quadrature_nodes, modal_matrix, print_table,
+    match_mock_quadrature_nodes, modal_matrix,
     quadrature_modal_coefficients, recover_polarimetric_coefficients,
     reference_tensor, solve_ball_gpswf, sphere_quadrature,
-    tensor_coefficients_from_matrix, vector_norm,
+    tensor_coefficients_from_matrix,
 )
 from common.phantom import Block, Mode, three_block_phantom, block_fourier_profile, truth_image_2d
 

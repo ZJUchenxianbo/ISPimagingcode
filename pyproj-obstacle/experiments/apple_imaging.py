@@ -1,6 +1,5 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import sys, os; sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from scipy.special import hankel1, jv
 from scipy.linalg import solve
 import warnings

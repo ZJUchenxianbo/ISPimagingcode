@@ -16,14 +16,13 @@ from common import (
     ExperimentConfig, ball_quadrature_nodes, collect_alpha_pairs_cached,
     farfield_fourier_nodes, interior_ball_nodes, make_table,
     match_mock_quadrature_nodes, modal_matrix, orthonormal_basis_perp,
-    print_table, quadrature_modal_coefficients, reference_tensor,
-    solve_ball_gpswf, sphere_quadrature, tensor_coefficients_from_matrix, vector_norm,
+    quadrature_modal_coefficients, reference_tensor,
+    solve_ball_gpswf, sphere_quadrature, tensor_coefficients_from_matrix,
 )
 from common.phantom import (
     Block, Mode,
     _shape_truth_and_fourier,
     cube_phantom, two_spheres_cube_phantom, dispersed_blocks_phantom,
-    sphere_fourier_profile, sphere_truth_2d,
 )
 from forward.vie import (
     assemble_vie_matrix, ball_voxel_grid, incident_plane_wave,
