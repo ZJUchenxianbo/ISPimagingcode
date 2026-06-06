@@ -14,7 +14,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-from scattering_common import PI2, Array, add_relative_noise, safe_slug
+from scattering_common import PI2, Array, add_relative_noise, parse_float_list, safe_slug
 from forward_scattering import solve_point_scatterer_farfield
 from sampling_imaging import (
     aperture_angles,
@@ -65,6 +65,25 @@ def plot_summary(
     plt.close(fig)
 
 
+def aperture_label(alpha: float) -> str:
+    if math.isclose(float(alpha), math.pi, rel_tol=0.0, abs_tol=1e-9):
+        return "full aperture"
+    return f"limited alpha={math.degrees(float(alpha)):.0f} deg"
+
+
+def normalize_aperture_half_widths(text: str) -> Array:
+    half_widths = parse_float_list(text)
+    normalized = []
+    for alpha in half_widths:
+        value = float(alpha)
+        if math.isclose(value, math.pi, rel_tol=0.0, abs_tol=1e-9):
+            value = math.pi
+        if not (0.0 < value <= math.pi):
+            raise ValueError("each aperture half-width must be in (0, pi]")
+        normalized.append(value)
+    return np.asarray(normalized, dtype=float)
+
+
 def main() -> None:
     p = argparse.ArgumentParser(description="Fixed-frequency limited-aperture imaging for point scatterers.")
     p.add_argument("--out-dir", type=str, default="outputs_point_scatterer_imaging")
@@ -73,6 +92,12 @@ def main() -> None:
     p.add_argument("--n-obs", type=int, default=121)
     p.add_argument("--noise-level", type=float, default=0.10)
     p.add_argument("--aperture-center", type=float, default=0.0)
+    p.add_argument(
+        "--aperture-half-widths",
+        type=str,
+        default="3.1415926536,1.5707963268,1.0471975512",
+        help="comma-separated aperture half-widths in radians; pi denotes full aperture",
+    )
     p.add_argument("--grid-extent", type=float, default=None)
     p.add_argument("--grid-size", type=int, default=321)
     p.add_argument("--block-size", type=int, default=32768)
@@ -108,11 +133,11 @@ def main() -> None:
     x_grid = np.linspace(-grid_extent, grid_extent, int(args.grid_size))
     y_grid = np.linspace(-grid_extent, grid_extent, int(args.grid_size))
 
-    apertures = [
-        ("full aperture", math.pi),
-        ("limited alpha=pi/2", math.pi / 2.0),
-        ("limited alpha=pi/3", math.pi / 3.0),
-    ]
+    try:
+        aperture_half_widths = normalize_aperture_half_widths(args.aperture_half_widths)
+    except ValueError as exc:
+        p.error(str(exc))
+    apertures = [(aperture_label(float(alpha)), float(alpha)) for alpha in aperture_half_widths]
 
     clean_images: list[Array] = []
     noisy_images: list[Array] = []

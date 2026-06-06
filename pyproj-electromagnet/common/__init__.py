@@ -1,0 +1,75 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""Common utilities for Maxwell-Born inversion diagnostics.
+
+This package re-exports all symbols that were previously defined in the
+monolithic ``common.py``, so existing import statements continue to work.
+"""
+from common.config import ExperimentConfig
+
+from common.phantom import (
+    Block,
+    Mode,
+    TensorKind,
+    ball_phantom,
+    block_fourier_profile,
+    cube_phantom,
+    dispersed_blocks_phantom,
+    normalized_ball_fourier_profile,
+    reference_tensor,
+    sphere_fourier_profile,
+    sphere_truth_2d,
+    tensor_basis,
+    tensor_coefficients_from_matrix,
+    three_block_phantom,
+    truth_image_2d,
+    two_spheres_cube_phantom,
+    _shape_truth_and_fourier,
+)
+
+from common.quadrature import (
+    LEBEDEV_ORDERS_AND_COUNTS,
+    SphereRule,
+    admissible_farfield_pairs_from_nodes,
+    ball_quadrature_nodes,
+    build_geometries_from_p,
+    equal_area_sphere_directions,
+    farfield_fourier_nodes,
+    fibonacci_sphere_directions,
+    interior_ball_nodes,
+    lebedev_sphere_quadrature,
+    match_mock_quadrature_nodes,
+    orthonormal_basis_perp,
+    paired_farfield_fourier_nodes,
+    sphere_quadrature,
+)
+
+from common.polarimetric import (
+    build_polarimetric_matrix,
+    recover_polarimetric_coefficients,
+)
+
+from common.gpswf import (
+    ball_gpswf_tridiagonal,
+    collect_alpha_pairs,
+    collect_alpha_pairs_cached,
+    compute_alpha_radial,
+    eval_radial_R,
+    jacobi_orthonormal_scale,
+    modal_matrix,
+    quadrature_modal_coefficients,
+    solve_ball_gpswf,
+    spherical_coordinates,
+    tridiagonal_residual,
+)
+
+from common.utils import (
+    Array,
+    CArray,
+    SimpleColumn,
+    SimpleTable,
+    complex_relative_noise,
+    make_table,
+    print_table,
+    vector_norm,
+)
