@@ -22,10 +22,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.linalg import solve, svd
 
-from scattering_common import Array, CArray, direction_vectors
-from sampling_imaging import normalize_indicator
-from target_cases import deduplicate_legend, obstacle_param_slice, plot_obstacle_boundaries
-from forward_scattering import solve_forward_farfield
+from common.scattering import Array, CArray, direction_vectors
+from common.sampling import normalize_indicator
+from common.targets import deduplicate_legend, obstacle_param_slice, plot_obstacle_boundaries
+from common.forward import solve_forward_farfield
 
 
 # ---------------------------------------------------------------------------

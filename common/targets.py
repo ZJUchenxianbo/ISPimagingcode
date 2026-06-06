@@ -27,7 +27,7 @@ from typing import Any, Sequence, TypeVar
 
 import numpy as np
 
-from scattering_common import PI2, Array, CArray
+from common.scattering import PI2, Array, CArray
 
 CaseT = TypeVar("CaseT")
 

@@ -22,6 +22,7 @@ Workflow:
 a2c/a2s/a3c/a3s 是边界形状的二、三阶 Fourier 扰动系数。
 """
 from __future__ import annotations
+import sys, os; sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 # 标准库：命令行参数、表格/JSON 输出、数学函数、路径处理、类型标注。
 import argparse
@@ -40,15 +41,15 @@ import numpy as np
 from numpy.typing import NDArray
 
 
-from sampling_imaging import direct_sampling_indicator, plot_indicator_image
+from common.sampling import direct_sampling_indicator, plot_indicator_image
 
 # 公共前向散射、噪声和边界绘图工具。
-from scattering_common import PI2, Array, CArray, add_relative_noise, empirical_snr, parse_float_list
-from target_cases import deduplicate_legend, obstacle_param_slice, plot_obstacle_boundaries
-from forward_scattering import solve_forward_farfield
+from common.scattering import PI2, Array, CArray, add_relative_noise, empirical_snr, parse_float_list
+from common.targets import deduplicate_legend, obstacle_param_slice, plot_obstacle_boundaries
+from common.forward import solve_forward_farfield
 
 # 复用重建模块中的约束、峰值选择和误差评估工具。
-from obstacle_reconstruction import (
+from reconstruction import (
     build_true_params,
     centers_from_params,
     enforce_constraints,

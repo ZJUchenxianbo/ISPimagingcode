@@ -25,6 +25,7 @@ all obstacle parameters jointly by a damped Gauss-Newton iteration.
 三个障碍物拼接后，完整参数向量长度为 21。
 """
 from __future__ import annotations
+import sys, os; sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 import argparse
 import csv
@@ -42,8 +43,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.linalg import solve, svd
-from scattering_common import PI2, Array, CArray, add_relative_noise, direction_vectors, empirical_snr, parse_float_list
-from target_cases import (
+from common.scattering import PI2, Array, CArray, add_relative_noise, direction_vectors, empirical_snr, parse_float_list
+from common.targets import (
     BoundaryGeometry,
     deduplicate_legend,
     obstacle_param_slice,
@@ -53,13 +54,13 @@ from target_cases import (
     star_radius,
     star_radius_derivative,
 )
-from forward_scattering import (
+from common.forward import (
     build_single_layer_matrix,
     plane_wave,
     single_layer_farfield_operator,
     solve_forward_farfield,
 )
-from sampling_imaging import normalize_indicator
+from common.sampling import normalize_indicator
 
 
 @dataclass

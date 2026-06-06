@@ -14,16 +14,16 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-from scattering_common import PI2, Array, add_relative_noise, parse_float_list, safe_slug
-from forward_scattering import solve_point_scatterer_farfield
-from sampling_imaging import (
+from common.scattering import PI2, Array, add_relative_noise, parse_float_list, safe_slug
+from common.forward import solve_point_scatterer_farfield
+from common.sampling import (
     aperture_angles,
     aperture_measure,
     direct_sampling_indicators,
     plot_indicator_image,
 )
-from target_cases import point_scatterer_cases
-from unet_imaging import (
+from common.targets import point_scatterer_cases
+from common.unet import (
     PointScattererUNetConfig,
     predict_unet_images,
     save_unet_checkpoint,

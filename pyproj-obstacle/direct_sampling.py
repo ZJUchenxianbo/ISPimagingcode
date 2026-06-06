@@ -7,9 +7,9 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from scattering_common import Array, CArray, add_relative_noise
-from forward_scattering import solve_forward_farfield
-from sampling_imaging import direct_sampling_indicator
+from common.scattering import Array, CArray, add_relative_noise
+from common.forward import solve_forward_farfield
+from common.sampling import direct_sampling_indicator
 
 
 @dataclass(frozen=True)

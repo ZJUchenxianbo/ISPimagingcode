@@ -13,7 +13,7 @@ from typing import Iterable
 
 import numpy as np
 
-from scattering_common import PI2, Array, CArray, direction_vectors
+from common.scattering import PI2, Array, CArray, direction_vectors
 
 
 def aperture_measure(alpha: float) -> float:

@@ -10,6 +10,7 @@
 因此成像会出现方向性模糊或分辨率下降。脚本会分别保存无噪声和有噪声指标图。
 """
 from __future__ import annotations
+import sys, os; sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 import argparse
 import json
@@ -23,15 +24,15 @@ import matplotlib.pyplot as plt
 import numpy as np
 from numpy.typing import NDArray
 
-from target_cases import (
+from common.targets import (
     ObstacleTargetCase as TargetCase,
     limited_aperture_obstacle_cases,
     parse_case_names,
     plot_obstacle_boundaries,
 )
-from obstacle_direct_sampling import compute_direct_sampling_result
-from scattering_common import parse_float_list
-from sampling_imaging import (
+from direct_sampling import compute_direct_sampling_result
+from common.scattering import parse_float_list
+from common.sampling import (
     aperture_angles,
     aperture_measure,
 )

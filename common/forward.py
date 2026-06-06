@@ -19,8 +19,8 @@ from scipy.integrate import quad
 from scipy.linalg import solve
 from scipy.special import hankel1
 
-from scattering_common import PI2, Array, CArray, direction_vectors
-from target_cases import BoundaryGeometry, params_to_geometry
+from common.scattering import PI2, Array, CArray, direction_vectors
+from common.targets import BoundaryGeometry, params_to_geometry
 
 ObstacleMethod = Literal["single_layer", "double_layer", "combined_field"]
 MediumMethod = Literal["born", "lippmann_schwinger"]

@@ -10,6 +10,7 @@
 其中后四项是星形边界的 Fourier 形状扰动系数。
 """
 from __future__ import annotations
+import sys, os; sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 # 标准库：命令行参数、JSON 元数据输出、路径处理。
 import argparse
@@ -24,11 +25,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 from numpy.typing import NDArray
 
-from scattering_common import PI2, Array, CArray, parse_float_list
-from target_cases import plot_obstacle_boundaries
-from obstacle_direct_sampling import compute_direct_sampling_result
-from obstacle_reconstruction import build_true_params
-from sampling_imaging import direct_sampling_indicator, plot_indicator_image
+from common.scattering import PI2, Array, CArray, parse_float_list
+from common.targets import plot_obstacle_boundaries
+from direct_sampling import compute_direct_sampling_result
+from reconstruction import build_true_params
+from common.sampling import direct_sampling_indicator, plot_indicator_image
 
 
 def save_imaging_plot(path: Path, image: Array, x_grid: Array, y_grid: Array, p_true: Array, title: str) -> None:

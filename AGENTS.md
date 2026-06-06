@@ -30,17 +30,11 @@
 
 ## 代码组织与命名
 
-- 优先减少重复代码，把有限孔径、直接采样、前向散射、目标案例和绘图等可复用逻辑逐步抽到共享模块。
+- 优先减少重复代码，把有限孔径、直接采样、前向散射、目标案例和绘图等可复用逻辑逐步抽到 `common/`。
 - 实验脚本应主要负责组织参数、调用公共函数、保存结果；不要长期承载可复用的核心算法。
-- 公共模块命名应描述数学或数值职责，例如 `scattering_common.py`、`sampling_imaging.py`、`target_cases.py`。
-- 实验脚本命名应描述研究对象和任务，例如 `obstacle_direct_imaging.py`；不必为了统一而添加 `experiment_` 前缀。
-- 文件名不要包含只需改运行参数就能改变的条件，例如目标个数、噪声水平、孔径大小或网格尺寸。
-- 如果几个脚本只是实验条件不同，应优先把条件做成运行时输入并合并入口；如果研究对象或代码逻辑明显不同，不要为了统一命名而强行合并。
-- 避免为了改名新增只转发 `main()` 的薄包装文件；若确实需要改名，优先在代码稳定后做真实重命名，并同步更新 import 和 README。
-- 公共模块数量要克制，只抽取能明显减少重复或表达清楚数学职责的部分。
-- 整理顺序优先为：先抽公共函数，再更新 README，最后在公共模块稳定后考虑文件改名。
-- 模块依赖按层级组织：`scattering_common`（Layer 0 根）→ 四大基石（Layer 1：`forward_scattering`、`sampling_imaging`、`target_cases`、`unet_imaging`）→ 桥接模块（Layer 2：`obstacle_direct_sampling`、`obstacle_reconstruction`）→ 实验脚本（Layer 3）。只允许上层依赖下层。
-- Layer 1 基石之间应尽量减少交叉依赖；Layer 3 实验脚本 **禁止互相 import**，需要共享的逻辑必须提取到 Layer 1 或 Layer 2。
+- 共享模块按层级组织：Layer 0 (`common/scattering.py`) → Layer 1 (`common/forward.py`, `common/sampling.py`, `common/targets.py`, `common/unet.py`) → Layer 2 (子项目内公共模块) → Layer 3 (实验脚本)。
+- Layer 3 实验脚本 **禁止互相 import**，需要共享的逻辑必须提取到 Layer 1 或 Layer 2。
+- 每个子项目独立目录，有 `main.py` 入口。子项目内实验脚本放在 `experiments/` 目录下。
 
 ## README 维护
 

@@ -23,9 +23,9 @@ except ImportError:  # pragma: no cover - exercised only when torch is absent.
     DataLoader = None
     TensorDataset = None
 
-from scattering_common import Array, add_relative_noise
-from forward_scattering import solve_point_scatterer_farfield
-from sampling_imaging import (
+from common.scattering import Array, add_relative_noise
+from common.forward import solve_point_scatterer_farfield
+from common.sampling import (
     aperture_angles,
     aperture_measure,
     direct_sampling_indicator,

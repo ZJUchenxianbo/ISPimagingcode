@@ -27,7 +27,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.special import j1
 
-from scattering_common import PI2, Array, CArray
+from common.scattering import PI2, Array, CArray
 
 
 THREE_DB_LEVEL = 2.0 ** -0.5

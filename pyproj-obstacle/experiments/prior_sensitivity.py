@@ -10,6 +10,7 @@
 目的是观察：当初值质量不同、噪声不同，联合 GN 是否仍能定位和分辨三个小障碍物。
 """
 from __future__ import annotations
+import sys, os; sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 import argparse
 import csv
@@ -25,12 +26,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # 公共前向散射和噪声工具。
-from scattering_common import PI2, add_relative_noise, empirical_snr, parse_float_list
-from target_cases import obstacle_param_slice, plot_obstacle_boundaries
-from forward_scattering import solve_forward_farfield
+from common.scattering import PI2, add_relative_noise, empirical_snr, parse_float_list
+from common.targets import obstacle_param_slice, plot_obstacle_boundaries
+from common.forward import solve_forward_farfield
 
 # 复用重建模块中的 MUSIC 指标、约束、评估和绘图函数。
-from obstacle_reconstruction import (
+from reconstruction import (
     centers_from_params,
     enforce_constraints,
     gauss_newton_reconstruct,
