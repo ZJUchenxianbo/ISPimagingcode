@@ -378,36 +378,30 @@ def quadrature_modal_coefficients(
     modes: list[Any],
     retained: np.ndarray,
 ) -> np.ndarray:
-    """Compute GPSWF modal coefficients via regularised least-squares.
+    """Compute GPSWF modal coefficients via Section 6 quadrature projection.
 
-    Solves  (A^H W A + λ I) c = A^H W d  where A has columns
-    ``conj(α_j) ψ_j(p)`` and W = diag(target_weights).
+    Solves  (A^H W A) c = A^H W d  for the retained modes, where A has
+    columns ``conj(α_j) ψ_j(p)`` and W = diag(target_weights).
 
-    The diagonal projection ``c_j = (A^H W d)_j / conj(α_j)`` is used as
-    a fast approximation only when the quadrature is exact enough to make
-    A^H W A nearly diagonal.  Otherwise the regularised normal equations
-    are solved.
+    When the quadrature is exact, A^H W A ≈ diag(|α_j|²), giving the
+    diagonal formula  c_j = (A^H W d)_j / |α_j|².
     """
     alpha = np.asarray([mode.alpha for mode in modes], dtype=np.complex128)
     A = basis_matrix[:, retained]
     n_retained = int(np.sum(retained))
 
-    # Build weighted normal-equation matrix and right-hand side
-    WA = (target_weights[:, None]) * A  # diag(W) @ A
-    AWA = np.conj(A).T @ WA             # A^H W A
-    AWd = np.conj(A).T @ (target_weights * component_data)  # A^H W d
+    WA = (target_weights[:, None]) * A
+    AWA = np.conj(A).T @ WA
+    AWd = np.conj(A).T @ (target_weights * component_data)
 
-    # Check whether the diagonal approximation is sufficient
     diag_AWA = np.diag(np.diag(AWA))
     offdiag = AWA - diag_AWA
     rel_offdiag = np.linalg.norm(offdiag) / max(np.linalg.norm(diag_AWA), 1e-14)
 
     if rel_offdiag < 0.01:
-        # Quadrature is near-exact — diagonal projection is fine.
-        # (A^H W A)_{jj} ≈ |α_j|², so c_j ≈ (A^H W d)_j / |α_j|².
-        retained_coeffs = AWd / (np.abs(alpha[retained]) ** 2)
+        abs_alpha_sq = np.abs(alpha[retained]) ** 2
+        retained_coeffs = AWd / abs_alpha_sq
     else:
-        # Regularised least-squares
         reg = 1e-10 * np.abs(np.trace(AWA)) / max(n_retained, 1)
         retained_coeffs = np.linalg.solve(
             AWA + reg * np.eye(n_retained, dtype=np.complex128), AWd

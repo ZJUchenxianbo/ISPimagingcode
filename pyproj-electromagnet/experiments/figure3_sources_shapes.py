@@ -89,7 +89,10 @@ def run_experiment(config: ExperimentConfig) -> Any:
 
     target_basis = modal_matrix(target_nodes, modes, fourier_side=True)
     alpha_abs = np.asarray([abs(m.alpha) for m in modes], dtype=float)
-    eps = 0.1 * max(alpha_abs); retained = alpha_abs > eps
+    order = np.argsort(-alpha_abs)
+    N = min(256, len(modes))
+    selected = order[:N]
+    retained = np.zeros(len(modes), dtype=bool); retained[selected] = True
 
     # -- Voxel grid and tensor (isotropic for simplicity) --
     volume_nodes, volume_weights, voxel_h = ball_voxel_grid(R, n_per_axis)
@@ -105,7 +108,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
         truth, gps, dm, fourier_analytical = _shape_truth_and_fourier(
             shape_name, p_nodes, grid_size, C)
         image_matrix = modal_matrix(gps, modes, fourier_side=False)
-        vmin = float(np.nanmin(np.real(truth))); vmax = float(np.nanmax(np.real(truth)))
+        tvmin = float(np.nanmin(np.real(truth[dm]))); tvmax = float(np.nanmax(np.real(truth[dm])))
 
         # --- Analytical Born (column 4) ---
         coeffs_ana = quadrature_modal_coefficients(
@@ -127,7 +130,6 @@ def run_experiment(config: ExperimentConfig) -> Any:
             p_nodes, matched_inc, matched_obs,
             volume_nodes, volume_weights, Q, tensor, k, R, lu,
         )
-        # Convert VIE convention → unified
         comp_full_u = vie_to_fourier_convention(comp_full)
         comp_born_vie_u = vie_to_fourier_convention(comp_born_vie)
 
@@ -140,10 +142,18 @@ def run_experiment(config: ExperimentConfig) -> Any:
         rec_bv = (image_matrix @ coeffs_bv).reshape(grid_size, grid_size); rec_bv[~dm] = 0.0
 
         # --- Plot row ---
+        # Each panel auto-scaled for visibility
         titles = ["truth", "Full VIE", "VIE Born", "Analytical Born"] if row_idx == 0 else ["", "", "", ""]
         images = [np.real(truth), np.real(rec_full), np.real(rec_bv), np.real(rec_ana)]
         for col_idx, (img, title) in enumerate(zip(images, titles)):
-            _imshow(axes[row_idx, col_idx], img, title, "viridis", vmin, vmax)
+            im = img[dm] if col_idx > 0 and dm.any() else img[dm] if dm.any() else img
+            if dm.any():
+                pvmin = float(np.nanmin(im)); pvmax = float(np.nanmax(im))
+            else:
+                pvmin, pvmax = -1, 1
+            if abs(pvmax - pvmin) < 1e-12:
+                pvmin, pvmax = -1, 1
+            _imshow(axes[row_idx, col_idx], img, title, "viridis", pvmin, pvmax)
 
         axes[row_idx, 0].set_ylabel(shape_name, fontsize=9, rotation=90, labelpad=12)
 

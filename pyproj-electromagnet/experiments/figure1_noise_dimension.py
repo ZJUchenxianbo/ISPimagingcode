@@ -73,6 +73,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
     target_basis = modal_matrix(target_nodes, modes, fourier_side=True)
     image_matrix = modal_matrix(grid_points, modes, fourier_side=False)
     alpha_abs = np.asarray([abs(m.alpha) for m in modes], dtype=float)
+    alpha_max = float(np.max(alpha_abs))
     order = np.argsort(-alpha_abs)
 
     # -- Plot --
