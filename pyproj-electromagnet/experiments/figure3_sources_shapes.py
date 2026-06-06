@@ -108,7 +108,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
         truth, gps, dm, fourier_analytical = _shape_truth_and_fourier(
             shape_name, p_nodes, grid_size, C)
         image_matrix = modal_matrix(gps, modes, fourier_side=False)
-        tvmin = float(np.nanmin(np.real(truth[dm]))); tvmax = float(np.nanmax(np.real(truth[dm])))
+        vmin = float(np.nanmin(np.real(truth))); vmax = float(np.nanmax(np.real(truth)))
 
         # --- Analytical Born (column 4) ---
         coeffs_ana = quadrature_modal_coefficients(
@@ -141,21 +141,13 @@ def run_experiment(config: ExperimentConfig) -> Any:
         rec_full = (image_matrix @ coeffs_full).reshape(grid_size, grid_size); rec_full[~dm] = 0.0
         rec_bv = (image_matrix @ coeffs_bv).reshape(grid_size, grid_size); rec_bv[~dm] = 0.0
 
-        # --- Plot row ---
-        # Each panel auto-scaled for visibility
+        # --- Plot row (shared vmin/vmax from truth, same style as Figure 1) ---
         titles = ["truth", "Full VIE", "VIE Born", "Analytical Born"] if row_idx == 0 else ["", "", "", ""]
         images = [np.real(truth), np.real(rec_full), np.real(rec_bv), np.real(rec_ana)]
         for col_idx, (img, title) in enumerate(zip(images, titles)):
-            im = img[dm] if col_idx > 0 and dm.any() else img[dm] if dm.any() else img
-            if dm.any():
-                pvmin = float(np.nanmin(im)); pvmax = float(np.nanmax(im))
-            else:
-                pvmin, pvmax = -1, 1
-            if abs(pvmax - pvmin) < 1e-12:
-                pvmin, pvmax = -1, 1
-            _imshow(axes[row_idx, col_idx], img, title, "viridis", pvmin, pvmax)
+            _imshow(axes[row_idx, col_idx], img, title, "viridis", vmin, vmax)
 
-        axes[row_idx, 0].set_ylabel(shape_name, fontsize=9, rotation=90, labelpad=12)
+        axes[row_idx, 0].set_ylabel(shape_name, fontsize=10, rotation=90, labelpad=12)
 
     fig.savefig(config.out_dir / "figure3_sources_shapes.png", dpi=200)
     plt.close(fig)

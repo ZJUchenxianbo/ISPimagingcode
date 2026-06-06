@@ -81,15 +81,18 @@ def run_experiment(config: ExperimentConfig) -> Any:
         gps = np.column_stack([X.reshape(-1), Y.reshape(-1), np.zeros(grid_size * grid_size)])
         image_matrix = modal_matrix(gps, modes, fourier_side=False)
 
-        # Truth (base phantom, scale=1.0)
+        # Truth and shared vmin/vmax (medium contrast = scale 1.0)
         blocks = three_block_phantom("born")
         truth, _, dm = truth_image_2d(grid_size, blocks, coeff0[component_index])
-        tvmin = float(np.nanmin(np.real(truth[dm]))); tvmax = float(np.nanmax(np.real(truth[dm])))
+        vmin = float(np.nanmin(np.real(truth))); vmax = float(np.nanmax(np.real(truth)))
 
-        _imshow(axes[row_idx, 0], np.real(truth),
-                "truth" if row_idx == 0 else "", "viridis", tvmin, tvmax)
+        for col_idx, scale in enumerate([None] + list(contrast_scales)):
+            if scale is None:
+                # Truth column
+                _imshow(axes[row_idx, 0], np.real(truth),
+                        "truth" if row_idx == 0 else "", "viridis", vmin, vmax)
+                continue
 
-        for col_idx, scale in enumerate(contrast_scales):
             scaled_blocks = [
                 Block(center=b.center, half_width=b.half_width,
                       amplitude=complex(b.amplitude.real * scale, b.amplitude.imag * scale))
@@ -103,12 +106,9 @@ def run_experiment(config: ExperimentConfig) -> Any:
                 comp_data, target_basis, target_weights, modes, retained)
             rec = (image_matrix @ coeffs).reshape(grid_size, grid_size)
             rec[~dm] = 0.0
-            rvmin = float(np.nanmin(np.real(rec[dm])))
-            rvmax = float(np.nanmax(np.real(rec[dm])))
-            if abs(rvmax - rvmin) < 1e-12: rvmin, rvmax = -1, 1
-            cl = ["low", "medium", "high"][col_idx]
-            _imshow(axes[row_idx, 1 + col_idx], np.real(rec),
-                    f"k={k}, {cl}" if row_idx == 0 else "", "viridis", rvmin, rvmax)
+            cl = ["low", "medium", "high"][col_idx - 1]  # col_idx 1,2,3
+            label = f"k={k}, {cl}" if row_idx == 0 else ""
+            _imshow(axes[row_idx, col_idx], np.real(rec), label, "viridis", vmin, vmax)
 
         axes[row_idx, 0].set_ylabel(f"k={k}", fontsize=10, rotation=90, labelpad=12)
 
