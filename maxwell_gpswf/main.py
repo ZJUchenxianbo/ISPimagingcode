@@ -21,6 +21,8 @@ def parse_args():
     p.add_argument("--out-dir", type=str, default="outputs")
     p.add_argument("--seed", type=int, default=12345)
     p.add_argument("--quick", action="store_true")
+    p.add_argument("--data-mode", choices=["mock", "ideal"], default="mock",
+                   help="mock: 06005-style nearest measured node; ideal: admissible direction pairs")
     p.add_argument("--mode", choices=["fig1", "fig2", "fig3", "diagnostics", "all"], default="all")
     return p.parse_args()
 
@@ -32,29 +34,32 @@ def _subdir(base: Path, name: str) -> Path:
 def main():
     args = parse_args()
     base = Path(args.out_dir); base.mkdir(parents=True, exist_ok=True)
-    cfg = ExperimentConfig(out_dir=base, seed=args.seed, quick=args.quick)
+
+    def cfg(sub: str) -> ExperimentConfig:
+        return ExperimentConfig(out_dir=_subdir(base, sub), seed=args.seed,
+                                quick=args.quick, data_mode=args.data_mode)
 
     if args.mode in {"fig1", "all"}:
-        print("\n== Figure 1: Noise & dimension ==")
-        run_fig1(ExperimentConfig(out_dir=_subdir(base, "fig1"), seed=args.seed, quick=args.quick))
+        print(f"\n== Figure 1: Noise & dimension [{args.data_mode}] ==")
+        run_fig1(cfg("fig1"))
 
     if args.mode in {"fig2", "all"}:
-        print("\n== Figure 2: Frequency & contrast ==")
-        run_fig2(ExperimentConfig(out_dir=_subdir(base, "fig2"), seed=args.seed, quick=args.quick))
+        print(f"\n== Figure 2: Frequency & contrast [{args.data_mode}] ==")
+        run_fig2(cfg("fig2"))
 
     if args.mode in {"fig3", "all"}:
-        print("\n== Figure 3: Sources & shapes ==")
-        run_fig3(ExperimentConfig(out_dir=_subdir(base, "fig3"), seed=args.seed, quick=args.quick))
+        print(f"\n== Figure 3: Sources & shapes [{args.data_mode}] ==")
+        run_fig3(cfg("fig3"))
 
     if args.mode in {"diagnostics", "all"}:
         dout = _subdir(base, "diagnostics")
         print("\n== Diagnostics ==")
+        dc = ExperimentConfig(out_dir=dout, seed=args.seed, quick=args.quick)
         for name, fn in [("Table 1: polarimetric", run_polarimetric_conditioning),
                           ("Table 2: noise amplification", run_noise_amplification),
                           ("Table 3: GPSWF residuals", run_gpswf_residuals),
                           ("Table 4: modal cutoff", run_modal_cutoff)]:
-            t = fn(ExperimentConfig(out_dir=dout, seed=args.seed, quick=args.quick))
-            print_table(name, t)
+            print_table(name, fn(dc))
 
     print(f"\nDone. Output: {base}")
 

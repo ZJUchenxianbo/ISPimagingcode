@@ -14,8 +14,7 @@ from scipy.linalg import lu_factor, lu_solve
 
 from common import (
     ExperimentConfig, ball_quadrature_nodes, collect_alpha_pairs_cached,
-    farfield_fourier_nodes, interior_ball_nodes, make_table,
-    match_mock_quadrature_nodes, modal_matrix, orthonormal_basis_perp,
+    generate_data_nodes, make_table, modal_matrix, orthonormal_basis_perp,
     quadrature_modal_coefficients, reference_tensor,
     solve_ball_gpswf, sphere_quadrature, tensor_coefficients_from_matrix,
 )
@@ -60,16 +59,9 @@ def run_experiment(config: ExperimentConfig) -> Any:
 
     # -- Setup --
     target_nodes, target_weights, _ = ball_quadrature_nodes(n_radial, requested_target_dirs)
-    directions, _, _ = sphere_quadrature(requested_measure_dirs, "lebedev")
-    all_measured = farfield_fourier_nodes(directions, directions)
-    interior_mask = np.linalg.norm(all_measured, axis=1) < 1.0 - 1e-12
-    inc_idx = np.repeat(np.arange(directions.shape[0]), directions.shape[0])[interior_mask]
-    obs_idx = np.tile(np.arange(directions.shape[0]), directions.shape[0])[interior_mask]
-    available_nodes = interior_ball_nodes(all_measured)
-    mock_idx, _ = match_mock_quadrature_nodes(target_nodes, available_nodes)
-    p_nodes = available_nodes[mock_idx]
-    matched_inc = directions[inc_idx[mock_idx]]
-    matched_obs = directions[obs_idx[mock_idx]]
+    data_mode = getattr(config, 'data_mode', 'mock')
+    p_nodes, matched_inc, matched_obs, mock_distances, data_info = generate_data_nodes(
+        target_nodes, requested_measure_dirs, data_mode=data_mode, branch_count=3)
 
     # -- GPSWF basis --
     alpha_df = collect_alpha_pairs_cached(
@@ -104,8 +96,10 @@ def run_experiment(config: ExperimentConfig) -> Any:
 
     for row_idx, shape_name in enumerate(SHAPES):
         print(f"  Processing {shape_name}...")
+        # Analytical Fourier uses target nodes (not duplicated p_nodes)
+        fourier_nodes = target_nodes if data_mode == 'ideal' else p_nodes
         truth, gps, dm, fourier_analytical = _shape_truth_and_fourier(
-            shape_name, p_nodes, grid_size, C)
+            shape_name, fourier_nodes, grid_size, C)
         image_matrix = modal_matrix(gps, modes, fourier_side=False)
         vmin = float(np.nanmin(np.real(truth))); vmax = float(np.nanmax(np.real(truth)))
 
@@ -131,6 +125,11 @@ def run_experiment(config: ExperimentConfig) -> Any:
         )
         comp_full_u = vie_to_fourier_convention(comp_full)
         comp_born_vie_u = vie_to_fourier_convention(comp_born_vie)
+        # In ideal mode, average over branches per target node
+        if data_mode == 'ideal':
+            n_target = target_nodes.shape[0]
+            comp_full_u = comp_full_u.reshape(-1, n_target).mean(axis=0)
+            comp_born_vie_u = comp_born_vie_u.reshape(-1, n_target).mean(axis=0)
 
         coeffs_full = quadrature_modal_coefficients(
             comp_full_u, target_basis, target_weights, modes, retained)

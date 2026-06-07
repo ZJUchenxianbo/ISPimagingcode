@@ -36,6 +36,7 @@ from common.quadrature import (
     equal_area_sphere_directions,
     farfield_fourier_nodes,
     fibonacci_sphere_directions,
+    generate_data_nodes,
     interior_ball_nodes,
     lebedev_sphere_quadrature,
     match_mock_quadrature_nodes,

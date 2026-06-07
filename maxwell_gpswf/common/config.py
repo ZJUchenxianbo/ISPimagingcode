@@ -14,3 +14,4 @@ class ExperimentConfig:
     out_dir: Path
     seed: int = 12345
     quick: bool = False
+    data_mode: str = "mock"  # "mock" (06005-style) or "ideal" (admissible pairs)

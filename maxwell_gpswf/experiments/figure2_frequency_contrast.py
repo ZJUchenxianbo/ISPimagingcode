@@ -13,8 +13,7 @@ import matplotlib.pyplot as plt; import numpy as np
 
 from common import (
     ExperimentConfig, ball_quadrature_nodes, collect_alpha_pairs_cached,
-    farfield_fourier_nodes, interior_ball_nodes,
-    make_table, match_mock_quadrature_nodes, modal_matrix,
+    generate_data_nodes, make_table, modal_matrix,
     quadrature_modal_coefficients, recover_polarimetric_coefficients,
     reference_tensor, solve_ball_gpswf, sphere_quadrature,
     tensor_coefficients_from_matrix,
@@ -39,10 +38,9 @@ def run_experiment(config: ExperimentConfig) -> Any:
     rng = np.random.default_rng(config.seed + 200)
 
     target_nodes, target_weights, _ = ball_quadrature_nodes(n_radial, requested_target_dirs)
-    directions, _, _ = sphere_quadrature(requested_measure_dirs, "lebedev")
-    available_nodes = interior_ball_nodes(farfield_fourier_nodes(directions, directions))
-    indices, _ = match_mock_quadrature_nodes(target_nodes, available_nodes)
-    p_nodes = available_nodes[indices]
+    data_mode = getattr(config, 'data_mode', 'mock')
+    p_nodes, _, _, mock_distances, data_info = generate_data_nodes(
+        target_nodes, requested_measure_dirs, data_mode=data_mode)
 
     coeff0 = tensor_coefficients_from_matrix(reference_tensor(kind), kind)
 
@@ -102,6 +100,9 @@ def run_experiment(config: ExperimentConfig) -> Any:
             tc = scalar[:, None] * coeff0[None, :]
             rec_c, _, _ = recover_polarimetric_coefficients(p_nodes, tc, kind, noise_level, rng)
             comp_data = rec_c[:, component_index]
+            if data_mode == 'ideal':
+                n_target = target_nodes.shape[0]
+                comp_data = comp_data.reshape(-1, n_target).mean(axis=0)
             coeffs = quadrature_modal_coefficients(
                 comp_data, target_basis, target_weights, modes, retained)
             rec = (image_matrix @ coeffs).reshape(grid_size, grid_size)
