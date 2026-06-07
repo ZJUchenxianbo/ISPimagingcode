@@ -22,9 +22,10 @@ pyproj/
 │   ├── sampling.py                  # 直接采样指标、孔径工具
 │   ├── targets.py                   # 合成目标案例
 │   └── unet.py                      # U-Net 模型
-├── pyproj-obstacle/                 # 障碍物成像
-│   ├── direct_sampling.py           # 直接采样公共流程
-│   ├── reconstruction.py            # Gauss-Newton / MUSIC 重建
+├── obstacle_imaging/                # 障碍物成像
+│   ├── lib/
+│   │   ├── direct_sampling.py       # 直接采样公共流程
+│   │   └── reconstruction.py        # Gauss-Newton / MUSIC 重建
 │   ├── experiments/                 # 实验脚本
 │   │   ├── direct_imaging.py
 │   │   ├── hybrid_imaging.py
@@ -33,17 +34,17 @@ pyproj/
 │   │   ├── prior_sensitivity.py
 │   │   └── apple_imaging.py
 │   └── main.py
-├── pyproj-point-scatterer/          # 点散射体成像
+├── point_scatterer/                 # 点散射体成像
 │   ├── experiments/imaging.py
 │   └── main.py
-├── pyproj-limited-aperture/         # 有限孔径分析
+├── limited_aperture/                # 有限孔径分析
 │   ├── experiments/coherence.py
 │   └── main.py
-├── pyproj-electromagnet/            # Maxwell 远场反演 (GPSWF)
-│   ├── common/       # phantom、求积、极化、GPSWF
-│   ├── forward/      # 解析 Born / VIE 正向求解器
-│   ├── experiments/  # 三张主图
-│   ├── diagnostics/  # 模块诊断
+├── maxwell_gpswf/                  # Maxwell 远场反演 (GPSWF)
+│   ├── common/                    # phantom、求积、极化、GPSWF
+│   ├── forward/                   # 解析 Born / VIE 正向求解器
+│   ├── experiments/               # 三张主图
+│   ├── diagnostics/               # 模块诊断
 │   └── main.py
 ├── AGENTS.md
 └── README.md
@@ -53,16 +54,16 @@ pyproj/
 
 ```bash
 # 障碍物成像
-.venv/bin/python pyproj-obstacle/main.py --mode all
+.venv/bin/python obstacle_imaging/main.py --mode all
 
 # 点散射体
-.venv/bin/python pyproj-point-scatterer/main.py
+.venv/bin/python point_scatterer/main.py
 
 # 有限孔径
-.venv/bin/python pyproj-limited-aperture/main.py
+.venv/bin/python limited_aperture/main.py
 
 # Maxwell 实验
-.venv/bin/python pyproj-electromagnet/main.py --out-dir outputs
+.venv/bin/python maxwell_gpswf/main.py --out-dir outputs
 ```
 
 ## 输出

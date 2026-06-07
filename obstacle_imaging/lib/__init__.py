@@ -5,8 +5,8 @@
 - direct_sampling: clean/noisy direct/orthogonal sampling workflow
 - reconstruction: MUSIC indicator, Gauss-Newton iteration, peak selection
 """
-from common.direct_sampling import compute_direct_sampling_result
-from common.reconstruction import (
+from lib.direct_sampling import compute_direct_sampling_result
+from lib.reconstruction import (
     build_true_params, generate_random_centers,
     music_indicator, select_peaks_2d,
     obstacle_max_radius, enforce_constraints,

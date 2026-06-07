@@ -48,7 +48,7 @@ from common.targets import deduplicate_legend, obstacle_param_slice, plot_obstac
 from common.forward import solve_forward_farfield
 
 # 复用重建模块中的约束、峰值选择和误差评估工具。
-from common.reconstruction import (
+from lib.reconstruction import (
     build_true_params,
     centers_from_params,
     enforce_constraints,

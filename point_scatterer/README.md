@@ -1,4 +1,4 @@
-# pyproj-point-scatterer — 点散射体成像
+# point_scatterer — 点散射体成像
 
 各向同性点散射体的解析远场、直接采样成像和 U-Net 后处理。
 
@@ -11,6 +11,6 @@
 ## 运行
 
 ```bash
-.venv/bin/python pyproj-point-scatterer/main.py
-.venv/bin/python pyproj-point-scatterer/experiments/imaging.py --no-unet
+.venv/bin/python point_scatterer/main.py
+.venv/bin/python point_scatterer/experiments/imaging.py --no-unet
 ```

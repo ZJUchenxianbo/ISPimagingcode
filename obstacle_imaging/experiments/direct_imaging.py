@@ -26,8 +26,8 @@ from numpy.typing import NDArray
 
 from common.scattering import PI2, Array, CArray, parse_float_list
 from common.targets import plot_obstacle_boundaries
-from common.direct_sampling import compute_direct_sampling_result
-from common.reconstruction import build_true_params
+from lib.direct_sampling import compute_direct_sampling_result
+from lib.reconstruction import build_true_params
 from common.sampling import direct_sampling_indicator, plot_indicator_image
 
 

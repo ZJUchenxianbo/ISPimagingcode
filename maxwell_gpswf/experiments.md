@@ -1,11 +1,11 @@
-# pyproj-electromagnet 实验说明
+# maxwell_gpswf 实验说明
 
 把 `06-005` 的标量远场反演方法类推到各向异性 Maxwell 问题。主方法：**ball GPSWF 函数截断 / alpha spectral cutoff**。Fourier 约定统一为 `exp(-i C p·x)`。
 
 ## 代码结构
 
 ```
-pyproj-electromagnet/
+maxwell_gpswf/
 ├── common/          # 公共模块（phantom, 求积, 极化, GPSWF, 工具）
 ├── forward/         # 正向求解器（解析 Born + VIE 含自作用项）
 ├── experiments/     # 三张主图实验（一个文件一个实验）
@@ -44,17 +44,17 @@ pyproj-electromagnet/
 
 ```bash
 # 全部
-.venv/bin/python pyproj-electromagnet/main.py --out-dir outputs
+.venv/bin/python maxwell_gpswf/main.py --out-dir outputs
 
 # 单张图 / 仅诊断
-.venv/bin/python pyproj-electromagnet/main.py --mode fig1 --out-dir outputs
-.venv/bin/python pyproj-electromagnet/main.py --mode diagnostics --out-dir outputs
+.venv/bin/python maxwell_gpswf/main.py --mode fig1 --out-dir outputs
+.venv/bin/python maxwell_gpswf/main.py --mode diagnostics --out-dir outputs
 
 # Smoke test
-.venv/bin/python pyproj-electromagnet/main.py --quick --out-dir outputs/smoke
+.venv/bin/python maxwell_gpswf/main.py --quick --out-dir outputs/smoke
 
 # 单独运行
-.venv/bin/python pyproj-electromagnet/experiments/figure1_noise_dimension.py --out-dir outputs/figures
+.venv/bin/python maxwell_gpswf/experiments/figure1_noise_dimension.py --out-dir outputs/figures
 ```
 
 ## Fourier 约定

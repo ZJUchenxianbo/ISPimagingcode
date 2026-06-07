@@ -1,12 +1,12 @@
-# pyproj-obstacle — 障碍物成像
+# obstacle_imaging — 障碍物成像
 
 声软障碍物的直接采样成像、有限孔径成像、Gauss-Newton 定量重建和混合成像。
 
 ## 结构
 
 ```
-pyproj-obstacle/
-├── common/
+obstacle_imaging/
+├── lib/
 │   ├── direct_sampling.py    # 直接/正交采样指标计算流程
 │   └── reconstruction.py     # MUSIC、Gauss-Newton、峰值选择
 ├── experiments/
@@ -34,6 +34,6 @@ pyproj-obstacle/
 ## 运行
 
 ```bash
-.venv/bin/python pyproj-obstacle/main.py --mode all
-.venv/bin/python pyproj-obstacle/main.py --mode direct
+.venv/bin/python obstacle_imaging/main.py --mode all
+.venv/bin/python obstacle_imaging/main.py --mode direct
 ```

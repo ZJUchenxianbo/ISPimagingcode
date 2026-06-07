@@ -60,7 +60,7 @@ from common.forward import (
     solve_forward_farfield,
 )
 from common.sampling import normalize_indicator
-from common.reconstruction import (
+from lib.reconstruction import (
     best_center_match_error,
     enforce_constraints,
     gauss_newton_reconstruct,

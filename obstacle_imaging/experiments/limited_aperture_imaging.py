@@ -29,7 +29,7 @@ from common.targets import (
     parse_case_names,
     plot_obstacle_boundaries,
 )
-from common.direct_sampling import compute_direct_sampling_result
+from lib.direct_sampling import compute_direct_sampling_result
 from common.scattering import parse_float_list
 from common.sampling import (
     aperture_angles,

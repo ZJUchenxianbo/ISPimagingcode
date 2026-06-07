@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import sys, os
-sys.path.insert(0, os.path.dirname(__file__))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from experiments.imaging import main as run_imaging
 

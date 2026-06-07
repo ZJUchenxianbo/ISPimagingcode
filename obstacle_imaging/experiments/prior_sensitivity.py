@@ -30,7 +30,7 @@ from common.targets import obstacle_param_slice, plot_obstacle_boundaries
 from common.forward import solve_forward_farfield
 
 # 复用重建模块中的 MUSIC 指标、约束、评估和绘图函数。
-from common.reconstruction import (
+from lib.reconstruction import (
     centers_from_params,
     enforce_constraints,
     gauss_newton_reconstruct,
