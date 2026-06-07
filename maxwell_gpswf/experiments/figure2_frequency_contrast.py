@@ -2,9 +2,8 @@
 # -*- coding: utf-8 -*-
 """Figure 2: Frequency and contrast effects (Born data, noise=0.2).
 
-Layout: 4 rows (k=10,20,30,40) × 4 cols (truth + low/medium/high contrast).
-Truncation: article-style — (ell_max, n_modes_per_ell, K, n_radial, n_angular)
-linked to C; all generated GPSWF modes are retained.
+Layout: 5 cols (truth + medium δ=0 + low/medium/high) × 4 rows (k=10,20,30,40).
+Truncation: article-style GPSWF params linked to k, plus epsilon 0.2 filter.
 """
 from __future__ import annotations
 

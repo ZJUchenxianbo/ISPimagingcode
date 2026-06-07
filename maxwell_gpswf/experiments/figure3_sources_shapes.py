@@ -2,8 +2,9 @@
 # -*- coding: utf-8 -*-
 """Figure 3: Data sources and scatterer shapes.
 
-Layout: 4 rows (sphere, cube, two_spheres+cube, dispersed) ×
-         4 cols (truth, Full VIE, VIE-Born, Analytical Born).
+Layout: 5 rows (sphere, cube, two_spheres+cube, dispersed, inhomogeneous) ×
+         5 cols (truth, Full VIE, VIE Born, Analytical Born, Noiseless Born).
+Truncation: article-style GPSWF params (ell_max=12, n_modes=7) + epsilon 0.1 filter.
 """
 from __future__ import annotations
 
