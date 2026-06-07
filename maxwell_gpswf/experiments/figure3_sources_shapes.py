@@ -48,8 +48,8 @@ def _shape_to_blocks(name: str) -> list[Block]:
 
 def _settings(quick: bool):
     if quick:
-        return 26, 6, 86, 51, 5, 30, 8, 5, 60, 50
-    return 74, 10, 170, 81, 11, 50, 12, 7, 140, 100
+        return 26, 10, 170, 51, 5, 30, 8, 5, 60, 50
+    return 74, 12, 230, 81, 11, 50, 12, 7, 140, 100
 
 
 def run_experiment(config: ExperimentConfig) -> Any:

@@ -73,7 +73,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
         # Target quadrature for this k
         target_nodes, target_weights, _ = ball_quadrature_nodes(n_radial, n_angular)
         p_nodes, _, _, _, _ = generate_data_nodes(
-            target_nodes, requested_measure_dirs, data_mode=data_mode)
+            target_nodes, requested_measure_dirs, data_mode=data_mode, branch_count=1)
 
         # GPSWF basis — all modes retained
         alpha_df = collect_alpha_pairs_cached(
