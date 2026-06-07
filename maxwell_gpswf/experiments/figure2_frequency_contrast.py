@@ -26,13 +26,13 @@ def _row_params(k: float) -> dict:
     """Article-style GPSWF parameters linked to wave number k."""
     C = 2.0 * k
     if k <= 10:
-        return {"ell_max": 8,  "n_modes": 5,  "K": 36, "n_radial": 8,  "n_angular": 110, "C": C}
+        return {"ell_max": 8,  "n_modes": 5,  "K": 36, "n_radial": 10, "n_angular": 110, "C": C}
     elif k <= 20:
-        return {"ell_max": 14, "n_modes": 6,  "K": 54, "n_radial": 12, "n_angular": 170, "C": C}
+        return {"ell_max": 14, "n_modes": 6,  "K": 54, "n_radial": 16, "n_angular": 302, "C": C}
     elif k <= 30:
-        return {"ell_max": 18, "n_modes": 7,  "K": 68, "n_radial": 14, "n_angular": 230, "C": C}
+        return {"ell_max": 18, "n_modes": 7,  "K": 68, "n_radial": 16, "n_angular": 434, "C": C}
     else:
-        return {"ell_max": 22, "n_modes": 8,  "K": 86, "n_radial": 16, "n_angular": 302, "C": C}
+        return {"ell_max": 22, "n_modes": 8,  "K": 86, "n_radial": 18, "n_angular": 590, "C": C}
 
 
 def _row_params_quick(k: float) -> dict:
@@ -131,8 +131,10 @@ def run_experiment(config: ExperimentConfig) -> Any:
             _imshow(axes[row_idx, col_idx], np.real(rec),
                     label if row_idx == 0 else "", "viridis", vmin, vmax)
 
-        n_total = len(modes)
-        axes[row_idx, 0].set_ylabel(f"k={k} ({n_total})", fontsize=10, rotation=90, labelpad=12)
+        n_total = len(modes); n_nodes = target_nodes.shape[0]
+        ratio = n_nodes / max(n_total, 1)
+        axes[row_idx, 0].set_ylabel(f"k={k}\nmodes={n_total}\ntarget={n_nodes}\nratio={ratio:.1f}",
+                                     fontsize=8, rotation=90, labelpad=12)
 
     fig.savefig(config.out_dir / "figure2_frequency_contrast.png", dpi=200)
     plt.close(fig)
