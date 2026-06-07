@@ -28,7 +28,7 @@ def _settings(quick: bool):
     if quick:
         return 38, 6, 110, 51, 40, 10, 6, [5, 20, 40, 60], 100, 80
     # Full settings
-    return 110, 12, 230, 81, 60, 18, 10, [5, 72, 144, 256], 160, 120
+    return 110, 12, 230, 81, 60, 18, 10, [5, 72, 144, 256, 512], 160, 120
 
 
 def run_experiment(config: ExperimentConfig) -> Any:

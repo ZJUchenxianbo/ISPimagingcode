@@ -341,5 +341,52 @@ def _shape_truth_and_fourier(
         truth, gp, dm = truth_image_2d(grid_size, blocks, comp_val)
         fourier = block_fourier_profile(p_nodes, blocks, C) * comp_val
         return truth, gp, dm, fourier
+    elif shape_name == "inhomogeneous":
+        fourier = _inhomogeneous_fourier(p_nodes, C)
+        truth, gp, dm = _inhomogeneous_truth(grid_size)
+        return truth, gp, dm, fourier
     else:
         raise ValueError(f"Unknown shape: {shape_name!r}")
+
+
+# ---------------------------------------------------------------------------
+# Inhomogeneous medium: sum of Gaussian bumps inside a disk
+# ---------------------------------------------------------------------------
+
+def _inhomogeneous_fourier(p_nodes, C):
+    """Fourier transform of a sum of Gaussian bumps (analytical)."""
+    xi = float(C) * np.asarray(p_nodes, dtype=float)
+    xi_sq = np.sum(xi * xi, axis=1)
+    total = np.zeros(p_nodes.shape[0], dtype=np.complex128)
+    # Three Gaussian bumps with different centers, widths, amplitudes
+    bumps = [
+        (np.array([-0.20, 0.15, 0.0]), 0.12, 1.0 + 0.0j),
+        (np.array([0.25, 0.10, 0.0]), 0.08, 0.7 + 0.2j),
+        (np.array([0.05, -0.25, 0.0]), 0.14, 1.2 - 0.1j),
+    ]
+    for center, sigma, amp in bumps:
+        # Q̂(ξ) = (2π)^(3/2) * σ³ * exp(-σ²|ξ|²/2) * exp(-i ξ·center)
+        prefactor = (2.0 * math.pi) ** 1.5 * sigma**3
+        fourier = prefactor * np.exp(-0.5 * sigma**2 * xi_sq)
+        phase = np.exp(-1j * (xi @ center))
+        total += complex(amp) * phase * fourier
+    return total
+
+
+def _inhomogeneous_truth(grid_size):
+    """z=0 cross-section of Gaussian bumps."""
+    xs = np.linspace(-1, 1, grid_size)
+    X, Y = np.meshgrid(xs, xs)
+    truth = np.zeros((grid_size, grid_size), dtype=np.complex128)
+    bumps = [
+        (np.array([-0.20, 0.15, 0.0]), 0.12, 1.0 + 0.0j),
+        (np.array([0.25, 0.10, 0.0]), 0.08, 0.7 + 0.2j),
+        (np.array([0.05, -0.25, 0.0]), 0.14, 1.2 - 0.1j),
+    ]
+    for center, sigma, amp in bumps:
+        r_sq = (X - center[0])**2 + (Y - center[1])**2 + (0 - center[2])**2
+        truth += complex(amp) * np.exp(-0.5 * r_sq / sigma**2)
+    disk_mask = X**2 + Y**2 <= 1.0
+    truth[~disk_mask] = 0.0
+    grid_points = np.column_stack([X.reshape(-1), Y.reshape(-1), np.zeros(grid_size * grid_size)])
+    return truth, grid_points, disk_mask

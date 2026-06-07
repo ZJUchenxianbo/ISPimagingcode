@@ -20,8 +20,6 @@ from common import (
 )
 from common.phantom import Block, Mode, three_block_phantom, block_fourier_profile, truth_image_2d
 
-N_TRUNC = 256
-
 
 def _settings(quick: bool):
     if quick:
@@ -68,10 +66,10 @@ def run_experiment(config: ExperimentConfig) -> Any:
 
         target_basis = modal_matrix(target_nodes, modes, fourier_side=True)
         alpha_abs = np.asarray([abs(m.alpha) for m in modes], dtype=float)
-        order = np.argsort(-alpha_abs)
-        N = min(N_TRUNC, len(modes))
-        selected = order[:N]
-        retained = np.zeros(len(modes), dtype=bool); retained[selected] = True
+        # Epsilon truncation: |alpha| > eps_ratio * max|alpha|
+        # Modes retained automatically scales with C (Shannon number)
+        eps_ratio = 0.1
+        retained = alpha_abs > eps_ratio * float(np.max(alpha_abs))
 
         # Grid points for image reconstruction
         xs = np.linspace(-1, 1, grid_size)

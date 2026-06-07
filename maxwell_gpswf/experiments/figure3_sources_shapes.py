@@ -29,7 +29,7 @@ from forward.vie import (
     vie_to_fourier_convention,
 )
 
-SHAPES = ["sphere", "cube", "two_spheres_cube", "dispersed"]
+SHAPES = ["sphere", "cube", "two_spheres_cube", "dispersed", "inhomogeneous"]
 
 
 def _shape_to_blocks(name: str) -> list[Block]:
@@ -41,6 +41,8 @@ def _shape_to_blocks(name: str) -> list[Block]:
         return two_spheres_cube_phantom()
     elif name == "dispersed":
         return dispersed_blocks_phantom()
+    elif name == "inhomogeneous":
+        return []  # Not block-based — built directly from Gaussian formula
     raise ValueError(name)
 
 
@@ -111,11 +113,25 @@ def run_experiment(config: ExperimentConfig) -> Any:
 
         # --- VIE data (columns 2, 3) ---
         blocks = _shape_to_blocks(shape_name)
-        Q = tensor_blocks_contrast(
-            volume_nodes,
-            [(np.asarray(b.center, dtype=float), np.asarray(b.half_width, dtype=float),
-              complex(b.amplitude)) for b in blocks],
-            tensor)
+        if shape_name == "inhomogeneous":
+            # Build Gaussian-bump contrast directly on voxel grid
+            Q = np.zeros((volume_nodes.shape[0], 3, 3), dtype=np.complex128)
+            bumps = [
+                (np.array([-0.20, 0.15, 0.0]), 0.12, 1.0 + 0.0j),
+                (np.array([0.25, 0.10, 0.0]), 0.08, 0.7 + 0.2j),
+                (np.array([0.05, -0.25, 0.0]), 0.14, 1.2 - 0.1j),
+            ]
+            for center, sigma, amp in bumps:
+                r_sq = np.sum((volume_nodes - center[None, :])**2, axis=1)
+                scalar = complex(amp) * np.exp(-0.5 * r_sq / sigma**2)
+                for a in range(3):
+                    Q[:, a, a] += scalar  # isotropic: Q_aa = scalar
+        else:
+            Q = tensor_blocks_contrast(
+                volume_nodes,
+                [(np.asarray(b.center, dtype=float), np.asarray(b.half_width, dtype=float),
+                  complex(b.amplitude)) for b in blocks],
+                tensor)
         A = assemble_vie_matrix(volume_nodes, volume_weights, Q, k, h=voxel_h)
         lu = lu_factor(A)
 
