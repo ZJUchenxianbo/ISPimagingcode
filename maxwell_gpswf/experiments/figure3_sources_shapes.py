@@ -82,10 +82,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
 
     target_basis = modal_matrix(target_nodes, modes, fourier_side=True)
     alpha_abs = np.asarray([abs(m.alpha) for m in modes], dtype=float)
-    order = np.argsort(-alpha_abs)
-    N = min(256, len(modes))
-    selected = order[:N]
-    retained = np.zeros(len(modes), dtype=bool); retained[selected] = True
+    retained = alpha_abs > 0.1 * float(np.max(alpha_abs))
 
     # -- Voxel grid and tensor (isotropic for simplicity) --
     volume_nodes, volume_weights, voxel_h = ball_voxel_grid(R, n_per_axis)
