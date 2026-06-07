@@ -45,7 +45,7 @@ def _row_params_quick(k: float) -> dict:
 
 def run_experiment(config: ExperimentConfig) -> Any:
     requested_measure_dirs = 110; grid_size = 81
-    noise_level = 0.2; kind = "full"; component_index = 0
+    noise_level = 0.2; epsilon = 0.2; kind = "full"; component_index = 0
     contrast_scales = [0.3, 1.0, 3.0]
     quad_order = 160; r_eval_count = 120
     k_values = [10, 20, 30, 40]
@@ -90,7 +90,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
                     modes.append(Mode(ell=ell, n=n, m=m, alpha=a, beta=beta[:, n]))
         # Article-style: all generated modes, minus tiny-alpha tail
         alpha_abs = np.asarray([abs(m.alpha) for m in modes], dtype=float)
-        retained = alpha_abs > 0.2 * float(np.max(alpha_abs))
+        retained = alpha_abs > epsilon * float(np.max(alpha_abs))
 
         target_basis = modal_matrix(target_nodes, modes, fourier_side=True)
 
