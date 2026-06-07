@@ -90,7 +90,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
                     modes.append(Mode(ell=ell, n=n, m=m, alpha=a, beta=beta[:, n]))
         # Article-style: all generated modes, minus tiny-alpha tail
         alpha_abs = np.asarray([abs(m.alpha) for m in modes], dtype=float)
-        retained = alpha_abs > noise_level * float(np.max(alpha_abs))
+        retained = alpha_abs > 0.2 * float(np.max(alpha_abs))
 
         target_basis = modal_matrix(target_nodes, modes, fourier_side=True)
 
