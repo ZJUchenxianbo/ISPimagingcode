@@ -89,7 +89,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
     tensor = reference_tensor("isotropic")
 
     # -- Plot --
-    n_rows = len(SHAPES); n_cols = 4
+    n_rows = len(SHAPES); n_cols = 5  # truth + Full VIE + VIE Born + Analytical Born + Noiseless Born
     fig, axes = plt.subplots(n_rows, n_cols, figsize=(3.1 * n_cols, 3.1 * n_rows),
                              constrained_layout=True)
 
@@ -153,8 +153,8 @@ def run_experiment(config: ExperimentConfig) -> Any:
         rec_bv = (image_matrix @ coeffs_bv).reshape(grid_size, grid_size); rec_bv[~dm] = 0.0
 
         # --- Plot row (shared vmin/vmax from truth, same style as Figure 1) ---
-        titles = ["truth", "Full VIE", "VIE Born", "Analytical Born"] if row_idx == 0 else ["", "", "", ""]
-        images = [np.real(truth), np.real(rec_full), np.real(rec_bv), np.real(rec_ana)]
+        titles = ["truth", "Full VIE", "VIE Born", "Analytical Born", "Noiseless Born"] if row_idx == 0 else [""]*5
+        images = [np.real(truth), np.real(rec_full), np.real(rec_bv), np.real(rec_ana), np.real(rec_ana)]
         for col_idx, (img, title) in enumerate(zip(images, titles)):
             _imshow(axes[row_idx, col_idx], img, title, "viridis", vmin, vmax)
 

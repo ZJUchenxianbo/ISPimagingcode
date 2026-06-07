@@ -49,6 +49,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
     contrast_scales = [0.3, 1.0, 3.0]
     quad_order = 160; r_eval_count = 120
     k_values = [10, 20, 30, 40]
+    n_cols = 1 + 1 + len(contrast_scales)  # truth + noiseless_medium + low/med/high
 
     if config.quick:
         requested_measure_dirs = 38; grid_size = 51
@@ -59,7 +60,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
     data_mode = getattr(config, 'data_mode', 'mock')
     coeff0 = tensor_coefficients_from_matrix(reference_tensor(kind), kind)
 
-    n_rows, n_cols = len(k_values), 1 + len(contrast_scales)
+    n_rows = len(k_values)
     fig, axes = plt.subplots(n_rows, n_cols, figsize=(3.1 * n_cols, 3.1 * n_rows),
                              constrained_layout=True)
     if n_rows == 1: axes = axes[None, :]
@@ -103,9 +104,15 @@ def run_experiment(config: ExperimentConfig) -> Any:
         truth, _, dm = truth_image_2d(grid_size, blocks, coeff0[component_index])
         vmin = float(np.nanmin(np.real(truth))); vmax = float(np.nanmax(np.real(truth)))
 
-        for col_idx, scale in enumerate([None] + list(contrast_scales)):
+        contrast_labels = {0.3: "low", 1.0: "medium", 3.0: "high"}
+        columns = [(None, None, "truth")]  # (scale, noise, label)
+        columns.append((1.0, 0.0, f"k={k}, medium δ=0"))
+        for scale in contrast_scales:
+            columns.append((scale, noise_level, f"k={k}, {contrast_labels[scale]}"))
+
+        for col_idx, (scale, nlevel, label) in enumerate(columns):
             if scale is None:
-                _imshow(axes[row_idx, 0], np.real(truth),
+                _imshow(axes[row_idx, col_idx], np.real(truth),
                         "truth" if row_idx == 0 else "", "viridis", vmin, vmax)
                 continue
 
@@ -113,7 +120,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
                 amplitude=complex(b.amplitude.real * scale, b.amplitude.imag * scale)) for b in blocks]
             scalar = block_fourier_profile(p_nodes, scaled_blocks, C=C)
             tc = scalar[:, None] * coeff0[None, :]
-            rec_c, _, _ = recover_polarimetric_coefficients(p_nodes, tc, kind, noise_level, rng)
+            rec_c, _, _ = recover_polarimetric_coefficients(p_nodes, tc, kind, nlevel, rng)
             comp_data = rec_c[:, component_index]
             if data_mode == 'ideal':
                 comp_data = comp_data.reshape(-1, target_nodes.shape[0]).mean(axis=0)
@@ -121,9 +128,8 @@ def run_experiment(config: ExperimentConfig) -> Any:
                 comp_data, target_basis, target_weights, modes, retained)
             rec = (image_matrix @ coeffs).reshape(grid_size, grid_size)
             rec[~dm] = 0.0
-            cl = ["low", "medium", "high"][col_idx - 1]
-            label = f"k={k}, {cl}" if row_idx == 0 else ""
-            _imshow(axes[row_idx, col_idx], np.real(rec), label, "viridis", vmin, vmax)
+            _imshow(axes[row_idx, col_idx], np.real(rec),
+                    label if row_idx == 0 else "", "viridis", vmin, vmax)
 
         n_total = len(modes)
         axes[row_idx, 0].set_ylabel(f"k={k} ({n_total})", fontsize=10, rotation=90, labelpad=12)
