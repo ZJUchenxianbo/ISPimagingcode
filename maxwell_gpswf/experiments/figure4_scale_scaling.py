@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Figure 4: Scale scaling — imaging region radius R varies, scatterer fixed.
+"""Figure 4: Support-radius scaling — prior support radius R varies.
 
 Layout: 5 cols (truth + R=1.0/1.5/2.0/3.0) × 5 rows (shapes from fig3).
-Data: Born analytical. Truncation: GPSWF params → ε=0.2 → N_cap=C²/2.
+Data: analytical Born for a fixed physical scatterer Q(x).
+
+For supp(Q) ⊂ B(0,R), set x = R y and C = 2 k R.  The unit-ball GPSWF
+inversion reconstructs f_R(y) = R^3 Q(R y); plotting physical Q(x) therefore
+evaluates at y=x/R and divides the result by R^3.
 """
 from __future__ import annotations
 
@@ -18,10 +22,7 @@ from common import (
     reference_tensor, solve_ball_gpswf,
     tensor_coefficients_from_matrix,
 )
-from common.phantom import (
-    Block, Mode,
-    _shape_truth_and_fourier,
-)
+from common.phantom import Mode, _shape_truth_and_fourier
 
 
 def _row_params(R: float) -> dict:
@@ -44,6 +45,7 @@ R_VALUES = [1.0, 1.5, 2.0, 3.0]
 def run_experiment(config: ExperimentConfig) -> Any:
     requested_measure_dirs = 110; grid_size = 81
     k = 15.0; epsilon = 0.2; kind = "full"; component_index = 0
+    data_C = 2.0 * k
     quad_order = 160; r_eval_count = 120
 
     rng = np.random.default_rng(config.seed + 400)
@@ -55,19 +57,16 @@ def run_experiment(config: ExperimentConfig) -> Any:
 
     for row_idx, shape_name in enumerate(SHAPES):
         print(f"  Processing {shape_name}...")
+        truth_ref, _, _, _ = _shape_truth_and_fourier(
+            shape_name, np.zeros((1, 3), dtype=float), grid_size, data_C)
+        vmin_ref = float(np.nanmin(np.real(truth_ref)))
+        vmax_ref = float(np.nanmax(np.real(truth_ref)))
 
         for col_idx, R in enumerate([None] + R_VALUES):
             if R is None:
-                # Truth at R=1.0 (physical scale)
-                rp0 = _row_params(1.0)
-                tgt0, _, _ = ball_quadrature_nodes(rp0["n_radial"], rp0["n_angular"])
-                truth_ref, _, dm_ref, _ = _shape_truth_and_fourier(
-                    shape_name, tgt0, grid_size, rp0["C"])
-                vmin_ref = float(np.nanmin(np.real(truth_ref)))
-                vmax_ref = float(np.nanmax(np.real(truth_ref)))
                 _imshow(axes[row_idx, 0], np.real(truth_ref),
                         "truth" if row_idx == 0 else "", "viridis",
-                        vmin_ref, vmax_ref, extent=1.0)
+                        vmin_ref, vmax_ref)
                 continue
 
             rp = _row_params(R); C = rp["C"]
@@ -104,24 +103,28 @@ def run_experiment(config: ExperimentConfig) -> Any:
             target_basis = modal_matrix(target_nodes, modes, fourier_side=True)
             xs = np.linspace(-1, 1, grid_size)
             X, Y = np.meshgrid(xs, xs)
-            gps = np.column_stack([X.reshape(-1), Y.reshape(-1), np.zeros(grid_size * grid_size)])
-            image_matrix = modal_matrix(gps, modes, fourier_side=False)
+            physical_points = np.column_stack([
+                X.reshape(-1), Y.reshape(-1), np.zeros(grid_size * grid_size)
+            ])
+            normalized_points = physical_points / float(R)
+            image_matrix = modal_matrix(normalized_points, modes, fourier_side=False)
 
-            # Analytical Born data
-            _, _, _, fourier_data = _shape_truth_and_fourier(shape_name, p_nodes, grid_size, C)
+            # Analytical Born data of the fixed physical scatterer Q(x).
+            # Under x=R y, this equals the Fourier data of f_R(y)=R^3 Q(Ry)
+            # at bandwidth C=2kR.
+            _, _, _, fourier_data = _shape_truth_and_fourier(shape_name, p_nodes, grid_size, data_C)
             rec_c, _, _ = recover_polarimetric_coefficients(
                 p_nodes, fourier_data[:, None] * coeff0[None, :], kind, 0.0, rng)
             comp_data = rec_c[:, component_index]
             coeffs = quadrature_modal_coefficients(
                 comp_data, target_basis, target_weights, modes, retained)
-            rec = (image_matrix @ coeffs).reshape(grid_size, grid_size)
+            rec = (image_matrix @ coeffs).reshape(grid_size, grid_size) / (float(R) ** 3)
+            support_mask = np.sum(physical_points * physical_points, axis=1).reshape(grid_size, grid_size) <= float(R) ** 2
+            rec[~support_mask] = 0.0
 
             label = f"R={R}" if row_idx == 0 else ""
-            rvmin = float(np.nanmin(np.real(rec))) if rec.size > 0 else -1
-            rvmax = float(np.nanmax(np.real(rec))) if rec.size > 0 else 1
-            if abs(rvmax - rvmin) < 1e-12: rvmin, rvmax = -1, 1
             _imshow(axes[row_idx, col_idx], np.real(rec), label, "viridis",
-                    rvmin, rvmax, extent=R)
+                    vmin_ref, vmax_ref)
 
         n_total = len(modes)
         axes[row_idx, 0].set_ylabel(shape_name, fontsize=9, rotation=90, labelpad=12)
@@ -132,9 +135,8 @@ def run_experiment(config: ExperimentConfig) -> Any:
     return make_table([{"figure": 4, "status": "ok"}])
 
 
-def _imshow(ax, img, title, cmap, vmin, vmax, extent=1.0):
-    R = float(extent)
-    im = ax.imshow(img, extent=(-R, R, -R, R), origin="lower", cmap=cmap, vmin=vmin, vmax=vmax)
+def _imshow(ax, img, title, cmap, vmin, vmax):
+    im = ax.imshow(img, extent=(-1, 1, -1, 1), origin="lower", cmap=cmap, vmin=vmin, vmax=vmax)
     ax.set_aspect("equal"); ax.set_xticks([]); ax.set_yticks([])
     if title: ax.set_title(title, fontsize=8)
 
