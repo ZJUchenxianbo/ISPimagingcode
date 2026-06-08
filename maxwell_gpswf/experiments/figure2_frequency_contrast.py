@@ -44,8 +44,7 @@ def _row_params_quick(k: float) -> dict:
 
 def run_experiment(config: ExperimentConfig) -> Any:
     requested_measure_dirs = 110; grid_size = 81
-    noise_level = 0.2; epsilon = 0.2; N_cap = 1000
-    kind = "full"; component_index = 0
+    noise_level = 0.2; epsilon = 0.2; kind = "full"; component_index = 0
     contrast_scales = [0.3, 1.0, 3.0]
     quad_order = 160; r_eval_count = 120
     k_values = [10, 15, 20, 25]
@@ -88,9 +87,10 @@ def run_experiment(config: ExperimentConfig) -> Any:
                 a = alpha_lookup[(ell, n)]
                 for m in range(-ell, ell + 1):
                     modes.append(Mode(ell=ell, n=n, m=m, alpha=a, beta=beta[:, n]))
-        # Three-layer truncation: GPSWF params → epsilon → N_cap
+        # Three-layer truncation: GPSWF params → epsilon → N_cap = C²/2
         alpha_abs = np.asarray([abs(m.alpha) for m in modes], dtype=float)
         retained = alpha_abs > epsilon * float(np.max(alpha_abs))
+        N_cap = int(C * C / 2)
         if np.sum(retained) > N_cap:
             order = np.argsort(-alpha_abs)
             keep = order[:N_cap]

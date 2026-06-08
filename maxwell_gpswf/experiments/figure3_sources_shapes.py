@@ -50,14 +50,14 @@ def _shape_to_blocks(name: str) -> list[Block]:
 def _settings(quick: bool):
     if quick:
         return 26, 10, 170, 51, 5, 30, 8, 5, 60, 50
-    return 74, 12, 230, 81, 11, 50, 12, 7, 140, 100
+    return 74, 12, 230, 81, 19, 50, 12, 7, 140, 100
 
 
 def run_experiment(config: ExperimentConfig) -> Any:
     (requested_measure_dirs, n_radial, requested_target_dirs, grid_size,
      n_per_axis, K, ell_max, n_modes_per_ell, quad_order, r_eval_count) = _settings(config.quick)
 
-    k = 15.0; C = 2.0 * k; R = 1.0; epsilon = 0.1; N_cap = 600
+    k = 15.0; C = 2.0 * k; R = 1.0; epsilon = 0.1
     kind = "full"; component_index = 0
     rng = np.random.default_rng(config.seed + 300)
 
@@ -85,6 +85,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
     target_basis = modal_matrix(target_nodes, modes, fourier_side=True)
     alpha_abs = np.asarray([abs(m.alpha) for m in modes], dtype=float)
     retained = alpha_abs > epsilon * float(np.max(alpha_abs))
+    N_cap = int(C * C / 2)
     if np.sum(retained) > N_cap:
         order = np.argsort(-alpha_abs)
         keep = order[:N_cap]

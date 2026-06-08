@@ -10,6 +10,7 @@ from common import ExperimentConfig, print_table
 from experiments.figure1_noise_dimension import run_experiment as run_fig1
 from experiments.figure2_frequency_contrast import run_experiment as run_fig2
 from experiments.figure3_sources_shapes import run_experiment as run_fig3
+from experiments.figure4_scale_scaling import run_experiment as run_fig4
 from diagnostics.gpswf_residuals import run_experiment as run_gpswf_residuals
 from diagnostics.modal_cutoff import run_experiment as run_modal_cutoff
 from diagnostics.noise_amplification import run_experiment as run_noise_amplification
@@ -23,7 +24,7 @@ def parse_args():
     p.add_argument("--quick", action="store_true")
     p.add_argument("--data-mode", choices=["mock", "ideal"], default="mock",
                    help="mock: 06005-style nearest measured node; ideal: admissible direction pairs")
-    p.add_argument("--mode", choices=["fig1", "fig2", "fig3", "diagnostics", "all"], default="all")
+    p.add_argument("--mode", choices=["fig1", "fig2", "fig3", "fig4", "diagnostics", "all"], default="all")
     return p.parse_args()
 
 
@@ -50,6 +51,10 @@ def main():
     if args.mode in {"fig3", "all"}:
         print(f"\n== Figure 3: Sources & shapes [{args.data_mode}] ==")
         run_fig3(cfg("fig3"))
+
+    if args.mode in {"fig4", "all"}:
+        print(f"\n== Figure 4: Scale scaling [{args.data_mode}] ==")
+        run_fig4(cfg("fig4"))
 
     if args.mode in {"diagnostics", "all"}:
         dout = _subdir(base, "diagnostics")
