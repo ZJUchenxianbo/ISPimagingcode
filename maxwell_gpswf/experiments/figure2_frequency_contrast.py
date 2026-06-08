@@ -44,7 +44,7 @@ def _row_params_quick(k: float) -> dict:
 
 def run_experiment(config: ExperimentConfig) -> Any:
     requested_measure_dirs = 110; grid_size = 81
-    noise_level = 0.2; epsilon = 0.2; N_cap = 2000
+    noise_level = 0.2; epsilon = 0.2; N_cap = 1000
     kind = "full"; component_index = 0
     contrast_scales = [0.3, 1.0, 3.0]
     quad_order = 160; r_eval_count = 120
