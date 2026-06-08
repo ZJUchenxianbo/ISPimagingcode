@@ -55,16 +55,19 @@ def run_experiment(config: ExperimentConfig) -> Any:
 
     for row_idx, shape_name in enumerate(SHAPES):
         print(f"  Processing {shape_name}...")
-        # Reference truth at R=1.0 for column 0
-        rp0 = _row_params(1.0)
-        tgt0, _, _ = ball_quadrature_nodes(rp0["n_radial"], rp0["n_angular"])
-        truth_ref, _, dm_ref, _ = _shape_truth_and_fourier(shape_name, tgt0, grid_size, rp0["C"])
-        vmin_ref = float(np.nanmin(np.real(truth_ref))); vmax_ref = float(np.nanmax(np.real(truth_ref)))
 
         for col_idx, R in enumerate([None] + R_VALUES):
             if R is None:
+                # Truth at R=1.0 (physical scale)
+                rp0 = _row_params(1.0)
+                tgt0, _, _ = ball_quadrature_nodes(rp0["n_radial"], rp0["n_angular"])
+                truth_ref, _, dm_ref, _ = _shape_truth_and_fourier(
+                    shape_name, tgt0, grid_size, rp0["C"])
+                vmin_ref = float(np.nanmin(np.real(truth_ref)))
+                vmax_ref = float(np.nanmax(np.real(truth_ref)))
                 _imshow(axes[row_idx, 0], np.real(truth_ref),
-                        "truth" if row_idx == 0 else "", "viridis", vmin_ref, vmax_ref)
+                        "truth" if row_idx == 0 else "", "viridis",
+                        vmin_ref, vmax_ref, extent=1.0)
                 continue
 
             rp = _row_params(R); C = rp["C"]
@@ -112,13 +115,13 @@ def run_experiment(config: ExperimentConfig) -> Any:
             coeffs = quadrature_modal_coefficients(
                 comp_data, target_basis, target_weights, modes, retained)
             rec = (image_matrix @ coeffs).reshape(grid_size, grid_size)
-            rec[~dm] = 0.0
 
             label = f"R={R}" if row_idx == 0 else ""
-            rvmin = float(np.nanmin(np.real(rec[dm_ref]))) if dm_ref.any() else -1
-            rvmax = float(np.nanmax(np.real(rec[dm_ref]))) if dm_ref.any() else 1
+            rvmin = float(np.nanmin(np.real(rec))) if rec.size > 0 else -1
+            rvmax = float(np.nanmax(np.real(rec))) if rec.size > 0 else 1
             if abs(rvmax - rvmin) < 1e-12: rvmin, rvmax = -1, 1
-            _imshow(axes[row_idx, 1 + col_idx], np.real(rec), label, "viridis", rvmin, rvmax)
+            _imshow(axes[row_idx, col_idx], np.real(rec), label, "viridis",
+                    rvmin, rvmax, extent=R)
 
         n_total = len(modes)
         axes[row_idx, 0].set_ylabel(shape_name, fontsize=9, rotation=90, labelpad=12)
@@ -129,8 +132,9 @@ def run_experiment(config: ExperimentConfig) -> Any:
     return make_table([{"figure": 4, "status": "ok"}])
 
 
-def _imshow(ax, img, title, cmap, vmin, vmax):
-    im = ax.imshow(img, extent=(-1, 1, -1, 1), origin="lower", cmap=cmap, vmin=vmin, vmax=vmax)
+def _imshow(ax, img, title, cmap, vmin, vmax, extent=1.0):
+    R = float(extent)
+    im = ax.imshow(img, extent=(-R, R, -R, R), origin="lower", cmap=cmap, vmin=vmin, vmax=vmax)
     ax.set_aspect("equal"); ax.set_xticks([]); ax.set_yticks([])
     if title: ax.set_title(title, fontsize=8)
 
