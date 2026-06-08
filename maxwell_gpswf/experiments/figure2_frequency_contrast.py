@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 """Figure 2: Frequency and contrast effects (Born data, noise=0.2).
 
-Layout: 5 cols (truth + medium δ=0 + low/medium/high) × 4 rows (k=10,20,30,40).
-Truncation: article-style GPSWF params linked to k, plus epsilon 0.2 filter.
+Layout: 5 cols (truth + medium δ=0 + low/medium/high) × 4 rows (k=10,15,20,25).
+Truncation: GPSWF params + epsilon 0.2 + N_cap.
 """
 from __future__ import annotations
 
@@ -26,12 +26,12 @@ def _row_params(k: float) -> dict:
     C = 2.0 * k
     if k <= 10:
         return {"ell_max": 8,  "n_modes": 5,  "K": 36, "n_radial": 10, "n_angular": 110, "C": C}
+    elif k <= 15:
+        return {"ell_max": 10, "n_modes": 5,  "K": 44, "n_radial": 12, "n_angular": 170, "C": C}
     elif k <= 20:
         return {"ell_max": 14, "n_modes": 6,  "K": 54, "n_radial": 16, "n_angular": 302, "C": C}
-    elif k <= 30:
-        return {"ell_max": 18, "n_modes": 7,  "K": 68, "n_radial": 16, "n_angular": 434, "C": C}
     else:
-        return {"ell_max": 22, "n_modes": 8,  "K": 86, "n_radial": 18, "n_angular": 590, "C": C}
+        return {"ell_max": 16, "n_modes": 7,  "K": 60, "n_radial": 14, "n_angular": 434, "C": C}
 
 
 def _row_params_quick(k: float) -> dict:
@@ -39,15 +39,16 @@ def _row_params_quick(k: float) -> dict:
     if k <= 12:
         return {"ell_max": 6, "n_modes": 4, "K": 24, "n_radial": 5, "n_angular": 74,  "C": C}
     else:
-        return {"ell_max": 8, "n_modes": 4, "K": 30, "n_radial": 6, "n_angular": 110, "C": C}
+        return {"ell_max": 8, "n_modes": 4, "K": 30, "n_radial": 8, "n_angular": 110, "C": C}
 
 
 def run_experiment(config: ExperimentConfig) -> Any:
     requested_measure_dirs = 110; grid_size = 81
-    noise_level = 0.2; epsilon = 0.2; kind = "full"; component_index = 0
+    noise_level = 0.2; epsilon = 0.2; N_cap = 2000
+    kind = "full"; component_index = 0
     contrast_scales = [0.3, 1.0, 3.0]
     quad_order = 160; r_eval_count = 120
-    k_values = [10, 20, 30, 40]
+    k_values = [10, 15, 20, 25]
     n_cols = 1 + 1 + len(contrast_scales)  # truth + noiseless_medium + low/med/high
 
     if config.quick:
@@ -87,9 +88,13 @@ def run_experiment(config: ExperimentConfig) -> Any:
                 a = alpha_lookup[(ell, n)]
                 for m in range(-ell, ell + 1):
                     modes.append(Mode(ell=ell, n=n, m=m, alpha=a, beta=beta[:, n]))
-        # Article-style: all generated modes, minus tiny-alpha tail
+        # Three-layer truncation: GPSWF params → epsilon → N_cap
         alpha_abs = np.asarray([abs(m.alpha) for m in modes], dtype=float)
         retained = alpha_abs > epsilon * float(np.max(alpha_abs))
+        if np.sum(retained) > N_cap:
+            order = np.argsort(-alpha_abs)
+            keep = order[:N_cap]
+            retained = np.zeros(len(modes), dtype=bool); retained[keep] = True
 
         target_basis = modal_matrix(target_nodes, modes, fourier_side=True)
 
