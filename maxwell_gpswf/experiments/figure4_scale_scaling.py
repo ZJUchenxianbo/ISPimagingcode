@@ -11,16 +11,20 @@ evaluates at y=x/R and divides the result by R^3.
 """
 from __future__ import annotations
 
-import argparse; from pathlib import Path; from typing import Any
+import argparse, math; from pathlib import Path; from typing import Any
 import matplotlib; matplotlib.use("Agg")
 import matplotlib.pyplot as plt; import numpy as np
 
 from common import (
+    collect_reconstruction_diagnostics,
     ExperimentConfig, ball_quadrature_nodes, collect_alpha_pairs_cached,
     generate_data_nodes, make_table, modal_matrix,
+    plot_diagnostic_curves,
     quadrature_modal_coefficients, recover_polarimetric_coefficients,
     reference_tensor, solve_ball_gpswf,
+    save_diagnostics_npz,
     tensor_coefficients_from_matrix,
+    write_diagnostics_csv,
 )
 from common.phantom import Mode, _shape_truth_and_fourier
 
@@ -54,6 +58,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
     n_rows = len(SHAPES); n_cols = 1 + len(R_VALUES)
     fig, axes = plt.subplots(n_rows, n_cols, figsize=(3.1 * n_cols, 3.1 * n_rows),
                              constrained_layout=True)
+    diagnostic_rows: list[dict[str, Any]] = []
 
     for row_idx, shape_name in enumerate(SHAPES):
         print(f"  Processing {shape_name}...")
@@ -75,7 +80,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
 
             # Quadrature
             target_nodes, target_weights, _ = ball_quadrature_nodes(n_radial, n_angular)
-            p_nodes, _, _, _, _ = generate_data_nodes(
+            p_nodes, _, _, mock_distances, _ = generate_data_nodes(
                 target_nodes, requested_measure_dirs, data_mode="mock", branch_count=1)
 
             # GPSWF
@@ -121,6 +126,41 @@ def run_experiment(config: ExperimentConfig) -> Any:
             rec = (image_matrix @ coeffs).reshape(grid_size, grid_size) / (float(R) ** 3)
             support_mask = np.sum(physical_points * physical_points, axis=1).reshape(grid_size, grid_size) <= float(R) ** 2
             rec[~support_mask] = 0.0
+            diagnostic_rows.append(collect_reconstruction_diagnostics(
+                case={
+                    "figure": 4,
+                    "case_id": f"{shape_name}_R{R:g}",
+                    "row": int(row_idx),
+                    "column": int(col_idx),
+                    "shape_name": shape_name,
+                    "R": float(R),
+                    "k": float(k),
+                    "C": float(C),
+                    "K": int(K_val),
+                    "ell_max": int(ell_max),
+                    "n_modes_per_ell": int(n_modes),
+                    "epsilon": float(epsilon),
+                    "N_cap": int(N_cap),
+                    "n_radial": int(n_radial),
+                    "n_angular_requested": int(n_angular),
+                    "data_mode": "mock",
+                    "noise_level": 0.0,
+                    "contrast_scale": math.nan,
+                    "data_source": "analytical_born_fixed_physical_scatterer",
+                },
+                modes=modes,
+                retained=retained,
+                target_nodes=target_nodes,
+                p_nodes=p_nodes,
+                mock_distances=mock_distances,
+                basis_matrix=target_basis,
+                target_weights=target_weights,
+                component_data=comp_data,
+                coeffs=coeffs,
+                image=rec,
+                truth=truth_ref,
+                disk_mask=np.ones_like(truth_ref, dtype=bool),
+            ))
 
             label = f"R={R}" if row_idx == 0 else ""
             _imshow(axes[row_idx, col_idx], np.real(rec), label, "viridis",
@@ -131,6 +171,13 @@ def run_experiment(config: ExperimentConfig) -> Any:
 
     fig.savefig(config.out_dir / "figure4_scale_scaling.png", dpi=200)
     plt.close(fig)
+    write_diagnostics_csv(diagnostic_rows, config.out_dir / "figure4_diagnostics.csv")
+    save_diagnostics_npz(diagnostic_rows, config.out_dir / "figure4_diagnostics_detail.npz")
+    plot_diagnostic_curves(
+        diagnostic_rows,
+        config.out_dir / "figure4_diagnostic_curves.png",
+        title="Figure 4 diagnostics",
+    )
     print(f"Saved {config.out_dir / 'figure4_scale_scaling.png'}")
     return make_table([{"figure": 4, "status": "ok"}])
 

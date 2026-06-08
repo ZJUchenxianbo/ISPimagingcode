@@ -64,6 +64,19 @@ from common.gpswf import (
     tridiagonal_residual,
 )
 
+from common.diagnostics import (
+    collect_reconstruction_diagnostics,
+    coefficient_diagnostics,
+    data_diagnostics,
+    image_diagnostics,
+    mode_diagnostics,
+    node_diagnostics,
+    plot_diagnostic_curves,
+    projection_diagnostics,
+    save_diagnostics_npz,
+    write_diagnostics_csv,
+)
+
 from common.utils import (
     Array,
     CArray,

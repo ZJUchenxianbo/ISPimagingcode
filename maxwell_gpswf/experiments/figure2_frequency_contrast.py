@@ -12,11 +12,15 @@ import matplotlib; matplotlib.use("Agg")
 import matplotlib.pyplot as plt; import numpy as np
 
 from common import (
+    collect_reconstruction_diagnostics,
     ExperimentConfig, ball_quadrature_nodes, collect_alpha_pairs_cached,
     generate_data_nodes, make_table, modal_matrix,
+    plot_diagnostic_curves,
     quadrature_modal_coefficients, recover_polarimetric_coefficients,
     reference_tensor, solve_ball_gpswf,
+    save_diagnostics_npz,
     tensor_coefficients_from_matrix,
+    write_diagnostics_csv,
 )
 from common.phantom import Block, Mode, three_block_phantom, block_fourier_profile, truth_image_2d
 
@@ -63,6 +67,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
     fig, axes = plt.subplots(n_rows, n_cols, figsize=(3.1 * n_cols, 3.1 * n_rows),
                              constrained_layout=True)
     if n_rows == 1: axes = axes[None, :]
+    diagnostic_rows: list[dict[str, Any]] = []
 
     for row_idx, k in enumerate(k_values):
         rp = _row_params_quick(k) if config.quick else _row_params(k)
@@ -71,7 +76,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
 
         # Target quadrature for this k
         target_nodes, target_weights, _ = ball_quadrature_nodes(n_radial, n_angular)
-        p_nodes, _, _, _, _ = generate_data_nodes(
+        p_nodes, _, _, mock_distances, _ = generate_data_nodes(
             target_nodes, requested_measure_dirs, data_mode=data_mode, branch_count=1)
 
         # GPSWF basis — all modes retained
@@ -132,6 +137,39 @@ def run_experiment(config: ExperimentConfig) -> Any:
                 comp_data, target_basis, target_weights, modes, retained)
             rec = (image_matrix @ coeffs).reshape(grid_size, grid_size)
             rec[~dm] = 0.0
+            diagnostic_rows.append(collect_reconstruction_diagnostics(
+                case={
+                    "figure": 2,
+                    "case_id": f"k{k:g}_{label.replace(' ', '_')}",
+                    "row": int(row_idx),
+                    "column": int(col_idx),
+                    "k": float(k),
+                    "C": float(C),
+                    "K": int(K_val),
+                    "ell_max": int(ell_max),
+                    "n_modes_per_ell": int(n_modes),
+                    "epsilon": float(epsilon),
+                    "N_cap": int(N_cap),
+                    "n_radial": int(n_radial),
+                    "n_angular_requested": int(n_angular),
+                    "data_mode": data_mode,
+                    "noise_level": float(nlevel),
+                    "contrast_scale": float(scale),
+                    "data_source": "analytical_born",
+                },
+                modes=modes,
+                retained=retained,
+                target_nodes=target_nodes,
+                p_nodes=p_nodes,
+                mock_distances=mock_distances,
+                basis_matrix=target_basis,
+                target_weights=target_weights,
+                component_data=comp_data,
+                coeffs=coeffs,
+                image=rec,
+                truth=truth,
+                disk_mask=dm,
+            ))
             _imshow(axes[row_idx, col_idx], np.real(rec),
                     label if row_idx == 0 else "", "viridis", vmin, vmax)
 
@@ -142,6 +180,13 @@ def run_experiment(config: ExperimentConfig) -> Any:
 
     fig.savefig(config.out_dir / "figure2_frequency_contrast.png", dpi=200)
     plt.close(fig)
+    write_diagnostics_csv(diagnostic_rows, config.out_dir / "figure2_diagnostics.csv")
+    save_diagnostics_npz(diagnostic_rows, config.out_dir / "figure2_diagnostics_detail.npz")
+    plot_diagnostic_curves(
+        diagnostic_rows,
+        config.out_dir / "figure2_diagnostic_curves.png",
+        title="Figure 2 diagnostics",
+    )
     print(f"Saved {config.out_dir / 'figure2_frequency_contrast.png'}")
     return make_table([{"figure": 2, "status": "ok"}])
 

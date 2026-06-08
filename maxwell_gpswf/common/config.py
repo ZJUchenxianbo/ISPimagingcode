@@ -9,7 +9,7 @@ from pathlib import Path
 
 @dataclass(frozen=True)
 class ExperimentConfig:
-    """Runtime settings shared by the diagnostics."""
+    """Runtime settings shared by the Maxwell GPSWF experiments."""
 
     out_dir: Path
     seed: int = 12345

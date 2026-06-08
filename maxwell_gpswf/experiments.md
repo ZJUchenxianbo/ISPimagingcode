@@ -8,8 +8,7 @@
 maxwell_gpswf/
 ├── common/          # config, phantom, 求积, 极化, GPSWF
 ├── forward/         # 解析 Born + VIE (含自作用项 L=-I/3)
-├── experiments/     # 三张主图
-├── diagnostics/     # 模块诊断
+├── experiments/     # 主图实验
 ├── main.py
 └── experiments.md
 ```
@@ -21,6 +20,17 @@ maxwell_gpswf/
 .venv/bin/python maxwell_gpswf/main.py --mode fig1 --data-mode ideal        # 单图+理想模式
 .venv/bin/python maxwell_gpswf/main.py --quick --out-dir outputs/smoke      # 快速检查
 ```
+
+每个主图会在对应输出目录生成成像图和运行时诊断文件：
+
+```text
+figure*_*.png                 # 成像图
+figure*_diagnostics.csv       # 标量诊断表
+figure*_diagnostics_detail.npz # 标量诊断 NPZ 备份
+figure*_diagnostic_curves.png # 诊断曲线
+```
+
+旧的论文表格型 `diagnostics/` 目录已删除。现在的诊断逻辑在 `common/diagnostics.py` 中，由各主图脚本在真实运行流程里调用。
 
 ---
 

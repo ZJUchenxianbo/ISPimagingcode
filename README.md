@@ -41,10 +41,9 @@ pyproj/
 │   ├── experiments/coherence.py
 │   └── main.py
 ├── maxwell_gpswf/                  # Maxwell 远场反演 (GPSWF)
-│   ├── common/                    # phantom、求积、极化、GPSWF
+│   ├── common/                    # phantom、求积、极化、GPSWF、运行时诊断
 │   ├── forward/                   # 解析 Born / VIE 正向求解器
-│   ├── experiments/               # 三张主图
-│   ├── diagnostics/               # 模块诊断
+│   ├── experiments/               # 主图实验
 │   └── main.py
 ├── AGENTS.md
 └── README.md
@@ -68,4 +67,4 @@ pyproj/
 
 ## 输出
 
-实验输出写入 `outputs/` 目录，分子项目存放。常见文件：`.png`（图像）、`.csv`（表格）、`.npz`（中间数组）。
+实验输出写入 `outputs/` 目录，分子项目存放。常见文件：`.png`（图像）、`.csv`（表格）、`.npz`（中间数组）。Maxwell 主图实验会额外输出 `figure*_diagnostics.csv`、`figure*_diagnostics_detail.npz` 和 `figure*_diagnostic_curves.png`，用于定位成像异常来自节点、模态、投影、数据、系数还是图像阶段。

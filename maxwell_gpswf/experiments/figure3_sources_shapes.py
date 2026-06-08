@@ -14,10 +14,14 @@ import matplotlib.pyplot as plt; import numpy as np
 from scipy.linalg import lu_factor, lu_solve
 
 from common import (
+    collect_reconstruction_diagnostics,
     ExperimentConfig, ball_quadrature_nodes, collect_alpha_pairs_cached,
     generate_data_nodes, make_table, modal_matrix, orthonormal_basis_perp,
+    plot_diagnostic_curves,
     quadrature_modal_coefficients, reference_tensor,
+    save_diagnostics_npz,
     solve_ball_gpswf, sphere_quadrature, tensor_coefficients_from_matrix,
+    write_diagnostics_csv,
 )
 from common.phantom import (
     Block, Mode,
@@ -99,6 +103,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
     n_rows = len(SHAPES); n_cols = 4
     fig, axes = plt.subplots(n_rows, n_cols, figsize=(3.1 * n_cols, 3.1 * n_rows),
                              constrained_layout=True)
+    diagnostic_rows: list[dict[str, Any]] = []
 
     for row_idx, shape_name in enumerate(SHAPES):
         print(f"  Processing {shape_name}...")
@@ -114,6 +119,45 @@ def run_experiment(config: ExperimentConfig) -> Any:
             fourier_analytical, target_basis, target_weights, modes, retained)
         rec_ana = (image_matrix @ coeffs_ana).reshape(grid_size, grid_size)
         rec_ana[~dm] = 0.0
+        effective_p_nodes = target_nodes if data_mode == 'ideal' else p_nodes
+        effective_mock_distances = np.zeros(target_nodes.shape[0]) if data_mode == 'ideal' else mock_distances
+        base_case = {
+            "figure": 3,
+            "shape_name": shape_name,
+            "k": float(k),
+            "C": float(C),
+            "K": int(K),
+            "ell_max": int(ell_max),
+            "n_modes_per_ell": int(n_modes_per_ell),
+            "epsilon": float(epsilon),
+            "N_cap": int(N_cap),
+            "n_radial": int(n_radial),
+            "n_angular_requested": int(requested_target_dirs),
+            "data_mode": data_mode,
+            "noise_level": 0.0,
+            "contrast_scale": math.nan,
+        }
+        diagnostic_rows.append(collect_reconstruction_diagnostics(
+            case={
+                **base_case,
+                "case_id": f"{shape_name}_analytical_born",
+                "row": int(row_idx),
+                "column": 3,
+                "data_source": "analytical_born",
+            },
+            modes=modes,
+            retained=retained,
+            target_nodes=target_nodes,
+            p_nodes=effective_p_nodes,
+            mock_distances=effective_mock_distances,
+            basis_matrix=target_basis,
+            target_weights=target_weights,
+            component_data=fourier_analytical,
+            coeffs=coeffs_ana,
+            image=rec_ana,
+            truth=truth,
+            disk_mask=dm,
+        ))
 
         # --- VIE data (columns 2, 3) ---
         blocks = _shape_to_blocks(shape_name)
@@ -161,6 +205,48 @@ def run_experiment(config: ExperimentConfig) -> Any:
 
         rec_full = (image_matrix @ coeffs_full).reshape(grid_size, grid_size); rec_full[~dm] = 0.0
         rec_bv = (image_matrix @ coeffs_bv).reshape(grid_size, grid_size); rec_bv[~dm] = 0.0
+        diagnostic_rows.append(collect_reconstruction_diagnostics(
+            case={
+                **base_case,
+                "case_id": f"{shape_name}_full_vie",
+                "row": int(row_idx),
+                "column": 1,
+                "data_source": "full_vie",
+            },
+            modes=modes,
+            retained=retained,
+            target_nodes=target_nodes,
+            p_nodes=effective_p_nodes,
+            mock_distances=effective_mock_distances,
+            basis_matrix=target_basis,
+            target_weights=target_weights,
+            component_data=comp_full_u,
+            coeffs=coeffs_full,
+            image=rec_full,
+            truth=truth,
+            disk_mask=dm,
+        ))
+        diagnostic_rows.append(collect_reconstruction_diagnostics(
+            case={
+                **base_case,
+                "case_id": f"{shape_name}_vie_born",
+                "row": int(row_idx),
+                "column": 2,
+                "data_source": "vie_born",
+            },
+            modes=modes,
+            retained=retained,
+            target_nodes=target_nodes,
+            p_nodes=effective_p_nodes,
+            mock_distances=effective_mock_distances,
+            basis_matrix=target_basis,
+            target_weights=target_weights,
+            component_data=comp_born_vie_u,
+            coeffs=coeffs_bv,
+            image=rec_bv,
+            truth=truth,
+            disk_mask=dm,
+        ))
 
         # --- Plot row (shared vmin/vmax from truth, same style as Figure 1) ---
         titles = ["truth", "Full VIE", "VIE Born", "Analytical Born"] if row_idx == 0 else [""]*4
@@ -172,6 +258,13 @@ def run_experiment(config: ExperimentConfig) -> Any:
 
     fig.savefig(config.out_dir / "figure3_sources_shapes.png", dpi=200)
     plt.close(fig)
+    write_diagnostics_csv(diagnostic_rows, config.out_dir / "figure3_diagnostics.csv")
+    save_diagnostics_npz(diagnostic_rows, config.out_dir / "figure3_diagnostics_detail.npz")
+    plot_diagnostic_curves(
+        diagnostic_rows,
+        config.out_dir / "figure3_diagnostic_curves.png",
+        title="Figure 3 diagnostics",
+    )
     print(f"Saved {config.out_dir / 'figure3_sources_shapes.png'}")
     return make_table([{"figure": 3, "status": "ok"}])
 

@@ -16,10 +16,13 @@ import numpy as np
 
 from common import (
     ExperimentConfig, ball_quadrature_nodes, collect_alpha_pairs_cached,
+    collect_reconstruction_diagnostics,
     generate_data_nodes, make_table, modal_matrix,
+    plot_diagnostic_curves,
     quadrature_modal_coefficients, recover_polarimetric_coefficients,
     reference_tensor, solve_ball_gpswf,
-    tensor_coefficients_from_matrix,
+    save_diagnostics_npz, tensor_coefficients_from_matrix,
+    write_diagnostics_csv,
 )
 from common.phantom import Block, Mode, three_block_phantom, block_fourier_profile, truth_image_2d
 
@@ -47,6 +50,8 @@ def run_experiment(config: ExperimentConfig) -> Any:
     if data_mode == 'ideal':
         target_nodes = target_nodes  # p_nodes === target_nodes, no mock error
         requested_measure_dirs = data_info['n_measure_dirs']
+    effective_p_nodes = target_nodes if data_mode == "ideal" else p_nodes
+    effective_mock_distances = np.zeros(target_nodes.shape[0]) if data_mode == "ideal" else mock_distances
 
     blocks = three_block_phantom("born")
     scalar = block_fourier_profile(p_nodes, blocks, C=C)
@@ -76,6 +81,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
     alpha_abs = np.asarray([abs(m.alpha) for m in modes], dtype=float)
     alpha_max = float(np.max(alpha_abs))
     order = np.argsort(-alpha_abs)
+    diagnostic_rows: list[dict[str, Any]] = []
 
     # -- Plot --
     fig, axes = plt.subplots(len(N_values), 1 + len(noise_levels),
@@ -109,6 +115,35 @@ def run_experiment(config: ExperimentConfig) -> Any:
                 comp_data, target_basis, target_weights, modes, retained)
             rec = (image_matrix @ coeffs).reshape(grid_size, grid_size)
             rec[~disk_mask] = 0.0
+            diagnostic_rows.append(collect_reconstruction_diagnostics(
+                case={
+                    "figure": 1,
+                    "case_id": f"N{dim}_noise{noise_level:g}",
+                    "k": k,
+                    "C": C,
+                    "K": K,
+                    "ell_max": ell_max,
+                    "n_modes_per_ell": n_modes_per_ell,
+                    "requested_N": N,
+                    "retained_N": dim,
+                    "noise_level": noise_level,
+                    "n_radial": n_radial,
+                    "n_angular_requested": requested_target_dirs,
+                    "data_mode": data_mode,
+                },
+                modes=modes,
+                retained=retained,
+                target_nodes=target_nodes,
+                p_nodes=effective_p_nodes,
+                mock_distances=effective_mock_distances,
+                basis_matrix=target_basis,
+                target_weights=target_weights,
+                component_data=comp_data,
+                coeffs=coeffs,
+                image=rec,
+                truth=truth,
+                disk_mask=disk_mask,
+            ))
             label = f"N={dim}, δ={noise_level:g}" if row_idx == 0 else ""
             _imshow(axes[row_idx, 1 + col_idx], np.real(rec), label, "viridis", vmin, vmax)
 
@@ -118,6 +153,13 @@ def run_experiment(config: ExperimentConfig) -> Any:
 
     fig.savefig(config.out_dir / "figure1_noise_dimension.png", dpi=200)
     plt.close(fig)
+    write_diagnostics_csv(diagnostic_rows, config.out_dir / "figure1_diagnostics.csv")
+    save_diagnostics_npz(diagnostic_rows, config.out_dir / "figure1_diagnostics_detail.npz")
+    plot_diagnostic_curves(
+        diagnostic_rows,
+        config.out_dir / "figure1_diagnostic_curves.png",
+        title="Figure 1 diagnostics",
+    )
     print(f"Saved {config.out_dir / 'figure1_noise_dimension.png'}")
     return make_table([{"figure": 1, "status": "ok"}])
 
