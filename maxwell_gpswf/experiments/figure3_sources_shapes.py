@@ -26,7 +26,7 @@ from common.phantom import (
 )
 from forward.vie import (
     assemble_vie_matrix, ball_voxel_grid, incident_plane_wave,
-    maxwell_born_far_field, maxwell_far_field, tensor_blocks_contrast,
+    maxwell_born_far_field, maxwell_far_field, tensor_ball_contrast, tensor_blocks_contrast,
     vie_to_fourier_convention,
 )
 
@@ -116,7 +116,10 @@ def run_experiment(config: ExperimentConfig) -> Any:
 
         # --- VIE data (columns 2, 3) ---
         blocks = _shape_to_blocks(shape_name)
-        if shape_name == "inhomogeneous":
+        if shape_name == "sphere":
+            Q = tensor_ball_contrast(volume_nodes, 0.25, tensor,
+                                     scale=1.0, center=np.array([0.0, 0.0, 0.0]))
+        elif shape_name == "inhomogeneous":
             # Build Gaussian-bump contrast directly on voxel grid
             Q = np.zeros((volume_nodes.shape[0], 3, 3), dtype=np.complex128)
             bumps = [
