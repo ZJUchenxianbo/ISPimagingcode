@@ -104,9 +104,9 @@ maxwell_gpswf/
 
 ## 图3: 数据来源与散射体形状
 
-**目的**：比较 Full VIE / VIE Born / Analytical Born / Noiseless Born 四种数据源在 5 种散射体上的反演。
+**目的**：比较 Full VIE / VIE Born / Analytical Born 三种数据源在 5 种散射体上的反演。
 
-**布局**：5 列 (truth + Full VIE + VIE Born + Analytical Born + Noiseless Born) × 5 行
+**布局**：4 列 (truth + Full VIE + VIE Born + Analytical Born) × 5 行
 
 ### 参数
 
@@ -149,6 +149,62 @@ maxwell_gpswf/
 - 自作用项：退极化 dyadic `L = -I/3` + 辐射修正 `i k³V/(6π) I`
 - GMRES 求解，rtol=1e-8
 - VIE 远场经 `vie_to_fourier_convention()` 取共轭后统一约定
+
+---
+
+## 实验性结论
+
+### 高频平台模态与离散稳定性
+
+当前图2的数值结果显示：当频率升高时，连续 GPSWF 算子的 effective rank 会增大，`|α_{ℓn}|` 可能出现更宽的稳定平台。此时仅用
+
+```text
+|α_{ℓn}| > ε · max |α|
+```
+
+作为截断条件，会把平台内的大量 `(ℓ,n,m)` 模式全部保留下来。连续意义上这些模式可能仍属于稳定平台，但当前离散系统未必能稳定承载全部平台模态。
+
+这里需要区分：
+
+```text
+连续稳定模态 ≠ 离散稳定模态
+```
+
+离散实验中还受到以下因素限制：
+
+- 球内 target quadrature 点数有限；
+- mock far-field nodes 与 target nodes 不完全一致；
+- 极化恢复引入有限配置误差；
+- `A^H W A` 只是在离散意义下近似对角；
+- 高 `ℓ` 模态对节点误差和求积误差更敏感。
+
+因此，高频下不能只依赖 `α` 阈值截断。图2、图3应在 `α` 截断之外加入离散稳定性约束，例如：
+
+```text
+GPSWF 参数截断 → α cutoff → N_cap
+```
+
+其中 `N_cap` 直接限制展开后的实际成像模式数：
+
+```text
+ψ_{ℓnm},  m = -ℓ, ..., ℓ
+```
+
+这也是图1固定 `N` 时成像相对稳定的原因：固定 `N` 本质上给离散反演加入了硬维数约束。
+
+### 后续调参原则
+
+图2、图3后续调参时优先检查：
+
+```text
+retained_modes
+retained_ell_max
+target_nodes / retained_modes
+background_p95_abs
+coeff_norm
+```
+
+如果 `α` 曲线在高频下接近平坦，说明 `α cutoff` 不能有效筛选稳定模态，应优先调小 `N_cap` 或加入 `ℓ` 层级约束，而不是继续单独调 `ε`。
 
 ---
 
