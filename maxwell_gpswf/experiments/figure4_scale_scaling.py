@@ -55,17 +55,16 @@ def run_experiment(config: ExperimentConfig) -> Any:
 
     for row_idx, shape_name in enumerate(SHAPES):
         print(f"  Processing {shape_name}...")
-        # Truth (R=1.0 only — scatterer is fixed)
-        rp0 = _row_params(1.0); C0 = rp0["C"]
+        # Reference truth at R=1.0 for column 0
+        rp0 = _row_params(1.0)
         tgt0, _, _ = ball_quadrature_nodes(rp0["n_radial"], rp0["n_angular"])
-        p0, _, _, _, _ = generate_data_nodes(tgt0, requested_measure_dirs, data_mode="mock")
-        truth, gps, dm, _ = _shape_truth_and_fourier(shape_name, tgt0, grid_size, C0)
-        vmin = float(np.nanmin(np.real(truth))); vmax = float(np.nanmax(np.real(truth)))
+        truth_ref, _, dm_ref, _ = _shape_truth_and_fourier(shape_name, tgt0, grid_size, rp0["C"])
+        vmin_ref = float(np.nanmin(np.real(truth_ref))); vmax_ref = float(np.nanmax(np.real(truth_ref)))
 
         for col_idx, R in enumerate([None] + R_VALUES):
             if R is None:
-                _imshow(axes[row_idx, 0], np.real(truth),
-                        "truth" if row_idx == 0 else "", "viridis", vmin, vmax)
+                _imshow(axes[row_idx, 0], np.real(truth_ref),
+                        "truth" if row_idx == 0 else "", "viridis", vmin_ref, vmax_ref)
                 continue
 
             rp = _row_params(R); C = rp["C"]
@@ -116,7 +115,10 @@ def run_experiment(config: ExperimentConfig) -> Any:
             rec[~dm] = 0.0
 
             label = f"R={R}" if row_idx == 0 else ""
-            _imshow(axes[row_idx, 1 + col_idx], np.real(rec), label, "viridis", vmin, vmax)
+            rvmin = float(np.nanmin(np.real(rec[dm_ref]))) if dm_ref.any() else -1
+            rvmax = float(np.nanmax(np.real(rec[dm_ref]))) if dm_ref.any() else 1
+            if abs(rvmax - rvmin) < 1e-12: rvmin, rvmax = -1, 1
+            _imshow(axes[row_idx, 1 + col_idx], np.real(rec), label, "viridis", rvmin, rvmax)
 
         n_total = len(modes)
         axes[row_idx, 0].set_ylabel(shape_name, fontsize=9, rotation=90, labelpad=12)
