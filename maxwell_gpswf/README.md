@@ -10,7 +10,7 @@ maxwell_gpswf/
 ├── forward/         # 解析 Born + VIE (含自作用项 L=-I/3)
 ├── experiments/     # 主图实验
 ├── main.py
-└── experiments.md
+└── README.md
 ```
 
 ## 运行
