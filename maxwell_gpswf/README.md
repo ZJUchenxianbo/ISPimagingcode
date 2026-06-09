@@ -13,6 +13,31 @@ maxwell_gpswf/
 └── README.md
 ```
 
+## 运行环境与依赖
+
+本项目在根目录 `.venv/` 虚拟环境中运行，当前本地环境为：
+
+```text
+Python 3.14.5
+numpy 2.4.6
+scipy 1.17.1
+matplotlib 3.10.9
+pandas 3.0.3
+```
+
+核心依赖：
+
+- `numpy`：数组计算、复数线性代数、`.npz` 数据保存。
+- `scipy`：GPSWF 三对角本征问题、球 Bessel/Jacobi 函数、Lebedev 球面积分节点、KDTree 匹配、GMRES/VIE 求解。
+- `matplotlib`：主图和诊断曲线输出。
+- `pandas`：可选依赖；若本地没有安装，代码会退回到轻量 CSV 表格实现。
+
+注意：`maxwell_gpswf/common/quadrature.py` 使用 `scipy.integrate.lebedev_rule`，因此 SciPy 版本不能太旧。运行时统一使用项目根目录的虚拟环境：
+
+```bash
+.venv/bin/python maxwell_gpswf/main.py ...
+```
+
 ## 运行
 
 ```bash
@@ -201,7 +226,7 @@ Q(x) = f_R(x/R) / R^3
 | 张量类型 | full (9 维) | |
 | 数据分量 | Q_11 | |
 | grid_size | 81×81 | 物理坐标范围固定为 `[-1,1]×[-1,1]` |
-| 入射/观测方向数 | 110 | mock 模式 |
+| 入射/观测方向数 | 110 | mock 模式固定 110 个 Lebedev 测量方向；ideal 模式直接构造 target node 对应方向对 |
 
 **截断**：三层 — GPSWF 参数 → ε=0.2 → N_cap = C²/2。
 

@@ -51,6 +51,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
     k = 15.0; epsilon = 0.2; kind = "full"; component_index = 0
     data_C = 2.0 * k
     quad_order = 160; r_eval_count = 120
+    data_mode = getattr(config, "data_mode", "mock")
 
     rng = np.random.default_rng(config.seed + 400)
     coeff0 = tensor_coefficients_from_matrix(reference_tensor(kind), kind)
@@ -80,8 +81,8 @@ def run_experiment(config: ExperimentConfig) -> Any:
 
             # Quadrature
             target_nodes, target_weights, _ = ball_quadrature_nodes(n_radial, n_angular)
-            p_nodes, _, _, mock_distances, _ = generate_data_nodes(
-                target_nodes, requested_measure_dirs, data_mode="mock", branch_count=1)
+            p_nodes, _, _, mock_distances, data_info = generate_data_nodes(
+                target_nodes, requested_measure_dirs, data_mode=data_mode, branch_count=1)
 
             # GPSWF
             alpha_df = collect_alpha_pairs_cached(
@@ -143,7 +144,9 @@ def run_experiment(config: ExperimentConfig) -> Any:
                     "N_cap": int(N_cap),
                     "n_radial": int(n_radial),
                     "n_angular_requested": int(n_angular),
-                    "data_mode": "mock",
+                    "data_mode": data_mode,
+                    "n_measure_dirs": int(data_info["n_measure_dirs"]),
+                    "measure_rule": data_info["measure_rule"],
                     "noise_level": 0.0,
                     "contrast_scale": math.nan,
                     "data_source": "analytical_born_fixed_physical_scatterer",
@@ -192,13 +195,15 @@ def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument("--out-dir", type=str, default="outputs/figures")
     p.add_argument("--seed", type=int, default=12345)
+    p.add_argument("--data-mode", choices=["mock", "ideal"], default="mock",
+                   help="mock: nearest measured Fourier node; ideal: exact admissible direction pairs")
     return p.parse_args()
 
 
 def main():
     args = parse_args()
     out_dir = Path(args.out_dir); out_dir.mkdir(parents=True, exist_ok=True)
-    run_experiment(ExperimentConfig(out_dir=out_dir, seed=args.seed))
+    run_experiment(ExperimentConfig(out_dir=out_dir, seed=args.seed, data_mode=args.data_mode))
 
 
 if __name__ == "__main__":
