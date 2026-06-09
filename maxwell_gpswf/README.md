@@ -6,7 +6,7 @@
 
 ```
 maxwell_gpswf/
-├── common/          # config, phantom, 求积, 极化, GPSWF
+├── common/          # config, phantom, 求积, 极化, GPSWF, Fourier/Bessel baseline
 ├── forward/         # 解析 Born + VIE (含自作用项 L=-I/3)
 ├── experiments/     # 主图实验
 ├── main.py
@@ -43,6 +43,7 @@ pandas 3.0.3
 ```bash
 .venv/bin/python maxwell_gpswf/main.py --out-dir outputs                    # 全部
 .venv/bin/python maxwell_gpswf/main.py --mode fig1 --data-mode ideal        # 单图+理想模式
+.venv/bin/python maxwell_gpswf/main.py --mode fig5 --out-dir outputs        # GPSWF/Fourier 对照
 .venv/bin/python maxwell_gpswf/main.py --quick --out-dir outputs/smoke      # 快速检查
 ```
 
@@ -102,16 +103,18 @@ figure*_diagnostic_curves.png # 诊断曲线
 
 **目的**：观察不同波数和对比度下 Born 重建质量。GPSWF 参数随 k 联动。
 
-**布局**：5 列 (truth + medium δ=0 + low + medium + high) × 4 行 (k=10, 15, 20, 25)
+**布局**：5 列 (truth + medium δ=0 + low + medium + high) × 6 行 (k=4, 6, 7, 8, 9, 10)
 
 ### GPSWF 参数联动
 
 | k | C | ℓ_max | n_modes | K | n_radial | n_angular | modes | nodes | ratio |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 10 | 20 | 8 | 5 | 36 | 10 | 110 | 405 | 1100 | **2.72** |
-| 15 | 30 | 10 | 5 | 44 | 12 | 170 | 605 | 2040 | **3.37** |
-| 20 | 40 | 14 | 6 | 54 | 16 | 302 | 1350 | 4832 | **3.58** |
-| 25 | 50 | 16 | 7 | 60 | 14 | 434 | 2023 | 6076 | **3.00** |
+| 4 | 8 | 4 | 2 | 16 | 5 | 50 | 50 | 250 | 5.00 |
+| 6 | 12 | 5 | 3 | 22 | 6 | 74 | 108 | 444 | 4.11 |
+| 7 | 14 | 6 | 3 | 24 | 7 | 74 | 147 | 518 | 3.52 |
+| 8 | 16 | 7 | 3 | 28 | 8 | 86 | 192 | 688 | 3.58 |
+| 9 | 18 | 7 | 4 | 32 | 8 | 110 | 256 | 880 | 3.44 |
+| 10 | 20 | 8 | 5 | 36 | 10 | 110 | 405 | 1100 | 2.72 |
 
 ### 截断
 
@@ -121,13 +124,13 @@ figure*_diagnostic_curves.png # 诊断曲线
 
 | 参数 | full | quick | 说明 |
 |------|------|-------|------|
-| k | 10, 15, 20, 25 | 10, 15 | |
+| k | 4, 6, 7, 8, 9, 10 | 4, 6, 8, 10 | |
 | 入射/观测方向数 | 110 | 38 | |
 | grid_size | 81×81 | 51×51 | |
 | 噪声 δ | 0.2 | 同 | |
 | 对比度 scale | 0.3, 1.0, 3.0 | 同 | low / medium / high |
 | ε | 0.2 | 同 | `|α| > ε·max|α|` |
-| N_cap | C²/2 (200~1250) | — | 随 C 增长 |
+| N_cap | C²/2 (32~200) | — | 随 C 增长 |
 | 张量类型 | full (9 维) | 同 | |
 | 数据分量 | Q_11 | 同 | |
 | α quad_order | 160 | 100 | |
@@ -229,6 +232,49 @@ Q(x) = f_R(x/R) / R^3
 | 入射/观测方向数 | 110 | mock 模式固定 110 个 Lebedev 测量方向；ideal 模式直接构造 target node 对应方向对 |
 
 **截断**：三层 — GPSWF 参数 → ε=0.2 → N_cap = C²/2。
+
+---
+
+## 图5: GPSWF、立方体 Fourier 与球谐-Bessel 对照
+
+**目的**：用图2当前的波数配置，在 medium 对比度下比较三种重构空间：
+
+- GPSWF：单位球支撑，单频 Born 数据，`C=2k`。
+- Fourier baseline：立方体支撑 `[-1,1]^3`，多频 Fourier 系数，最大波数 `K_max=k`，实际使用 Fourier 半径 `|ξ| <= 2K_max`。
+- Bessel baseline：单位球支撑，球谐-Bessel 基，径向零点满足 `ρ_{ℓn} <= 2K_max`，系数由物理空间 L2 投影给出。
+
+**布局**：4 列 (truth + GPSWF + Cube Fourier + Ball Bessel) × 6 行 (k/Kmax=4, 6, 7, 8, 9, 10)。
+
+Fourier baseline 使用标准立方体 Fourier 基：
+
+```text
+phi_l(x) = exp(i*pi*l.x),  l in Z^3,  x in [-1,1]^3
+```
+
+系数由解析 Born Fourier 数据给出：
+
+```text
+c_l = Qhat(pi*l) / 8
+```
+
+Ball Bessel baseline 使用单位球 Dirichlet 基：
+
+```text
+phi_{ell,n,m}(x) = N_{ell,n} j_ell(rho_{ell,n}|x|) Y_ell^m(theta, phi)
+```
+
+当前实现中，Fourier baseline 使用解析 Fourier 系数，Bessel baseline 使用物理空间 L2 投影系数，并在系数向量上添加相对噪声。二者用于隔离“基函数截断表达能力”的差异；它们不是 GPSWF 那种完整的有限 Fourier 球远场数据反演流程。
+
+### 模式数
+
+| K_max | Fourier modes (`|ξ| <= 2K_max`) | Bessel modes (`ρ <= 2K_max`) |
+|-------|----------------------------------|-------------------------------|
+| 4 | 81 | 20 |
+| 6 | 251 | 93 |
+| 7 | 365 | 153 |
+| 8 | 515 | 220 |
+| 9 | 751 | 338 |
+| 10 | 1045 | 456 |
 
 ---
 
