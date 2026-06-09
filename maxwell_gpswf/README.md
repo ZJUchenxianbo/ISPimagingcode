@@ -240,30 +240,42 @@ Q(x) = f_R(x/R) / R^3
 **目的**：用图2当前的波数配置，在 medium 对比度下比较三种重构空间：
 
 - GPSWF：单位球支撑，单频 Born 数据，`C=2k`。
-- Fourier baseline：立方体支撑 `[-1,1]^3`，多频 Fourier 系数，最大波数 `K_max=k`，实际使用 Fourier 半径 `|ξ| <= 2K_max`。
-- Bessel baseline：单位球支撑，球谐-Bessel 基，径向零点满足 `ρ_{ℓn} <= 2K_max`，系数由物理空间 L2 投影给出。
+- Cube Fourier：立方体支撑 `[-1,1]^3`，基函数满足 `|ξ_l| <= 2K_max`。
+- Ball Bessel：单位球支撑，球谐-Bessel 基，径向零点满足 `ρ_{ℓn} <= 2K_max`。
 
 **布局**：4 列 (truth + GPSWF + Cube Fourier + Ball Bessel) × 6 行 (k/Kmax=4, 6, 7, 8, 9, 10)。
 
-Fourier baseline 使用标准立方体 Fourier 基：
+三种方法使用同一套前置流程：
+
+```text
+远场 Born 数据 -> 极化恢复 -> recovered Qhat(p) -> 选择不同基函数重构 Q(x)
+```
+
+Cube Fourier 使用标准立方体 Fourier 基：
 
 ```text
 phi_l(x) = exp(i*pi*l.x),  l in Z^3,  x in [-1,1]^3
 ```
 
-系数由解析 Born Fourier 数据给出：
+其系数由同一批 recovered Fourier 数据解最小二乘问题：
 
 ```text
-c_l = Qhat(pi*l) / 8
+sum_l c_l int_cube phi_l(x) exp(-i C p_i.x) dx ~= Qhat(p_i)
 ```
 
-Ball Bessel baseline 使用单位球 Dirichlet 基：
+Ball Bessel 使用单位球 Dirichlet 基：
 
 ```text
 phi_{ell,n,m}(x) = N_{ell,n} j_ell(rho_{ell,n}|x|) Y_ell^m(theta, phi)
 ```
 
-当前实现中，Fourier baseline 使用解析 Fourier 系数，Bessel baseline 使用物理空间 L2 投影系数，并在系数向量上添加相对噪声。二者用于隔离“基函数截断表达能力”的差异；它们不是 GPSWF 那种完整的有限 Fourier 球远场数据反演流程。
+其系数同样由 recovered Fourier 数据解最小二乘问题：
+
+```text
+sum_j c_j int_ball phi_j(x) exp(-i C p_i.x) dx ~= Qhat(p_i)
+```
+
+因此图5只改变最后的展开基函数，远场数据、极化恢复、mock/ideal 节点和噪声流程保持一致。
 
 ### 模式数
 

@@ -9,8 +9,8 @@ The basis functions are
 
 where ``rho_{ell,n}`` is the n-th positive zero of ``j_ell``.  They form the
 standard Dirichlet Laplacian eigenbasis on the unit ball.  In this project they
-serve as a ball-basis baseline distinct from GPSWF: coefficients are computed
-by physical-space L2 projection, not by the GPSWF Fourier eigenvalue relation.
+serve as a ball-basis baseline distinct from GPSWF: coefficients can be
+recovered from the same finite Fourier data by a least-squares data equation.
 """
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ from scipy.special import spherical_jn
 
 from common.phantom import Block
 from common.gpswf import spherical_coordinates
-from common.utils import complex_relative_noise, vector_norm
+from common.utils import complex_relative_noise, vector_norm, weighted_lstsq
 
 
 @dataclass(frozen=True)
@@ -167,6 +167,82 @@ def ball_bessel_coefficients_from_blocks(
             raise ValueError("rng is required when noise_level > 0")
         coeffs = coeffs + complex_relative_noise(coeffs, float(noise_level), rng)
     return coeffs
+
+
+def ball_bessel_data_matrix(
+    p_nodes: np.ndarray,
+    modes: list[BesselMode],
+    C: float,
+    *,
+    quadrature_nodes: np.ndarray,
+    quadrature_weights: np.ndarray,
+    block_size: int = 256,
+) -> np.ndarray:
+    """Return ``int_ball phi_j(x) exp(-i C p.x) dx`` for Bessel modes."""
+    p_nodes = np.asarray(p_nodes, dtype=float)
+    quadrature_nodes = np.asarray(quadrature_nodes, dtype=float)
+    quadrature_weights = np.asarray(quadrature_weights, dtype=float)
+    if p_nodes.ndim != 2 or p_nodes.shape[1] != 3:
+        raise ValueError("p_nodes must have shape (n_nodes, 3)")
+    if quadrature_nodes.ndim != 2 or quadrature_nodes.shape[1] != 3:
+        raise ValueError("quadrature_nodes must have shape (n_quad, 3)")
+    if quadrature_weights.shape != (quadrature_nodes.shape[0],):
+        raise ValueError("quadrature_weights must have shape (n_quad,)")
+
+    basis = ball_bessel_matrix(quadrature_nodes, modes)
+    weighted_basis = quadrature_weights[:, None] * basis
+    matrix = np.empty((p_nodes.shape[0], len(modes)), dtype=np.complex128)
+    for start in range(0, p_nodes.shape[0], int(block_size)):
+        stop = min(start + int(block_size), p_nodes.shape[0])
+        phase = np.exp(-1j * float(C) * (p_nodes[start:stop] @ quadrature_nodes.T))
+        matrix[start:stop] = phase @ weighted_basis
+    return matrix
+
+
+def reconstruct_ball_bessel_from_data(
+    component_data: np.ndarray,
+    p_nodes: np.ndarray,
+    data_weights: np.ndarray,
+    points: np.ndarray,
+    k_max: float,
+    C: float,
+    *,
+    quadrature_nodes: np.ndarray,
+    quadrature_weights: np.ndarray,
+    bandwidth_factor: float = 2.0,
+    rcond: float = 1e-8,
+) -> tuple[np.ndarray, dict[str, Any]]:
+    """Reconstruct one component from recovered Fourier data using Bessel modes."""
+    modes = ball_bessel_modes(k_max, bandwidth_factor=bandwidth_factor)
+    data_matrix = ball_bessel_data_matrix(
+        p_nodes,
+        modes,
+        C,
+        quadrature_nodes=quadrature_nodes,
+        quadrature_weights=quadrature_weights,
+    )
+    coeffs, ls_meta = weighted_lstsq(
+        data_matrix,
+        np.asarray(component_data, dtype=np.complex128),
+        weights=np.asarray(data_weights, dtype=float),
+        rcond=rcond,
+    )
+    image_matrix = ball_bessel_matrix(points, modes)
+    image_values = image_matrix @ coeffs
+    rho_values = np.asarray([mode.rho for mode in modes], dtype=float)
+    meta = {
+        "bessel_modes": int(len(modes)),
+        "bessel_ell_max": int(max((mode.ell for mode in modes), default=-1)),
+        "bessel_n_max": int(max((mode.n for mode in modes), default=0)),
+        "bessel_rho_max": float(np.max(rho_values)) if rho_values.size else math.nan,
+        "bandwidth_factor": float(bandwidth_factor),
+        "coeff_norm": vector_norm(coeffs),
+        "coeff_max_abs": float(np.max(np.abs(coeffs))) if coeffs.size else math.nan,
+        "data_norm": vector_norm(np.asarray(component_data, dtype=np.complex128)),
+        "data_max_abs": float(np.max(np.abs(component_data))) if np.asarray(component_data).size else math.nan,
+        **ls_meta,
+    }
+    return image_values, meta
 
 
 def reconstruct_blocks_ball_bessel(

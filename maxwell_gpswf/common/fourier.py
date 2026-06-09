@@ -7,10 +7,9 @@ experiments.  They use standard cube Fourier modes
 
     exp(i*pi*l.x/R),  l in Z^3,
 
-and are intentionally separate from the ball GPSWF basis.  The baseline uses
-Fourier coefficients of the tensor contrast after polarimetric recovery; in the
-current analytical experiments those coefficients are generated directly from
-the block phantom.
+and are intentionally separate from the ball GPSWF basis.  For data-driven
+comparisons, coefficients are recovered from the same polarimetric Fourier data
+used by GPSWF through a least-squares data equation.
 """
 from __future__ import annotations
 
@@ -20,7 +19,7 @@ from typing import Any
 import numpy as np
 
 from common.phantom import Block
-from common.utils import complex_relative_noise, vector_norm
+from common.utils import complex_relative_noise, vector_norm, weighted_lstsq
 
 
 def cube_fourier_indices(
@@ -126,6 +125,73 @@ def evaluate_cube_fourier_series(
         phase = np.exp(1j * (points[start:stop] @ xi.T))
         values[start:stop] = phase @ coeffs
     return values
+
+
+def cube_fourier_data_matrix(
+    p_nodes: np.ndarray,
+    indices: np.ndarray,
+    C: float,
+    *,
+    half_side: float = 1.0,
+) -> np.ndarray:
+    """Return ``int_cube phi_l(x) exp(-i C p.x) dx`` for cube Fourier modes."""
+    p_nodes = np.asarray(p_nodes, dtype=float)
+    indices = np.asarray(indices, dtype=int)
+    if p_nodes.ndim != 2 or p_nodes.shape[1] != 3:
+        raise ValueError("p_nodes must have shape (n_nodes, 3)")
+    if indices.ndim != 2 or indices.shape[1] != 3:
+        raise ValueError("indices must have shape (n_modes, 3)")
+    xi_modes = cube_fourier_frequencies(indices, half_side=half_side)
+    xi_data = float(C) * p_nodes
+    delta = xi_modes[None, :, :] - xi_data[:, None, :]
+    factors = 2.0 * float(half_side) * np.sinc(delta * float(half_side) / math.pi)
+    return np.prod(factors, axis=2)
+
+
+def reconstruct_fourier_cube_from_data(
+    component_data: np.ndarray,
+    p_nodes: np.ndarray,
+    data_weights: np.ndarray,
+    points: np.ndarray,
+    k_max: float,
+    C: float,
+    *,
+    half_side: float = 1.0,
+    bandwidth_factor: float = 2.0,
+    rcond: float = 1e-8,
+) -> tuple[np.ndarray, dict[str, Any]]:
+    """Reconstruct one component from recovered Fourier data using cube modes."""
+    indices = cube_fourier_indices(
+        k_max,
+        half_side=half_side,
+        bandwidth_factor=bandwidth_factor,
+    )
+    data_matrix = cube_fourier_data_matrix(
+        p_nodes,
+        indices,
+        C,
+        half_side=half_side,
+    )
+    coeffs, ls_meta = weighted_lstsq(
+        data_matrix,
+        np.asarray(component_data, dtype=np.complex128),
+        weights=np.asarray(data_weights, dtype=float),
+        rcond=rcond,
+    )
+    image_values = evaluate_cube_fourier_series(points, indices, coeffs, half_side=half_side)
+    xi = cube_fourier_frequencies(indices, half_side=half_side)
+    meta = {
+        "fourier_modes": int(indices.shape[0]),
+        "fourier_index_linf": int(np.max(np.abs(indices))) if indices.size else 0,
+        "fourier_radius_max": float(np.max(np.linalg.norm(xi, axis=1))) if xi.size else 0.0,
+        "bandwidth_factor": float(bandwidth_factor),
+        "coeff_norm": vector_norm(coeffs),
+        "coeff_max_abs": float(np.max(np.abs(coeffs))) if coeffs.size else math.nan,
+        "data_norm": vector_norm(np.asarray(component_data, dtype=np.complex128)),
+        "data_max_abs": float(np.max(np.abs(component_data))) if np.asarray(component_data).size else math.nan,
+        **ls_meta,
+    }
+    return image_values, meta
 
 
 def reconstruct_blocks_fourier_cube(

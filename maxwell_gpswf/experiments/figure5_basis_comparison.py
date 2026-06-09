@@ -6,7 +6,8 @@ Rows use the current Figure 2 wave-number configuration.  For each row, GPSWF
 uses single-frequency Born data at ``k`` on the unit ball, while the Fourier
 baseline uses cube Fourier modes on ``[-1,1]^3`` with ``|xi| <= 2*K_max`` and
 ``K_max = k``.  The ball Bessel baseline uses the unit-ball Dirichlet basis
-with ``rho_{ell,n} <= 2*K_max`` and physical-space L2 projection.
+with ``rho_{ell,n} <= 2*K_max``.  All three methods use the same recovered
+polarimetric Fourier data; only the final reconstruction basis is changed.
 """
 from __future__ import annotations
 
@@ -33,8 +34,8 @@ from common import (
     plot_diagnostic_curves,
     quadrature_modal_coefficients,
     recover_polarimetric_coefficients,
-    reconstruct_blocks_ball_bessel,
-    reconstruct_blocks_fourier_cube,
+    reconstruct_ball_bessel_from_data,
+    reconstruct_fourier_cube_from_data,
     reference_tensor,
     save_diagnostics_npz,
     solve_ball_gpswf,
@@ -250,15 +251,17 @@ def run_experiment(config: ExperimentConfig) -> Any:
             disk_mask=disk_mask,
         ))
 
-        fourier_values, fourier_meta = reconstruct_blocks_fourier_cube(
-            scaled_blocks,
+        data_nodes = target_nodes if data_mode == "ideal" else p_nodes
+
+        fourier_values, fourier_meta = reconstruct_fourier_cube_from_data(
+            comp_data,
+            data_nodes,
+            target_weights,
             grid_points,
             float(k),
+            C,
             half_side=half_side,
-            component_value=coeff0[component_index],
             bandwidth_factor=bandwidth_factor,
-            noise_level=noise_level,
-            rng=rng,
         )
         fourier_rec = fourier_values.reshape(grid_size, grid_size)
         _imshow(axes[row_idx, 2], np.real(fourier_rec), "Cube Fourier" if row_idx == 0 else "", vmin, vmax)
@@ -275,27 +278,28 @@ def run_experiment(config: ExperimentConfig) -> Any:
                 "noise_level": float(noise_level),
                 "contrast_scale": float(contrast_scale),
                 "support": "cube_half_side_1",
-                "projection_branch": "direct_fourier_coefficients",
+                "projection_branch": "data_lstsq",
                 "basis_modes": int(fourier_meta["fourier_modes"]),
-                "target_nodes": int(fourier_meta["fourier_modes"]),
-                "p_nodes": int(fourier_meta["fourier_modes"]),
+                "target_nodes": int(target_nodes.shape[0]),
+                "p_nodes": int(data_nodes.shape[0]),
                 **fourier_meta,
             },
             image=fourier_rec,
             truth=truth,
             valid_mask=square_mask,
+            mock_distances=mock_distances,
         ))
 
-        bessel_values, bessel_meta = reconstruct_blocks_ball_bessel(
-            scaled_blocks,
+        bessel_values, bessel_meta = reconstruct_ball_bessel_from_data(
+            comp_data,
+            data_nodes,
+            target_weights,
             grid_points,
             float(k),
-            projection_nodes=target_nodes,
-            projection_weights=target_weights,
-            component_value=coeff0[component_index],
+            C,
+            quadrature_nodes=target_nodes,
+            quadrature_weights=target_weights,
             bandwidth_factor=bandwidth_factor,
-            noise_level=noise_level,
-            rng=rng,
         )
         bessel_rec = bessel_values.reshape(grid_size, grid_size)
         bessel_rec[~disk_mask] = 0.0
@@ -313,15 +317,16 @@ def run_experiment(config: ExperimentConfig) -> Any:
                 "noise_level": float(noise_level),
                 "contrast_scale": float(contrast_scale),
                 "support": "unit_ball",
-                "projection_branch": "physical_l2_projection",
+                "projection_branch": "data_lstsq",
                 "basis_modes": int(bessel_meta["bessel_modes"]),
                 "target_nodes": int(target_nodes.shape[0]),
-                "p_nodes": int(target_nodes.shape[0]),
+                "p_nodes": int(data_nodes.shape[0]),
                 **bessel_meta,
             },
             image=bessel_rec,
             truth=truth,
             valid_mask=disk_mask,
+            mock_distances=mock_distances,
         ))
 
         axes[row_idx, 0].set_ylabel(
@@ -355,6 +360,7 @@ def _baseline_diagnostics(
     image: np.ndarray,
     truth: np.ndarray,
     valid_mask: np.ndarray,
+    mock_distances: np.ndarray | None,
 ) -> dict[str, Any]:
     row: dict[str, Any] = dict(case)
     abs_img = np.abs(image)
@@ -367,16 +373,24 @@ def _baseline_diagnostics(
     def p95(mask: np.ndarray) -> float:
         return float(np.percentile(abs_img[mask], 95)) if np.any(mask) else float("nan")
 
+    if mock_distances is None:
+        mock_mean = mock_max = mock_p95 = float("nan")
+    else:
+        distances = np.asarray(mock_distances, dtype=float)
+        mock_mean = float(np.mean(distances)) if distances.size else float("nan")
+        mock_max = float(np.max(distances)) if distances.size else float("nan")
+        mock_p95 = float(np.percentile(distances, 95)) if distances.size else float("nan")
+
     row.update({
         "retained_modes": int(row["basis_modes"]),
-        "mock_distance_mean": float("nan"),
-        "mock_distance_max": float("nan"),
-        "mock_distance_p95": float("nan"),
+        "mock_distance_mean": mock_mean,
+        "mock_distance_max": mock_max,
+        "mock_distance_p95": mock_p95,
         "total_modes": int(row["basis_modes"]),
         "gram_offdiag_ratio": float("nan"),
         "gram_cond": float("nan"),
-        "data_norm": float(row["coeff_norm"]),
-        "data_max_abs": float(row["coeff_max_abs"]),
+        "data_norm": float(row.get("data_norm", row["coeff_norm"])),
+        "data_max_abs": float(row.get("data_max_abs", row["coeff_max_abs"])),
         "image_min": float(np.min(np.real(image))),
         "image_max": float(np.max(np.real(image))),
         "image_max_abs": float(np.max(abs_img)),

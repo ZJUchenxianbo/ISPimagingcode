@@ -66,19 +66,23 @@ from common.gpswf import (
 
 from common.fourier import (
     block_fourier_transform_xi,
+    cube_fourier_data_matrix,
     cube_fourier_coefficients_from_blocks,
     cube_fourier_frequencies,
     cube_fourier_indices,
     evaluate_cube_fourier_series,
+    reconstruct_fourier_cube_from_data,
     reconstruct_blocks_fourier_cube,
 )
 
 from common.spherical_bessel import (
     BesselMode,
     ball_bessel_coefficients_from_blocks,
+    ball_bessel_data_matrix,
     ball_bessel_matrix,
     ball_bessel_modes,
     block_values_at_points,
+    reconstruct_ball_bessel_from_data,
     reconstruct_blocks_ball_bessel,
     spherical_bessel_roots,
 )
@@ -105,4 +109,5 @@ from common.utils import (
     make_table,
     print_table,
     vector_norm,
+    weighted_lstsq,
 )
