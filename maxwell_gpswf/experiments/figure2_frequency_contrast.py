@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """Figure 2: Frequency and contrast effects (Born data, noise=0.2).
 
-Layout: 5 cols (truth + medium δ=0 + low/medium/high) × 6 rows (k=2,4,6,8,9,10).
+Layout: 5 cols (truth + medium δ=0 + low/medium/high) × 6 rows (k=4,6,7,8,9,10).
 Truncation: GPSWF params + epsilon 0.2 + N_cap.
 """
 from __future__ import annotations
@@ -28,12 +28,12 @@ from common.phantom import Block, Mode, three_block_phantom, block_fourier_profi
 def _row_params(k: float) -> dict:
     """Article-style GPSWF parameters linked to wave number k."""
     C = 2.0 * k
-    if k <= 2:
-        return {"ell_max": 2,  "n_modes": 2,  "K": 10, "n_radial": 4,  "n_angular": 38,  "C": C}
-    elif k <= 4:
+    if k <= 4:
         return {"ell_max": 4,  "n_modes": 2,  "K": 16, "n_radial": 5,  "n_angular": 50,  "C": C}
     elif k <= 6:
         return {"ell_max": 5,  "n_modes": 3,  "K": 22, "n_radial": 6,  "n_angular": 74,  "C": C}
+    elif k <= 7:
+        return {"ell_max": 6,  "n_modes": 3,  "K": 24, "n_radial": 7,  "n_angular": 74,  "C": C}
     elif k <= 8:
         return {"ell_max": 7,  "n_modes": 3,  "K": 28, "n_radial": 8,  "n_angular": 86,  "C": C}
     elif k <= 9:
@@ -61,7 +61,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
     noise_level = 0.2; epsilon = 0.2; kind = "full"; component_index = 0
     contrast_scales = [0.3, 1.0, 3.0]
     quad_order = 160; r_eval_count = 120
-    k_values = [2, 4, 6, 8, 9, 10]
+    k_values = [4, 6, 7, 8, 9, 10]
     n_cols = 1 + 1 + len(contrast_scales)  # truth + noiseless_medium + low/med/high
 
     if config.quick:
