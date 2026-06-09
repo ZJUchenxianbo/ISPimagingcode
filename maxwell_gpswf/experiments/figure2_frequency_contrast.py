@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """Figure 2: Frequency and contrast effects (Born data, noise=0.2).
 
-Layout: 5 cols (truth + medium δ=0 + low/medium/high) × 4 rows (k=10,15,20,25).
+Layout: 5 cols (truth + medium δ=0 + low/medium/high) × 6 rows (k=2,4,6,8,9,10).
 Truncation: GPSWF params + epsilon 0.2 + N_cap.
 """
 from __future__ import annotations
@@ -28,22 +28,32 @@ from common.phantom import Block, Mode, three_block_phantom, block_fourier_profi
 def _row_params(k: float) -> dict:
     """Article-style GPSWF parameters linked to wave number k."""
     C = 2.0 * k
-    if k <= 10:
-        return {"ell_max": 8,  "n_modes": 5,  "K": 36, "n_radial": 10, "n_angular": 110, "C": C}
-    elif k <= 15:
-        return {"ell_max": 10, "n_modes": 5,  "K": 44, "n_radial": 12, "n_angular": 170, "C": C}
-    elif k <= 20:
-        return {"ell_max": 14, "n_modes": 6,  "K": 54, "n_radial": 16, "n_angular": 302, "C": C}
+    if k <= 2:
+        return {"ell_max": 2,  "n_modes": 2,  "K": 10, "n_radial": 4,  "n_angular": 38,  "C": C}
+    elif k <= 4:
+        return {"ell_max": 4,  "n_modes": 2,  "K": 16, "n_radial": 5,  "n_angular": 50,  "C": C}
+    elif k <= 6:
+        return {"ell_max": 5,  "n_modes": 3,  "K": 22, "n_radial": 6,  "n_angular": 74,  "C": C}
+    elif k <= 8:
+        return {"ell_max": 7,  "n_modes": 3,  "K": 28, "n_radial": 8,  "n_angular": 86,  "C": C}
+    elif k <= 9:
+        return {"ell_max": 7,  "n_modes": 4,  "K": 32, "n_radial": 8,  "n_angular": 110, "C": C}
     else:
-        return {"ell_max": 16, "n_modes": 7,  "K": 60, "n_radial": 14, "n_angular": 434, "C": C}
+        return {"ell_max": 8,  "n_modes": 5,  "K": 36, "n_radial": 10, "n_angular": 110, "C": C}
 
 
 def _row_params_quick(k: float) -> dict:
     C = 2.0 * k
-    if k <= 12:
-        return {"ell_max": 6, "n_modes": 4, "K": 24, "n_radial": 5, "n_angular": 74,  "C": C}
+    if k <= 4:
+        return {"ell_max": 2, "n_modes": 2, "K": 10, "n_radial": 3, "n_angular": 26, "C": C}
+    elif k <= 6:
+        return {"ell_max": 4, "n_modes": 2, "K": 14, "n_radial": 5, "n_angular": 38, "C": C}
+    elif k <= 8:
+        return {"ell_max": 5, "n_modes": 3, "K": 16, "n_radial": 5, "n_angular": 50, "C": C}
+    elif k <= 9:
+        return {"ell_max": 6, "n_modes": 3, "K": 18, "n_radial": 5, "n_angular": 74, "C": C}
     else:
-        return {"ell_max": 8, "n_modes": 4, "K": 30, "n_radial": 8, "n_angular": 110, "C": C}
+        return {"ell_max": 7, "n_modes": 3, "K": 20, "n_radial": 6, "n_angular": 74, "C": C}
 
 
 def run_experiment(config: ExperimentConfig) -> Any:
@@ -51,12 +61,12 @@ def run_experiment(config: ExperimentConfig) -> Any:
     noise_level = 0.2; epsilon = 0.2; kind = "full"; component_index = 0
     contrast_scales = [0.3, 1.0, 3.0]
     quad_order = 160; r_eval_count = 120
-    k_values = [10, 15, 20, 25]
+    k_values = [2, 4, 6, 8, 9, 10]
     n_cols = 1 + 1 + len(contrast_scales)  # truth + noiseless_medium + low/med/high
 
     if config.quick:
         requested_measure_dirs = 38; grid_size = 51
-        k_values = [10, 15]
+        k_values = [4, 6, 8, 10]
         quad_order = 100; r_eval_count = 80
 
     rng = np.random.default_rng(config.seed + 200)
