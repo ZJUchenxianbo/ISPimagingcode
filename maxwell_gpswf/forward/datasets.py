@@ -79,6 +79,9 @@ def _build_vie_contrast(shape_name: str, volume_nodes, tensor):
         blocks = two_spheres_cube_phantom()
     elif name == "dispersed":
         blocks = dispersed_blocks_phantom()
+    elif name == "three_blocks":
+        from common.phantom import three_block_phantom
+        blocks = three_block_phantom("born")
     else:
         raise ValueError(f"Unknown shape: {name!r}")
     return tensor_blocks_contrast(

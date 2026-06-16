@@ -30,6 +30,7 @@ from common import (
     modal_matrix,
     plot_diagnostic_curves,
     quadrature_modal_coefficients,
+    recover_polarimetric_coefficients,
     reference_tensor,
     save_diagnostics_npz,
     solve_ball_gpswf,
@@ -40,6 +41,10 @@ from common import (
 )
 from common.phantom import Mode
 from common.utils import vector_norm
+from forward.datasets import (
+    full_vie_farfield_dataset,
+    farfield_dataset_to_qhat,
+)
 from forward.vie import ball_voxel_grid
 from nonlinear import (
     compute_bim_gpswf_linearization,
@@ -189,7 +194,16 @@ def run_experiment(config: ExperimentConfig) -> Any:
         vmax = float(np.nanmax(np.real(truth)))
         _imshow(axes[row_idx, 0], np.real(truth), titles[0] if row_idx == 0 else "", vmin, vmax)
 
-        analytic_born_farfield_data = block_fourier_profile(p_nodes, blocks, C) * comp_scale
+        # Analytic Born: full pipeline (like figs 1/2)
+        coeff0 = tensor_coefficients_from_matrix(reference_tensor("full"), "full")
+        scalar_born = block_fourier_profile(p_nodes, blocks, C)
+        tc_born = scalar_born[:, None] * coeff0[None, :]
+        rec_c_born, _, _ = recover_polarimetric_coefficients(
+            p_nodes, tc_born, "full", 0.0,
+            np.random.default_rng(config.seed + 700))
+        comp_born = rec_c_born[:, 0]
+
+        # Full VIE: keep scalar VIE data for BIM, add unified pipeline for column 2
         observed = compute_scalar_vie_data(
             p_nodes=vie_p_nodes,
             incident_dirs=inc_dirs,
@@ -205,8 +219,17 @@ def run_experiment(config: ExperimentConfig) -> Any:
         )
         observed_data = observed.data
 
+        # Full VIE via unified pipeline (column 2 replacement)
+        ds_full = full_vie_farfield_dataset(
+            "three_blocks", p_nodes, kind="full", k=k, R=1.0,
+            n_per_axis=n_per_axis, n_geometries=6)
+        rec_c_vie = farfield_dataset_to_qhat(
+            ds_full, kind="full", noise_level=0.0,
+            rng=np.random.default_rng(config.seed + 701))
+        comp_vie = rec_c_vie[:, 0]
+
         coeffs_analytic_born = quadrature_modal_coefficients(
-            analytic_born_farfield_data,
+            comp_born,
             target_basis,
             target_weights,
             modes,
@@ -249,7 +272,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
         ))
 
         coeffs_full_component = quadrature_modal_coefficients(
-            observed_data,
+            comp_vie,
             target_basis,
             target_weights,
             modes,
