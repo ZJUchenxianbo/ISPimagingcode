@@ -22,6 +22,15 @@
 - 主图脚本必须读取 `ExperimentConfig.data_mode` 或命令行 `--data-mode`，不得在单个图中无说明地硬编码 `mock` 或 `ideal`。
 - 分析输出目录前，必须先检查诊断表中的 `data_mode`，不能只根据目录名假设结果属于 mock 或 ideal。
 
+## 正向数据与反演流程
+
+- 本子项目必须严格区分两层流程：第一层是正向数据生成，第二层是由远场数据反演 `Q(x)`。
+- 正向数据生成的输入是给定散射体 `Q(x)`，输出应是可测远场数据，例如 analytic Born far-field、discrete VIE-Born far-field 或 Full VIE far-field。
+- 反演流程的输入应是远场数据，标准链路是 `far-field data -> polarimetric recovery Qhat(p) -> GPSWF/Fourier/Bessel/DSM reconstruction Q(x)`。
+- 主实验不得把由 `Q(x)` 解析得到的 `Qhat(p)` 直接送入 GPSWF 作为最终评价流程；这种直接 Fourier 输入只能作为明确标注的调试或正向校验分支。
+- “解析”只描述正向远场数据的生成方式，即通过 Born 远场公式和连续 phantom 的解析积分生成 far-field data；不表示反演时已知 `Qhat(p)`。
+- 如果未来接入外部 Maxwell 正向求解器，应直接把其输出当作远场数据接入统一反演入口，而不是改变后续极化恢复和 GPSWF 重构流程。
+
 ## 方向对与极化配置
 
 - `branch_count` 只表示 ideal 模式下每个 Fourier 点构造多少组方向对，不等同于论文中极化恢复的配置数。

@@ -3,7 +3,7 @@
 """Figure 3: Data sources and scatterer shapes.
 
 Layout: 5 rows (sphere, cube, two_spheres+cube, dispersed, inhomogeneous) ×
-         4 cols (truth, Full VIE, VIE Born, Analytical Born).
+         4 cols (truth, Full VIE, VIE-Born FF, Analytic Born FF).
 Truncation: GPSWF params (ell_max=12, n_modes=7) + epsilon 0.1 + N_cap.
 """
 from __future__ import annotations
@@ -18,8 +18,8 @@ from common import (
     ExperimentConfig, ball_quadrature_nodes, collect_alpha_pairs_cached,
     generate_data_nodes, make_table, modal_matrix, orthonormal_basis_perp,
     plot_diagnostic_curves,
-    quadrature_modal_coefficients, reference_tensor,
-    save_diagnostics_npz,
+    quadrature_modal_coefficients, recover_polarimetric_coefficients,
+    reference_tensor, save_diagnostics_npz,
     solve_ball_gpswf, sphere_quadrature, tensor_coefficients_from_matrix,
     write_diagnostics_csv,
 )
@@ -28,10 +28,10 @@ from common.phantom import (
     _shape_truth_and_fourier,
     cube_phantom, two_spheres_cube_phantom, dispersed_blocks_phantom,
 )
-from forward.vie import (
-    assemble_vie_matrix, ball_voxel_grid, incident_plane_wave,
-    maxwell_born_far_field, maxwell_far_field, tensor_ball_contrast, tensor_blocks_contrast,
-    vie_to_fourier_convention,
+from forward.datasets import (
+    FarfieldDataset, analytic_born_farfield_dataset,
+    discrete_vie_born_farfield_dataset, full_vie_farfield_dataset,
+    farfield_dataset_to_qhat,
 )
 
 SHAPES = ["sphere", "cube", "two_spheres_cube", "dispersed", "inhomogeneous"]
@@ -95,10 +95,6 @@ def run_experiment(config: ExperimentConfig) -> Any:
         keep = order[:N_cap]
         retained = np.zeros(len(modes), dtype=bool); retained[keep] = True
 
-    # -- Voxel grid and tensor (isotropic for simplicity) --
-    volume_nodes, volume_weights, voxel_h = ball_voxel_grid(R, n_per_axis)
-    tensor = reference_tensor("isotropic")
-
     # -- Plot --
     n_rows = len(SHAPES); n_cols = 4
     fig, axes = plt.subplots(n_rows, n_cols, figsize=(3.1 * n_cols, 3.1 * n_rows),
@@ -107,16 +103,21 @@ def run_experiment(config: ExperimentConfig) -> Any:
 
     for row_idx, shape_name in enumerate(SHAPES):
         print(f"  Processing {shape_name}...")
-        # Analytical Fourier uses target nodes (not duplicated p_nodes)
+        # Analytic Born far-field data uses continuous phantom Fourier formulas.
         fourier_nodes = target_nodes if data_mode == 'ideal' else p_nodes
-        truth, gps, dm, fourier_analytical = _shape_truth_and_fourier(
+        truth, gps, dm, analytic_born_farfield = _shape_truth_and_fourier(
             shape_name, fourier_nodes, grid_size, C)
         image_matrix = modal_matrix(gps, modes, fourier_side=False)
         vmin = float(np.nanmin(np.real(truth))); vmax = float(np.nanmax(np.real(truth)))
 
-        # --- Analytical Born (column 4) ---
+        # --- Analytic Born far-field (column 4): full pipeline ---
+        coeff0 = tensor_coefficients_from_matrix(reference_tensor(kind), kind)
+        tc_ana = analytic_born_farfield[:, None] * coeff0[None, :]
+        rec_c_ana, _, _ = recover_polarimetric_coefficients(
+            p_nodes, tc_ana, kind, 0.0, rng)
+        comp_data_ana = rec_c_ana[:, component_index]
         coeffs_ana = quadrature_modal_coefficients(
-            fourier_analytical, target_basis, target_weights, modes, retained)
+            comp_data_ana, target_basis, target_weights, modes, retained)
         rec_ana = (image_matrix @ coeffs_ana).reshape(grid_size, grid_size)
         rec_ana[~dm] = 0.0
         effective_p_nodes = target_nodes if data_mode == 'ideal' else p_nodes
@@ -140,10 +141,10 @@ def run_experiment(config: ExperimentConfig) -> Any:
         diagnostic_rows.append(collect_reconstruction_diagnostics(
             case={
                 **base_case,
-                "case_id": f"{shape_name}_analytical_born",
+                "case_id": f"{shape_name}_analytic_born_farfield",
                 "row": int(row_idx),
                 "column": 3,
-                "data_source": "analytical_born",
+                "data_source": "analytic_born_farfield",
             },
             modes=modes,
             retained=retained,
@@ -152,104 +153,69 @@ def run_experiment(config: ExperimentConfig) -> Any:
             mock_distances=effective_mock_distances,
             basis_matrix=target_basis,
             target_weights=target_weights,
-            component_data=fourier_analytical,
+            component_data=comp_data_ana,
             coeffs=coeffs_ana,
             image=rec_ana,
             truth=truth,
             disk_mask=dm,
         ))
 
-        # --- VIE data (columns 2, 3) ---
-        blocks = _shape_to_blocks(shape_name)
-        if shape_name == "sphere":
-            Q = tensor_ball_contrast(volume_nodes, 0.25, tensor,
-                                     scale=1.0, center=np.array([0.0, 0.0, 0.0]))
-        elif shape_name == "inhomogeneous":
-            # Build Gaussian-bump contrast directly on voxel grid
-            Q = np.zeros((volume_nodes.shape[0], 3, 3), dtype=np.complex128)
-            bumps = [
-                (np.array([-0.20, 0.15, 0.0]), 0.12, 1.0 + 0.0j),
-                (np.array([0.25, 0.10, 0.0]), 0.08, 0.7 + 0.2j),
-                (np.array([0.05, -0.25, 0.0]), 0.14, 1.2 - 0.1j),
-            ]
-            for center, sigma, amp in bumps:
-                r_sq = np.sum((volume_nodes - center[None, :])**2, axis=1)
-                scalar = complex(amp) * np.exp(-0.5 * r_sq / sigma**2)
-                for a in range(3):
-                    Q[:, a, a] += scalar  # isotropic: Q_aa = scalar
-        else:
-            Q = tensor_blocks_contrast(
-                volume_nodes,
-                [(np.asarray(b.center, dtype=float), np.asarray(b.half_width, dtype=float),
-                  complex(b.amplitude)) for b in blocks],
-                tensor)
-        A = assemble_vie_matrix(volume_nodes, volume_weights, Q, k, h=voxel_h)
-        lu = lu_factor(A)
-
-        comp_full, comp_born_vie = _compute_vie_scalar_data(
-            p_nodes, matched_inc, matched_obs,
-            volume_nodes, volume_weights, Q, tensor, k, R, lu,
-        )
-        comp_full_u = vie_to_fourier_convention(comp_full)
-        comp_born_vie_u = vie_to_fourier_convention(comp_born_vie)
-        # In ideal mode, average over branches per target node
+        # --- VIE data (columns 2, 3): unified farfield → polarimetric → GPSWF ---
+        # Full VIE
+        ds_full = full_vie_farfield_dataset(
+            shape_name, target_nodes, kind=kind, k=k, R=R,
+            n_per_axis=n_per_axis, n_geometries=6)
+        rec_c_full = farfield_dataset_to_qhat(ds_full, kind=kind, noise_level=0.0, rng=rng)
+        comp_full = rec_c_full[:, component_index]
         if data_mode == 'ideal':
-            n_target = target_nodes.shape[0]
-            comp_full_u = comp_full_u.reshape(-1, n_target).mean(axis=0)
-            comp_born_vie_u = comp_born_vie_u.reshape(-1, n_target).mean(axis=0)
-
+            comp_full = comp_full.reshape(-1, target_nodes.shape[0]).mean(axis=0)
         coeffs_full = quadrature_modal_coefficients(
-            comp_full_u, target_basis, target_weights, modes, retained)
-        coeffs_bv = quadrature_modal_coefficients(
-            comp_born_vie_u, target_basis, target_weights, modes, retained)
+            comp_full, target_basis, target_weights, modes, retained)
+        rec_full = (image_matrix @ coeffs_full).reshape(grid_size, grid_size)
+        rec_full[~dm] = 0.0
 
-        rec_full = (image_matrix @ coeffs_full).reshape(grid_size, grid_size); rec_full[~dm] = 0.0
-        rec_bv = (image_matrix @ coeffs_bv).reshape(grid_size, grid_size); rec_bv[~dm] = 0.0
+        # VIE Born
+        ds_born = discrete_vie_born_farfield_dataset(
+            shape_name, target_nodes, kind=kind, k=k, R=R,
+            n_per_axis=n_per_axis, n_geometries=6)
+        rec_c_born = farfield_dataset_to_qhat(ds_born, kind=kind, noise_level=0.0, rng=rng)
+        comp_born = rec_c_born[:, component_index]
+        if data_mode == 'ideal':
+            comp_born = comp_born.reshape(-1, target_nodes.shape[0]).mean(axis=0)
+        coeffs_bv = quadrature_modal_coefficients(
+            comp_born, target_basis, target_weights, modes, retained)
+        rec_bv = (image_matrix @ coeffs_bv).reshape(grid_size, grid_size)
+        rec_bv[~dm] = 0.0
+
         diagnostic_rows.append(collect_reconstruction_diagnostics(
             case={
                 **base_case,
                 "case_id": f"{shape_name}_full_vie",
-                "row": int(row_idx),
-                "column": 1,
-                "data_source": "full_vie",
+                "row": int(row_idx), "column": 1, "data_source": "full_vie",
             },
-            modes=modes,
-            retained=retained,
-            target_nodes=target_nodes,
-            p_nodes=effective_p_nodes,
+            modes=modes, retained=retained,
+            target_nodes=target_nodes, p_nodes=effective_p_nodes,
             mock_distances=effective_mock_distances,
-            basis_matrix=target_basis,
-            target_weights=target_weights,
-            component_data=comp_full_u,
-            coeffs=coeffs_full,
-            image=rec_full,
-            truth=truth,
-            disk_mask=dm,
+            basis_matrix=target_basis, target_weights=target_weights,
+            component_data=comp_full, coeffs=coeffs_full,
+            image=rec_full, truth=truth, disk_mask=dm,
         ))
         diagnostic_rows.append(collect_reconstruction_diagnostics(
             case={
                 **base_case,
                 "case_id": f"{shape_name}_vie_born",
-                "row": int(row_idx),
-                "column": 2,
-                "data_source": "vie_born",
+                "row": int(row_idx), "column": 2, "data_source": "discrete_vie_born_farfield",
             },
-            modes=modes,
-            retained=retained,
-            target_nodes=target_nodes,
-            p_nodes=effective_p_nodes,
+            modes=modes, retained=retained,
+            target_nodes=target_nodes, p_nodes=effective_p_nodes,
             mock_distances=effective_mock_distances,
-            basis_matrix=target_basis,
-            target_weights=target_weights,
-            component_data=comp_born_vie_u,
-            coeffs=coeffs_bv,
-            image=rec_bv,
-            truth=truth,
-            disk_mask=dm,
+            basis_matrix=target_basis, target_weights=target_weights,
+            component_data=comp_born, coeffs=coeffs_bv,
+            image=rec_bv, truth=truth, disk_mask=dm,
         ))
 
         # --- Plot row (shared vmin/vmax from truth, same style as Figure 1) ---
-        titles = ["truth", "Full VIE", "VIE Born", "Analytical Born"] if row_idx == 0 else [""]*4
+        titles = ["truth", "Full VIE", "VIE-Born FF", "Analytic Born FF"] if row_idx == 0 else [""]*4
         images = [np.real(truth), np.real(rec_full), np.real(rec_bv), np.real(rec_ana)]
         for col_idx, (img, title) in enumerate(zip(images, titles)):
             _imshow(axes[row_idx, col_idx], img, title, "viridis", vmin, vmax)
@@ -267,36 +233,6 @@ def run_experiment(config: ExperimentConfig) -> Any:
     )
     print(f"Saved {config.out_dir / 'figure3_sources_shapes.png'}")
     return make_table([{"figure": 3, "status": "ok"}])
-
-
-def _compute_vie_scalar_data(p_nodes, inc_dirs, obs_dirs, v_nodes, v_weights, Q, tensor, k, R, lu):
-    """Compute scalar Fourier data from VIE for all matched direction pairs."""
-    coeff0 = tensor_coefficients_from_matrix(tensor, "isotropic")
-    comp_scale = complex(coeff0[0])
-    comp_full = np.zeros(p_nodes.shape[0], dtype=np.complex128)
-    comp_born = np.zeros_like(comp_full)
-    scale = (4.0 * math.pi / (float(k) ** 2)) / (float(R) ** 3)
-
-    for idx in range(p_nodes.shape[0]):
-        d = inc_dirs[idx]; xhat = obs_dirs[idx]
-        E_basis = np.column_stack(orthonormal_basis_perp(d))
-        projector = np.eye(3) - np.outer(xhat, xhat)
-        model_blocks, full_blocks, born_blocks = [], [], []
-        for col in range(E_basis.shape[1]):
-            e = E_basis[:, col].astype(np.complex128)
-            rhs = incident_plane_wave(v_nodes, k, d, e).reshape(-1)
-            total_field = lu_solve(lu, rhs).reshape((-1, 3))
-            full = maxwell_far_field(v_nodes, v_weights, Q, total_field, k, xhat[None, :])[0]
-            born = maxwell_born_far_field(v_nodes, v_weights, Q, k, d, e, xhat[None, :])[0]
-            model_blocks.append(projector @ tensor @ e)
-            full_blocks.append(scale * full)
-            born_blocks.append(scale * born)
-        model = np.concatenate(model_blocks)
-        denom = np.vdot(model, model)
-        if abs(denom) > 1e-14:
-            comp_full[idx] = np.vdot(model, np.concatenate(full_blocks)) / denom * comp_scale
-            comp_born[idx] = np.vdot(model, np.concatenate(born_blocks)) / denom * comp_scale
-    return comp_full, comp_born
 
 
 def _imshow(ax, img, title, cmap, vmin, vmax):

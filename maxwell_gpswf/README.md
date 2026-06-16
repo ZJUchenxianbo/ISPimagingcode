@@ -62,6 +62,30 @@ figure*_diagnostic_curves.png # 诊断曲线
 
 ---
 
+## 数据源术语
+
+本子项目中“解析”只描述**远场数据的生成方式**，不是说反演时直接把 `Q(x)` 交给算法。
+
+三类数据源区分如下：
+
+```text
+Analytic Born far-field
+    给定连续 phantom Q(x)，代入 Born 远场公式；
+    对球、方块、高斯等形状，积分项有解析表达式。
+
+Discrete VIE-Born far-field
+    给定体素离散 Q_i，在 VIE 求解器框架内把总场替换为入射场 E_i；
+    远场由体素求和得到，是离散 Born 数据。
+
+Full VIE far-field
+    给定体素离散 Q_i，先解 VIE 得到总场 E，再计算远场；
+    数据含多重散射，不再等价于 Born 模型下的 Qhat(p)。
+```
+
+在 Born 近似下，远场通道满足 `g(p)=M(p)c(p)`，其中 `c(p)` 是 `Qhat(p)` 在张量基下的系数。极化恢复指的是从远场通道 `g(p)` 解出 `c(p)`，然后再进入 GPSWF / Fourier / Bessel / DSM 成像。
+
+---
+
 ## 图1: 噪声与截断维数
 
 **目的**：固定 k=15，观察截断维数 N 和噪声水平对 Born 重建的影响。
@@ -144,9 +168,9 @@ figure*_diagnostic_curves.png # 诊断曲线
 
 ## 图3: 数据来源与散射体形状
 
-**目的**：比较 Full VIE / VIE Born / Analytical Born 三种数据源在 5 种散射体上的反演。
+**目的**：比较 Full VIE far-field / Discrete VIE-Born far-field / Analytic Born far-field 三种数据源在 5 种散射体上的反演。
 
-**布局**：4 列 (truth + Full VIE + VIE Born + Analytical Born) × 5 行
+**布局**：4 列 (truth + Full VIE + VIE-Born FF + Analytic Born FF) × 5 行
 
 ### 参数
 
@@ -175,7 +199,7 @@ figure*_diagnostic_curves.png # 诊断曲线
 
 ### 5 种散射体
 
-| 行 | 名称 | 描述 | 解析 Fourier 公式 |
+| 行 | 名称 | 描述 | 解析 Born 远场积分公式 |
 |----|------|------|-------------------|
 | 1 | sphere | 球，半径 0.25，中心原点 | 球 Bessel: 4π(sin(z)-z cos(z))/ξ³ |
 | 2 | cube | 立方体，边长 0.4 | sinc 乘积 |
@@ -198,7 +222,7 @@ figure*_diagnostic_curves.png # 诊断曲线
 
 **布局**：5 列 (truth + R=1.0/1.5/2.0/3.0) × 5 行（同图3 散射体）
 
-**数据源**：Born 解析。所有列都使用固定物理坐标范围 `[-1,1]×[-1,1]` 显示。
+**数据源**：Analytic Born far-field。所有列都使用固定物理坐标范围 `[-1,1]×[-1,1]` 显示。
 
 尺度关系：
 
@@ -370,7 +394,7 @@ min_a ||A_n a - r^n||^2 + lambda ||a||^2
 q^{n+1} = q^n + step * sum_j a_j psi_j
 ```
 
-**布局**：6 列 (truth + Analytical Born-GPSWF + Full VIE Born-GPSWF + BIM iter 1 + BIM iter 2 + BIM iter 3) × 若干行。
+**布局**：6 列 (truth + Analytic Born FF-GPSWF + Full VIE data-GPSWF + BIM iter 1 + BIM iter 2 + BIM iter 3) × 若干行。
 
 full 模式使用：
 
@@ -394,6 +418,12 @@ n_per_axis = 5
 N_iter = 3
 ```
 
+图7第一列数据源说明：
+
+- `Analytic Born FF-GPSWF`：由连续三方块 phantom 的 Born 远场积分解析公式生成数据，再做 GPSWF 截断成像。
+- `Full VIE data-GPSWF`：由体素离散 VIE 求出 Full far-field，再直接套 Born/GPSWF 线性成像模型得到初值。
+- `BIM iter`：以上一列 Full VIE data-GPSWF 为初值，在 retained GPSWF 空间中迭代修正。
+
 VIE 远场原始相位对应 `exp(+i C p·x)`。图7为了与 GPSWF 投影使用的
 `exp(-i C p·x)` 约定一致，生成 VIE / BIM 数据时使用 `-p` 的入射/观测方向对；
 因此不再通过简单复共轭来转换 VIE 数据。这样对复值 `q(x)` 不会把反差错误共轭。
@@ -402,7 +432,7 @@ BIM 诊断中：
 
 - `relative_data_residual_before_update`：本次 BIM 更新前的相对数据残差；
 - `relative_data_residual`：应用本次更新并重新求解 VIE 后的相对数据残差；
-- `mock_distance_mean`：Analytical Born 路径的 mock 节点平均距离；
+- `mock_distance_mean`：Analytic Born far-field 路径的 mock 节点平均距离；
 - `vie_mock_distance_mean`：VIE / BIM 使用 `-p` 方向对时的 mock 节点平均距离。
 
 输出文件：

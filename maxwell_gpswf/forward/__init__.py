@@ -22,3 +22,11 @@ from forward.vie import (
     tensor_blocks_contrast,
     vie_to_fourier_convention,
 )
+
+from forward.datasets import (
+    FarfieldDataset,
+    analytic_born_farfield_dataset,
+    discrete_vie_born_farfield_dataset,
+    farfield_dataset_to_qhat,
+    full_vie_farfield_dataset,
+)

@@ -20,6 +20,8 @@
 - 变量名尽量保留数学和物理含义，例如 `k`、`alpha`、`obs_angles`、`incident_angles`、`farfield`、`indicator`。
 - 优先复用已有工具函数，包括 `scattering_common`（常量/噪声）、`sampling_imaging`（成像指标/孔径）、`target_cases`（几何/绘图）、`forward_scattering`（前向求解）、`obstacle_reconstruction`（重建算法）。
 - 重构应以消除重复、打破循环依赖或提取共享逻辑为目的；重构前应先说明理由并取得确认。
+- 非小改动开始前，应先生成一个临时计划 Markdown 文件（例如 `.codex_plan_tmp.md` 或子项目内同名文件），写清修改目标、当前问题、拟修改文件、具体步骤、验证方式和不做的事情；待用户审核确认后再实施。
+- 临时计划文件只用于本次协作，任务完成并验证后应删除，不保留在项目中。
 
 ## 数学与数值实现
 

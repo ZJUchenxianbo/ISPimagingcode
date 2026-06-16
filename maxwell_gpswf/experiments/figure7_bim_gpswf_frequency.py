@@ -81,7 +81,7 @@ def _row_params_quick(k: float) -> dict[str, float | int]:
 def run_experiment(config: ExperimentConfig) -> Any:
     requested_measure_dirs = 110
     grid_size = 81
-    k_values = [4, 6, 7, 8, 9, 10]
+    k_values = [5, 6, 7, 8, 9, 10]
     n_per_axis = 7
     n_iterations = 3
     epsilon = 0.2
@@ -109,8 +109,8 @@ def run_experiment(config: ExperimentConfig) -> Any:
     n_rows = len(k_values)
     titles = [
         "truth",
-        "Analytical Born",
-        "Full VIE Born",
+        "Analytic Born FF",
+        "Full VIE data",
         "BIM iter 1",
         "BIM iter 2",
         "BIM iter 3",
@@ -189,7 +189,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
         vmax = float(np.nanmax(np.real(truth)))
         _imshow(axes[row_idx, 0], np.real(truth), titles[0] if row_idx == 0 else "", vmin, vmax)
 
-        analytical_data = block_fourier_profile(p_nodes, blocks, C) * comp_scale
+        analytic_born_farfield_data = block_fourier_profile(p_nodes, blocks, C) * comp_scale
         observed = compute_scalar_vie_data(
             p_nodes=vie_p_nodes,
             incident_dirs=inc_dirs,
@@ -205,31 +205,31 @@ def run_experiment(config: ExperimentConfig) -> Any:
         )
         observed_data = observed.data
 
-        coeffs_analytical = quadrature_modal_coefficients(
-            analytical_data,
+        coeffs_analytic_born = quadrature_modal_coefficients(
+            analytic_born_farfield_data,
             target_basis,
             target_weights,
             modes,
             retained,
         )
-        image_analytical = (image_matrix @ coeffs_analytical).reshape(grid_size, grid_size)
-        image_analytical[~disk_mask] = 0.0
+        image_analytic_born = (image_matrix @ coeffs_analytic_born).reshape(grid_size, grid_size)
+        image_analytic_born[~disk_mask] = 0.0
         _imshow(
             axes[row_idx, 1],
-            np.real(image_analytical),
+            np.real(image_analytic_born),
             titles[1] if row_idx == 0 else "",
             vmin,
             vmax,
         )
         diagnostic_rows.append(_diagnostic_row(
             figure=7,
-            case_id=f"k{k:g}_analytical_born",
-            method="analytical_born_gpswf",
+            case_id=f"k{k:g}_analytic_born_farfield",
+            method="analytic_born_farfield_gpswf",
             row=row_idx,
             column=1,
             k=float(k),
             iteration=0,
-            image=image_analytical,
+            image=image_analytic_born,
             truth=truth,
             disk_mask=disk_mask,
             retained_modes=int(np.sum(retained)),
@@ -284,8 +284,8 @@ def run_experiment(config: ExperimentConfig) -> Any:
         initial_residual_norm = vector_norm(residual)
         diagnostic_rows.append(_diagnostic_row(
             figure=7,
-            case_id=f"k{k:g}_full_vie_born_gpswf",
-            method="full_vie_born_gpswf",
+            case_id=f"k{k:g}_full_vie_data_gpswf",
+            method="full_vie_data_gpswf",
             row=row_idx,
             column=2,
             k=float(k),
