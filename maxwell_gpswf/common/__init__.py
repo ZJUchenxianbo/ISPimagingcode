@@ -10,6 +10,7 @@ from common.config import ExperimentConfig
 from common.phantom import (
     Block,
     Mode,
+    TensorBlock,
     TensorKind,
     ball_phantom,
     block_fourier_profile,
@@ -20,8 +21,11 @@ from common.phantom import (
     sphere_fourier_profile,
     sphere_truth_2d,
     tensor_basis,
+    tensor_block_fourier_coefficients,
+    tensor_truth_image_2d,
     tensor_coefficients_from_matrix,
     three_block_phantom,
+    three_tensor_block_phantom,
     truth_image_2d,
     two_spheres_cube_phantom,
     _shape_truth_and_fourier,
@@ -47,7 +51,9 @@ from common.quadrature import (
 
 from common.polarimetric import (
     build_polarimetric_matrix,
+    polarimetric_farfield_data,
     recover_polarimetric_coefficients,
+    recover_polarimetric_coefficients_from_data,
 )
 
 from common.gpswf import (
@@ -85,6 +91,12 @@ from common.spherical_bessel import (
     reconstruct_ball_bessel_from_data,
     reconstruct_blocks_ball_bessel,
     spherical_bessel_roots,
+)
+
+from common.direct_sampling import (
+    direct_sampling_component_indicator,
+    direct_sampling_farfield_indicator,
+    direct_sampling_tensor_indicator,
 )
 
 from common.diagnostics import (

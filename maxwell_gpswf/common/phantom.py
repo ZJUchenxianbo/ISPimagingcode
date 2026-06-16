@@ -30,6 +30,15 @@ class Block:
 
 
 @dataclass(frozen=True)
+class TensorBlock:
+    """Axis-aligned block scatterer with its own 3x3 tensor contrast."""
+
+    center: tuple[float, float, float]
+    half_width: tuple[float, float, float]
+    tensor: CArray
+
+
+@dataclass(frozen=True)
 class Mode:
     """Ball-GPSWF mode identifier with precomputed data."""
 
@@ -69,6 +78,48 @@ def three_block_phantom(variant: str = "born") -> list[Block]:
     raise ValueError(f"Unknown three_block_phantom variant: {variant!r}")
 
 
+def three_tensor_block_phantom() -> list[TensorBlock]:
+    """Three blocks with different full anisotropic tensor contrasts."""
+    return [
+        TensorBlock(
+            center=(-0.42, 0.30, 0.0),
+            half_width=(0.16, 0.16, 0.16),
+            tensor=np.asarray(
+                [
+                    [1.00 + 0.15j, 0.32 - 0.18j, -0.08 + 0.06j],
+                    [-0.22 + 0.10j, -0.50 + 0.24j, 0.18 - 0.12j],
+                    [0.12 + 0.03j, -0.26 + 0.08j, 0.65 - 0.25j],
+                ],
+                dtype=np.complex128,
+            ),
+        ),
+        TensorBlock(
+            center=(0.28, 0.28, 0.0),
+            half_width=(0.15, 0.15, 0.16),
+            tensor=np.asarray(
+                [
+                    [0.25 + 0.05j, -0.18 + 0.08j, 0.42 - 0.10j],
+                    [0.30 - 0.16j, 1.05 + 0.12j, -0.20 + 0.18j],
+                    [-0.15 + 0.04j, 0.36 - 0.07j, -0.45 + 0.22j],
+                ],
+                dtype=np.complex128,
+            ),
+        ),
+        TensorBlock(
+            center=(0.00, -0.35, 0.0),
+            half_width=(0.18, 0.14, 0.16),
+            tensor=np.asarray(
+                [
+                    [-0.55 + 0.28j, 0.16 + 0.12j, 0.12 - 0.20j],
+                    [-0.08 + 0.05j, 0.35 - 0.18j, 0.48 + 0.06j],
+                    [0.24 - 0.10j, -0.30 + 0.16j, 1.25 - 0.30j],
+                ],
+                dtype=np.complex128,
+            ),
+        ),
+    ]
+
+
 def ball_phantom(
     center: tuple[float, float, float] = (0.0, 0.0, 0.0),
     radius: float = 0.35,
@@ -100,6 +151,33 @@ def block_fourier_profile(p_nodes: np.ndarray, blocks: list[Block], C: float) ->
     return values
 
 
+def tensor_block_fourier_coefficients(
+    p_nodes: np.ndarray,
+    blocks: list[TensorBlock],
+    C: float,
+    kind: TensorKind = "full",
+) -> CArray:
+    """Analytical Fourier coefficients for a tensor-block phantom.
+
+    Returns an array with shape ``(n_nodes, n_tensor_coeffs)`` representing
+    ``Qhat(p) = sum_r c_r(p) T_r`` in the selected tensor basis.
+    """
+    p_nodes = np.asarray(p_nodes, dtype=float)
+    if p_nodes.ndim != 2 or p_nodes.shape[1] != 3:
+        raise ValueError("p_nodes must have shape (n_nodes, 3)")
+    n_coeffs = len(tensor_basis(kind))
+    values = np.zeros((p_nodes.shape[0], n_coeffs), dtype=np.complex128)
+    xi = float(C) * p_nodes
+    for block in blocks:
+        center = np.asarray(block.center, dtype=float)
+        half_width = np.asarray(block.half_width, dtype=float)
+        phase = np.exp(-1j * (xi @ center))
+        profile = np.prod(2.0 * half_width * np.sinc((xi * half_width) / math.pi), axis=1)
+        tensor_coeffs = tensor_coefficients_from_matrix(block.tensor, kind)
+        values += (phase * profile)[:, None] * tensor_coeffs[None, :]
+    return values
+
+
 def truth_image_2d(
     grid_size: int, blocks: list[Block], component_value: complex
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -120,6 +198,45 @@ def truth_image_2d(
         if abs(cz) <= hz:
             mask = (np.abs(X - cx) <= hx) & (np.abs(Y - cy) <= hy)
             truth[mask] += complex(block.amplitude) * component_value
+    disk_mask = X**2 + Y**2 <= 1.0
+    truth[~disk_mask] = 0.0
+    grid_points = np.column_stack([X.reshape(-1), Y.reshape(-1), np.zeros(grid_size * grid_size)])
+    return truth, grid_points, disk_mask
+
+
+def tensor_truth_image_2d(
+    grid_size: int,
+    blocks: list[TensorBlock],
+    *,
+    kind: TensorKind = "full",
+    component_index: int | None = None,
+    display: Literal["frobenius", "component"] = "frobenius",
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Generate a z=0 truth image for tensor-block phantoms."""
+    centers = np.linspace(-1.0, 1.0, grid_size)
+    X, Y = np.meshgrid(centers, centers)
+    matrix_field = np.zeros((grid_size, grid_size, 3, 3), dtype=np.complex128)
+    for block in blocks:
+        cx, cy, cz = block.center
+        hx, hy, hz = block.half_width
+        if abs(cz) <= hz:
+            mask = (np.abs(X - cx) <= hx) & (np.abs(Y - cy) <= hy)
+            matrix_field[mask] += np.asarray(block.tensor, dtype=np.complex128)
+
+    if display == "frobenius":
+        truth = np.linalg.norm(matrix_field.reshape(grid_size, grid_size, 9), axis=2)
+        truth = truth.astype(np.complex128)
+    elif display == "component":
+        if component_index is None:
+            raise ValueError("component_index is required for component display")
+        coeff_field = np.zeros((grid_size, grid_size, len(tensor_basis(kind))), dtype=np.complex128)
+        for i in range(grid_size):
+            for j in range(grid_size):
+                coeff_field[i, j] = tensor_coefficients_from_matrix(matrix_field[i, j], kind)
+        truth = coeff_field[:, :, int(component_index)]
+    else:
+        raise ValueError("display must be 'frobenius' or 'component'")
+
     disk_mask = X**2 + Y**2 <= 1.0
     truth[~disk_mask] = 0.0
     grid_points = np.column_stack([X.reshape(-1), Y.reshape(-1), np.zeros(grid_size * grid_size)])

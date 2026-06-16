@@ -75,6 +75,7 @@ def ball_bessel_modes(
     *,
     bandwidth_factor: float = 2.0,
     ell_max: int | None = None,
+    max_modes: int | None = None,
 ) -> list[BesselMode]:
     """Build unit-ball Bessel modes with ``rho_{ell,n} <= bandwidth_factor*k_max``."""
     if k_max <= 0.0:
@@ -104,6 +105,9 @@ def ball_bessel_modes(
                         normalization=float(normalization),
                     )
                 )
+    modes.sort(key=lambda mode: (mode.rho, mode.ell, mode.n, mode.m))
+    if max_modes is not None and int(max_modes) > 0 and len(modes) > int(max_modes):
+        return modes[: int(max_modes)]
     return modes
 
 
@@ -210,10 +214,12 @@ def reconstruct_ball_bessel_from_data(
     quadrature_nodes: np.ndarray,
     quadrature_weights: np.ndarray,
     bandwidth_factor: float = 2.0,
+    max_modes: int | None = None,
     rcond: float = 1e-8,
 ) -> tuple[np.ndarray, dict[str, Any]]:
     """Reconstruct one component from recovered Fourier data using Bessel modes."""
-    modes = ball_bessel_modes(k_max, bandwidth_factor=bandwidth_factor)
+    candidate_modes = len(ball_bessel_modes(k_max, bandwidth_factor=bandwidth_factor))
+    modes = ball_bessel_modes(k_max, bandwidth_factor=bandwidth_factor, max_modes=max_modes)
     data_matrix = ball_bessel_data_matrix(
         p_nodes,
         modes,
@@ -232,6 +238,8 @@ def reconstruct_ball_bessel_from_data(
     rho_values = np.asarray([mode.rho for mode in modes], dtype=float)
     meta = {
         "bessel_modes": int(len(modes)),
+        "bessel_candidate_modes": int(candidate_modes),
+        "basis_mode_cap": int(max_modes) if max_modes is not None else int(candidate_modes),
         "bessel_ell_max": int(max((mode.ell for mode in modes), default=-1)),
         "bessel_n_max": int(max((mode.n for mode in modes), default=0)),
         "bessel_rho_max": float(np.max(rho_values)) if rho_values.size else math.nan,

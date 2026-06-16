@@ -6,7 +6,7 @@
 
 ```
 maxwell_gpswf/
-├── common/          # config, phantom, 求积, 极化, GPSWF, Fourier/Bessel baseline
+├── common/          # config, phantom, 求积, 极化, GPSWF, Fourier/Bessel/DSM
 ├── forward/         # 解析 Born + VIE (含自作用项 L=-I/3)
 ├── experiments/     # 主图实验
 ├── main.py
@@ -43,7 +43,9 @@ pandas 3.0.3
 ```bash
 .venv/bin/python maxwell_gpswf/main.py --out-dir outputs                    # 全部
 .venv/bin/python maxwell_gpswf/main.py --mode fig1 --data-mode ideal        # 单图+理想模式
-.venv/bin/python maxwell_gpswf/main.py --mode fig5 --out-dir outputs        # GPSWF/Fourier 对照
+.venv/bin/python maxwell_gpswf/main.py --mode fig5 --out-dir outputs        # 基函数与 DSM 对照
+.venv/bin/python maxwell_gpswf/main.py --mode fig6 --out-dir outputs        # 不同张量散射体
+.venv/bin/python maxwell_gpswf/main.py --mode fig7 --out-dir outputs        # BIM-GPSWF 非线性修正
 .venv/bin/python maxwell_gpswf/main.py --quick --out-dir outputs/smoke      # 快速检查
 ```
 
@@ -235,20 +237,22 @@ Q(x) = f_R(x/R) / R^3
 
 ---
 
-## 图5: GPSWF、立方体 Fourier 与球谐-Bessel 对照
+## 图5: GPSWF、立方体 Fourier、球谐-Bessel、DSM 与 EM-DSM 对照
 
-**目的**：用图2当前的波数配置，在 medium 对比度下比较三种重构空间：
+**目的**：用图2当前的波数配置，在 medium 对比度下比较三种重构空间和两个直接成像指标：
 
 - GPSWF：单位球支撑，单频 Born 数据，`C=2k`。
-- Cube Fourier：立方体支撑 `[-1,1]^3`，基函数满足 `|ξ_l| <= 2K_max`。
-- Ball Bessel：单位球支撑，球谐-Bessel 基，径向零点满足 `ρ_{ℓn} <= 2K_max`。
+- Cube Fourier：立方体支撑 `[-1,1]^3`，候选基函数满足 `|ξ_l| <= 2K_max`。
+- Ball Bessel：单位球支撑，球谐-Bessel 候选基，径向零点满足 `ρ_{ℓn} <= 2K_max`。
+- DSM：不求展开系数，直接对极化恢复后的 recovered Fourier 数据做相位回投指标。
+- EM-DSM：不做极化伪逆恢复，直接用 Maxwell 远场通道算子的伴随 `M(p)^*g(p)` 做相位回投指标。
 
-**布局**：4 列 (truth + GPSWF + Cube Fourier + Ball Bessel) × 6 行 (k/Kmax=4, 6, 7, 8, 9, 10)。
+**布局**：6 列 (truth + GPSWF + Cube Fourier + Ball Bessel + DSM + EM-DSM) × 6 行 (k/Kmax=4, 6, 7, 8, 9, 10)。
 
-三种方法使用同一套前置流程：
+GPSWF、Cube Fourier、Ball Bessel 和 DSM 使用同一套极化恢复前置流程：
 
 ```text
-远场 Born 数据 -> 极化恢复 -> recovered Qhat(p) -> 选择不同基函数重构 Q(x)
+远场 Born 数据 -> 极化恢复 -> recovered Qhat(p)
 ```
 
 Cube Fourier 使用标准立方体 Fourier 基：
@@ -257,7 +261,7 @@ Cube Fourier 使用标准立方体 Fourier 基：
 phi_l(x) = exp(i*pi*l.x),  l in Z^3,  x in [-1,1]^3
 ```
 
-其系数由同一批 recovered Fourier 数据解最小二乘问题：
+其系数由 recovered Fourier 数据解最小二乘方程：
 
 ```text
 sum_l c_l int_cube phi_l(x) exp(-i C p_i.x) dx ~= Qhat(p_i)
@@ -269,15 +273,38 @@ Ball Bessel 使用单位球 Dirichlet 基：
 phi_{ell,n,m}(x) = N_{ell,n} j_ell(rho_{ell,n}|x|) Y_ell^m(theta, phi)
 ```
 
-其系数同样由 recovered Fourier 数据解最小二乘问题：
+其系数同样由 recovered Fourier 数据解最小二乘方程：
 
 ```text
 sum_j c_j int_ball phi_j(x) exp(-i C p_i.x) dx ~= Qhat(p_i)
 ```
 
-因此图5只改变最后的展开基函数，远场数据、极化恢复、mock/ideal 节点和噪声流程保持一致。
+为避免普通 Fourier/Bessel 数据方程在高频下严重放大噪声，图5会先生成候选模式，再使用经验稳定化截断。Fourier 和 Ball Bessel 的模式数比例分别由 `fourier_mode_fraction`、`bessel_mode_fraction` 控制，当前默认都为 `1.2`：
 
-### 模式数
+```text
+Fourier modes <= max(12, fourier_mode_fraction * GPSWF retained modes)
+Bessel modes  <= max(12, bessel_mode_fraction  * GPSWF retained modes)
+```
+
+图5当前最小二乘截断为 `rcond=1e-8`。
+
+DSM 列使用同一批 recovered Fourier 数据：
+
+```text
+I_DSM(z) = |sum_i w_i Qhat(p_i) exp(i C p_i.z)|
+```
+
+图中显示的是归一化后的 DSM 指标，主要用于比较目标定位和旁瓣，不直接表示 `Q_11` 的对比度大小。
+
+EM-DSM 列使用极化恢复之前的原始远场通道数据，但不是把通道向量当成标量直接相加，而是先作用 Maxwell 通道矩阵的伴随：
+
+```text
+I_EMDSM(z) = ||sum_i w_i M(p_i)^* g(p_i) exp(i C p_i.z)||_2
+```
+
+这里 `g(p_i)` 包含每个 Fourier 点下所有 admissible direction / incident polarization / observed vector component 通道，`M(p_i)^*` 对应完整电磁测试函数中的横向投影和入射极化结构。它不做 `pinv(M)`，因此仍是直接成像指标，而不是张量 Fourier 系数恢复。
+
+### 候选模式数
 
 | K_max | Fourier modes (`|ξ| <= 2K_max`) | Bessel modes (`ρ <= 2K_max`) |
 |-------|----------------------------------|-------------------------------|
@@ -287,6 +314,106 @@ sum_j c_j int_ball phi_j(x) exp(-i C p_i.x) dx ~= Qhat(p_i)
 | 8 | 515 | 220 |
 | 9 | 751 | 338 |
 | 10 | 1045 | 456 |
+
+---
+
+## 图6: 不同张量散射体重构
+
+**目的**：检查每个散射体具有不同 `3×3` 张量反差时，极化恢复后的 GPSWF、Cube Fourier、Ball Bessel、DSM，以及不做极化恢复的 EM-DSM 是否还能恢复目标位置。
+
+图6 使用新的 `TensorBlock`：
+
+```text
+Q(x) = sum_b 1_{D_b}(x) T_b
+```
+
+其中三个 block 的位置沿用图5，但每个 block 使用不同的 full tensor `T_b`。这不再是图5中的 `Q(x)=q(x)T` 共享张量结构。
+
+**布局**：6 列 (truth `||Q||_F` + GPSWF `||Q||_F` + Cube Fourier `||Q||_F` + Ball Bessel `||Q||_F` + DSM `||Q||_F` + EM-DSM) × 6 行 (k=4, 6, 7, 8, 9, 10)。
+
+图6 完全沿用图5的成像流程，只是把共享张量 phantom 换成不同张量的 `TensorBlock` phantom：
+
+```text
+远场 Born 数据 -> 极化恢复 -> recovered c_r(p) -> 重构所有张量分量 -> 显示 ||Q(x)||_F
+```
+
+这里显示 Frobenius 范数，而不是单个 `Q_11` 分量，避免某个散射体在 `Q_11` 分量上弱或接近零时被误判为没有恢复。
+
+Cube Fourier 和 Ball Bessel 的模式数截断同样分开控制，图6当前默认 `fourier_mode_fraction=1.1`、`bessel_mode_fraction=1.1`，最小二乘截断为 `rcond=1e-7`。
+
+最后一列 EM-DSM 不恢复 `c_r(p)`，而是直接对原始 far-field channel vector 做伴随相位回投；它是定位指标，不是张量反差重构。
+
+---
+
+## 图7: BIM-GPSWF 多重散射修正
+
+**目的**：沿用图5的不同入射波数设置，比较 Born-GPSWF 与 BIM-GPSWF 对 Full VIE 数据的成像效果，观察引入当前总场后是否改善分辨。
+
+第一版采用标量反差模型：
+
+```text
+Q(x) = q(x) T0
+```
+
+其中 `T0` 为固定 isotropic tensor，未知量为标量函数 `q(x)`。BIM 更新量限制在 GPSWF 低秩空间：
+
+```text
+delta q(x) = sum_j a_j psi_j(x)
+```
+
+BIM-GPSWF 每次迭代使用当前总场 `E^n` 构造线性化响应：
+
+```text
+r^n = d_obs - d_pred^n
+A_n(psi_j) = int P_xhat [psi_j(y) T0 E^n(y)] exp(-i k xhat.y) dy
+min_a ||A_n a - r^n||^2 + lambda ||a||^2
+q^{n+1} = q^n + step * sum_j a_j psi_j
+```
+
+**布局**：6 列 (truth + Analytical Born-GPSWF + Full VIE Born-GPSWF + BIM iter 1 + BIM iter 2 + BIM iter 3) × 若干行。
+
+full 模式使用：
+
+```text
+k = 4, 6, 7, 8, 9, 10
+GPSWF 参数 = 图5同一 k 行参数
+n_per_axis = 7
+N_iter = 3
+step = 0.2
+lambda0 = 1e-2
+epsilon = 0.2
+phantom = three_block_phantom("born")
+```
+
+quick 模式使用：
+
+```text
+k = 4, 6, 8, 10
+GPSWF 参数 = 图5 quick 同一 k 行参数
+n_per_axis = 5
+N_iter = 3
+```
+
+VIE 远场原始相位对应 `exp(+i C p·x)`。图7为了与 GPSWF 投影使用的
+`exp(-i C p·x)` 约定一致，生成 VIE / BIM 数据时使用 `-p` 的入射/观测方向对；
+因此不再通过简单复共轭来转换 VIE 数据。这样对复值 `q(x)` 不会把反差错误共轭。
+
+BIM 诊断中：
+
+- `relative_data_residual_before_update`：本次 BIM 更新前的相对数据残差；
+- `relative_data_residual`：应用本次更新并重新求解 VIE 后的相对数据残差；
+- `mock_distance_mean`：Analytical Born 路径的 mock 节点平均距离；
+- `vie_mock_distance_mean`：VIE / BIM 使用 `-p` 方向对时的 mock 节点平均距离。
+
+输出文件：
+
+```text
+figure7_bim_gpswf_frequency.png
+figure7_diagnostics.csv
+figure7_diagnostics_detail.npz
+figure7_residual_curves.png
+figure7_diagnostic_curves.png
+```
 
 ---
 

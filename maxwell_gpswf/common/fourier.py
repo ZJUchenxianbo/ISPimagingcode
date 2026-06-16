@@ -158,6 +158,7 @@ def reconstruct_fourier_cube_from_data(
     *,
     half_side: float = 1.0,
     bandwidth_factor: float = 2.0,
+    max_modes: int | None = None,
     rcond: float = 1e-8,
 ) -> tuple[np.ndarray, dict[str, Any]]:
     """Reconstruct one component from recovered Fourier data using cube modes."""
@@ -166,6 +167,9 @@ def reconstruct_fourier_cube_from_data(
         half_side=half_side,
         bandwidth_factor=bandwidth_factor,
     )
+    candidate_modes = int(indices.shape[0])
+    if max_modes is not None and int(max_modes) > 0 and indices.shape[0] > int(max_modes):
+        indices = indices[: int(max_modes)]
     data_matrix = cube_fourier_data_matrix(
         p_nodes,
         indices,
@@ -182,6 +186,8 @@ def reconstruct_fourier_cube_from_data(
     xi = cube_fourier_frequencies(indices, half_side=half_side)
     meta = {
         "fourier_modes": int(indices.shape[0]),
+        "fourier_candidate_modes": candidate_modes,
+        "basis_mode_cap": int(max_modes) if max_modes is not None else candidate_modes,
         "fourier_index_linf": int(np.max(np.abs(indices))) if indices.size else 0,
         "fourier_radius_max": float(np.max(np.linalg.norm(xi, axis=1))) if xi.size else 0.0,
         "bandwidth_factor": float(bandwidth_factor),
