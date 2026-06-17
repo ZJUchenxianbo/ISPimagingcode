@@ -2,9 +2,10 @@
 # -*- coding: utf-8 -*-
 """Figure 7: BIM-GPSWF frequency experiment.
 
-This experiment tests whether Full VIE data can improve a GPSWF low-rank
-reconstruction when the update is restricted to the retained GPSWF modes.
-The first prototype uses a scalar contrast model ``Q(x)=q(x)T0``.
+Analytic Born + Full VIE columns use the unified polarimetric pipeline.
+BIM iterations currently use scalarized VIE data (scalarized BIM-GPSWF
+transitional implementation); raw far-field channel BIM is planned.
+The contrast model is ``Q(x)=q(x)T0`` with known tensor T0.
 """
 from __future__ import annotations
 

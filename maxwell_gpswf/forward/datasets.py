@@ -103,16 +103,24 @@ def analytic_born_farfield_dataset(
     k: float = 15.0,
     *,
     n_geometries: int = 6,
+    incident_dirs: np.ndarray | None = None,
+    obs_dirs: np.ndarray | None = None,
 ) -> FarfieldDataset:
-    """Analytical Born far-field: compute Q̂(ξ) analytically, build vector E∞.
+    """Analytical Born far-field: compute Q̂(ξ) analytically, build g = M(p)c(p).
 
-    For each p, construct admissible direction pairs and compute the
-    analytic Born vector far-field E∞(x̂,d,e) = k²/(4π)·P_x̂·Q̂(k(d-x̂))·e
-    for two orthogonal polarizations.
+    If ``incident_dirs`` / ``obs_dirs`` are provided, they are used directly
+    (e.g. from mock-quadrature matching).  Otherwise admissible direction
+    pairs are constructed from ``p_nodes``.
     """
     from common.phantom import _shape_truth_and_fourier
 
-    incident_dirs, obs_dirs, n_p, n_geometries = _admissible_geometries(p_nodes, n_geometries)
+    if incident_dirs is not None and obs_dirs is not None:
+        n_meas = incident_dirs.shape[0]
+        n_p = p_nodes.shape[0]
+        n_geometries = max(1, n_meas // n_p)
+    else:
+        incident_dirs, obs_dirs, n_p, n_geometries = _admissible_geometries(p_nodes, n_geometries)
+        n_meas = incident_dirs.shape[0]
 
     # Analytical Fourier Q̂ at each p (scalar)
     C = 2.0 * k
@@ -121,9 +129,7 @@ def analytic_born_farfield_dataset(
     coeffs_per_p = scalar_fourier[:, None] * coeff0[None, :]  # (n_p, n_coeffs)
 
     basis = tensor_basis(kind)
-    n_meas = incident_dirs.shape[0]
     farfield_data = np.zeros((n_meas, 6), dtype=np.complex128)
-    prefactor = float(k) ** 2 / (4.0 * math.pi)
 
     for j in range(n_meas):
         d = incident_dirs[j]; xhat = obs_dirs[j]
@@ -131,7 +137,7 @@ def analytic_born_farfield_dataset(
         P = np.eye(3) - np.outer(xhat, xhat)
         Qhat = sum(coeffs_per_p[idx, r] * basis[r] for r in range(len(basis)))
         E_basis = np.column_stack(orthonormal_basis_perp(d))
-        ff = prefactor * (P @ Qhat @ E_basis)
+        ff = P @ Qhat @ E_basis  # g = M(p)c(p), no k²/(4π) prefactor
         farfield_data[j] = ff.reshape(-1, order='F')
 
     return FarfieldDataset(
@@ -149,11 +155,17 @@ def discrete_vie_born_farfield_dataset(
     R: float = 1.0,
     n_per_axis: int = 11,
     n_geometries: int = 6,
+    *,
+    incident_dirs: np.ndarray | None = None,
+    obs_dirs: np.ndarray | None = None,
 ) -> FarfieldDataset:
     """VIE-discretised Born far-field: voxelised phantom, E = E_inc."""
     from forward.vie import ball_voxel_grid, maxwell_born_far_field
 
-    incident_dirs, obs_dirs, n_p, n_geometries = _admissible_geometries(p_nodes, n_geometries)
+    if incident_dirs is not None and obs_dirs is not None:
+        n_p = p_nodes.shape[0]; n_geometries = max(1, incident_dirs.shape[0] // n_p)
+    else:
+        incident_dirs, obs_dirs, n_p, n_geometries = _admissible_geometries(p_nodes, n_geometries)
     volume_nodes, volume_weights, _ = ball_voxel_grid(R, n_per_axis)
     tensor = reference_tensor(kind)
     Q = _build_vie_contrast(shape_name, volume_nodes, tensor)
@@ -184,6 +196,9 @@ def full_vie_farfield_dataset(
     R: float = 1.0,
     n_per_axis: int = 11,
     n_geometries: int = 6,
+    *,
+    incident_dirs: np.ndarray | None = None,
+    obs_dirs: np.ndarray | None = None,
 ) -> FarfieldDataset:
     """Full Maxwell VIE far-field: solve total field, compute E∞."""
     from forward.vie import (
@@ -191,7 +206,10 @@ def full_vie_farfield_dataset(
         maxwell_far_field,
     )
 
-    incident_dirs, obs_dirs, n_p, n_geometries = _admissible_geometries(p_nodes, n_geometries)
+    if incident_dirs is not None and obs_dirs is not None:
+        n_p = p_nodes.shape[0]; n_geometries = max(1, incident_dirs.shape[0] // n_p)
+    else:
+        incident_dirs, obs_dirs, n_p, n_geometries = _admissible_geometries(p_nodes, n_geometries)
     volume_nodes, volume_weights, voxel_h = ball_voxel_grid(R, n_per_axis)
     tensor = reference_tensor(kind)
     Q = _build_vie_contrast(shape_name, volume_nodes, tensor)

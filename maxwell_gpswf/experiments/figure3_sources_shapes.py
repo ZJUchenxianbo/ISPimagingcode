@@ -162,10 +162,14 @@ def run_experiment(config: ExperimentConfig) -> Any:
 
         # --- VIE data (columns 2, 3): unified farfield → polarimetric → GPSWF ---
         vie_nodes = target_nodes if data_mode == 'ideal' else p_nodes
+        # In mock mode, pass matched direction pairs from generate_data_nodes
+        ext_inc = matched_inc if data_mode == 'mock' else None
+        ext_obs = matched_obs if data_mode == 'mock' else None
         # Full VIE
         ds_full = full_vie_farfield_dataset(
             shape_name, vie_nodes, kind=kind, k=k, R=R,
-            n_per_axis=n_per_axis, n_geometries=6)
+            n_per_axis=n_per_axis, n_geometries=6,
+            incident_dirs=ext_inc, obs_dirs=ext_obs)
         rec_c_full = farfield_dataset_to_qhat(ds_full, kind=kind, noise_level=0.0, rng=rng)
         comp_full = rec_c_full[:, component_index]
         if data_mode == 'ideal':
@@ -178,7 +182,8 @@ def run_experiment(config: ExperimentConfig) -> Any:
         # VIE Born
         ds_born = discrete_vie_born_farfield_dataset(
             shape_name, vie_nodes, kind=kind, k=k, R=R,
-            n_per_axis=n_per_axis, n_geometries=6)
+            n_per_axis=n_per_axis, n_geometries=6,
+            incident_dirs=ext_inc, obs_dirs=ext_obs)
         rec_c_born = farfield_dataset_to_qhat(ds_born, kind=kind, noise_level=0.0, rng=rng)
         comp_born = rec_c_born[:, component_index]
         if data_mode == 'ideal':
