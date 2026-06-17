@@ -421,8 +421,8 @@ N_iter = 3
 图7第一列数据源说明：
 
 - `Analytic Born FF-GPSWF`：由连续三方块 phantom 的 Born 远场积分解析公式生成数据，再做 GPSWF 截断成像。
-- `Full VIE data-GPSWF`：由体素离散 VIE 求出 Full far-field，再直接套 Born/GPSWF 线性成像模型得到初值。
-- `BIM iter`：以上一列 Full VIE data-GPSWF 为初值，在 retained GPSWF 空间中迭代修正。
+- `Full VIE data-GPSWF`：由体素离散 VIE 求出归一化 raw far-field channels，经极化恢复后再用 GPSWF 线性成像得到初值。
+- `BIM iter`：以上一列 Full VIE data-GPSWF 为初值，在 retained GPSWF 空间中用同一批 raw far-field channels 的残差迭代修正。
 
 VIE 远场原始相位对应 `exp(+i C p·x)`。图7为了与 GPSWF 投影使用的
 `exp(-i C p·x)` 约定一致，生成 VIE / BIM 数据时使用 `-p` 的入射/观测方向对；
@@ -432,6 +432,7 @@ BIM 诊断中：
 
 - `relative_data_residual_before_update`：本次 BIM 更新前的相对数据残差；
 - `relative_data_residual`：应用本次更新并重新求解 VIE 后的相对数据残差；
+- `bim_residual_space`：BIM 残差所在空间，当前主路径为 `raw_farfield_channel`；
 - `mock_distance_mean`：Analytic Born far-field 路径的 mock 节点平均距离；
 - `vie_mock_distance_mean`：VIE / BIM 使用 `-p` 方向对时的 mock 节点平均距离。
 

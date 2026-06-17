@@ -3,9 +3,9 @@
 """Figure 7: BIM-GPSWF frequency experiment.
 
 Analytic Born + Full VIE columns use the unified polarimetric pipeline.
-BIM iterations currently use scalarized VIE data (scalarized BIM-GPSWF
-transitional implementation); raw far-field channel BIM is planned.
-The contrast model is ``Q(x)=q(x)T0`` with known tensor T0.
+BIM iterations use the same normalized raw Full VIE far-field channels as the
+Full VIE GPSWF initial image.  The contrast model is ``Q(x)=q(x)T0`` with
+known tensor T0, and the update is restricted to retained GPSWF modes.
 """
 from __future__ import annotations
 
@@ -43,13 +43,13 @@ from common import (
 from common.phantom import Mode
 from common.utils import vector_norm
 from forward.datasets import (
-    full_vie_farfield_dataset,
+    FarfieldDataset,
     farfield_dataset_to_qhat,
 )
 from forward.vie import ball_voxel_grid
 from nonlinear import (
-    compute_bim_gpswf_linearization,
-    compute_scalar_vie_data,
+    compute_raw_bim_gpswf_linearization,
+    compute_raw_vie_farfield_data,
     evaluate_blocks_on_nodes,
     solve_tikhonov_update,
 )
@@ -96,6 +96,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
     quad_order = 160
     r_eval_count = 120
     data_mode = getattr(config, "data_mode", "mock")
+    kind = "isotropic"
 
     if config.quick:
         requested_measure_dirs = 38
@@ -105,8 +106,8 @@ def run_experiment(config: ExperimentConfig) -> Any:
         quad_order = 100
         r_eval_count = 80
 
-    tensor = reference_tensor("isotropic")
-    comp_scale = complex(tensor_coefficients_from_matrix(tensor, "isotropic")[0])
+    tensor = reference_tensor(kind)
+    comp_scale = complex(tensor_coefficients_from_matrix(tensor, kind)[0])
     blocks = three_block_phantom("born")
 
     volume_nodes, volume_weights, voxel_h = ball_voxel_grid(1.0, n_per_axis)
@@ -158,6 +159,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
             data_mode=data_mode,
             branch_count=1,
         )
+        vie_reconstruction_nodes = -vie_p_nodes
 
         modes = _build_modes(
             C=C,
@@ -196,17 +198,17 @@ def run_experiment(config: ExperimentConfig) -> Any:
         _imshow(axes[row_idx, 0], np.real(truth), titles[0] if row_idx == 0 else "", vmin, vmax)
 
         # Analytic Born: full pipeline (like figs 1/2)
-        coeff0 = tensor_coefficients_from_matrix(reference_tensor("full"), "full")
+        coeff0 = tensor_coefficients_from_matrix(tensor, kind)
         scalar_born = block_fourier_profile(p_nodes, blocks, C)
         tc_born = scalar_born[:, None] * coeff0[None, :]
         rec_c_born, _, _ = recover_polarimetric_coefficients(
-            p_nodes, tc_born, "full", 0.0,
+            p_nodes, tc_born, kind, 0.0,
             np.random.default_rng(config.seed + 700))
         comp_born = rec_c_born[:, 0]
 
-        # Full VIE: keep scalar VIE data for BIM, add unified pipeline for column 2
-        observed = compute_scalar_vie_data(
-            p_nodes=vie_p_nodes,
+        # Full VIE observation: one raw far-field dataset feeds both the
+        # polarimetric GPSWF initial image and the BIM residual.
+        observed = compute_raw_vie_farfield_data(
             incident_dirs=inc_dirs,
             obs_dirs=obs_dirs,
             volume_nodes=volume_nodes,
@@ -218,16 +220,25 @@ def run_experiment(config: ExperimentConfig) -> Any:
             return_fields=False,
             conjugate_to_unified=False,
         )
-        observed_data = observed.data
-
-        # Full VIE via unified pipeline (column 2 replacement)
-        ds_full = full_vie_farfield_dataset(
-            "three_blocks", p_nodes, kind="full", k=k, R=1.0,
-            n_per_axis=n_per_axis, n_geometries=6)
+        observed_dataset = FarfieldDataset(
+            p_nodes=vie_reconstruction_nodes,
+            incident_dirs=inc_dirs,
+            obs_dirs=obs_dirs,
+            farfield_data=observed.farfield_data,
+            data_source="full_vie",
+            metadata={
+                "kind": kind,
+                "k": float(k),
+                "farfield_normalization": "M_c",
+                "fourier_convention": "exp(-i C p.x)",
+                "physical_node_sign": -1,
+            },
+        )
         rec_c_vie = farfield_dataset_to_qhat(
-            ds_full, kind="full", noise_level=0.0,
+            observed_dataset, kind=kind, noise_level=0.0,
             rng=np.random.default_rng(config.seed + 701))
         comp_vie = rec_c_vie[:, 0]
+        observed_vector = observed.farfield_data.reshape(-1)
 
         coeffs_analytic_born = quadrature_modal_coefficients(
             comp_born,
@@ -270,6 +281,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
             bim_matrix_norm=math.nan,
             bim_matrix_cond=math.nan,
             data_mode=data_mode,
+            bim_residual_space="none",
         ))
 
         coeffs_full_component = quadrature_modal_coefficients(
@@ -291,8 +303,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
 
         q_coeffs = coeffs_full_component / comp_scale
         current_scalar = volume_basis @ q_coeffs
-        current_data = compute_scalar_vie_data(
-            p_nodes=vie_p_nodes,
+        current_data = compute_raw_vie_farfield_data(
             incident_dirs=inc_dirs,
             obs_dirs=obs_dirs,
             volume_nodes=volume_nodes,
@@ -304,7 +315,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
             return_fields=True,
             conjugate_to_unified=False,
         )
-        residual = observed_data - current_data.data
+        residual = observed_vector - current_data.farfield_data.reshape(-1)
         initial_residual_norm = vector_norm(residual)
         diagnostic_rows.append(_diagnostic_row(
             figure=7,
@@ -320,7 +331,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
             retained_modes=int(np.sum(retained)),
             total_modes=len(modes),
             data_residual_norm=initial_residual_norm,
-            relative_data_residual=initial_residual_norm / max(vector_norm(observed_data), 1e-14),
+            relative_data_residual=initial_residual_norm / max(vector_norm(observed_vector), 1e-14),
             update_norm=0.0,
             step_size=0.0,
             lambda_value=math.nan,
@@ -331,8 +342,9 @@ def run_experiment(config: ExperimentConfig) -> Any:
             bim_matrix_norm=math.nan,
             bim_matrix_cond=math.nan,
             data_mode=data_mode,
+            bim_residual_space="raw_farfield_channel",
             data_residual_norm_before_update=initial_residual_norm,
-            relative_data_residual_before_update=initial_residual_norm / max(vector_norm(observed_data), 1e-14),
+            relative_data_residual_before_update=initial_residual_norm / max(vector_norm(observed_vector), 1e-14),
             mock_distance_mean=float(np.mean(mock_distances)) if mock_distances.size else math.nan,
             vie_mock_distance_mean=float(np.mean(vie_mock_distances)) if vie_mock_distances.size else math.nan,
         ))
@@ -340,7 +352,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
         for iteration in range(1, n_iterations + 1):
             if current_data.total_fields is None:
                 raise RuntimeError("BIM iteration requires total fields")
-            linearization = compute_bim_gpswf_linearization(
+            linearization = compute_raw_bim_gpswf_linearization(
                 incident_dirs=inc_dirs,
                 obs_dirs=obs_dirs,
                 volume_nodes=volume_nodes,
@@ -363,8 +375,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
             q_coeffs = q_coeffs + float(step_size) * update_coeffs
 
             current_scalar = volume_basis @ q_coeffs
-            current_data = compute_scalar_vie_data(
-                p_nodes=vie_p_nodes,
+            current_data = compute_raw_vie_farfield_data(
                 incident_dirs=inc_dirs,
                 obs_dirs=obs_dirs,
                 volume_nodes=volume_nodes,
@@ -376,7 +387,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
                 return_fields=True,
                 conjugate_to_unified=False,
             )
-            residual = observed_data - current_data.data
+            residual = observed_vector - current_data.farfield_data.reshape(-1)
             residual_after_norm = vector_norm(residual)
 
             image_bim = (image_matrix @ (q_coeffs * comp_scale)).reshape(grid_size, grid_size)
@@ -402,7 +413,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
                 retained_modes=int(np.sum(retained)),
                 total_modes=len(modes),
                 data_residual_norm=residual_after_norm,
-                relative_data_residual=residual_after_norm / max(vector_norm(observed_data), 1e-14),
+                relative_data_residual=residual_after_norm / max(vector_norm(observed_vector), 1e-14),
                 update_norm=float(solve_meta["update_norm"]),
                 step_size=float(step_size),
                 lambda_value=float(solve_meta["lambda"]),
@@ -413,8 +424,9 @@ def run_experiment(config: ExperimentConfig) -> Any:
                 bim_matrix_norm=linearization.matrix_norm,
                 bim_matrix_cond=linearization.condition,
                 data_mode=data_mode,
+                bim_residual_space="raw_farfield_channel",
                 data_residual_norm_before_update=residual_before_norm,
-                relative_data_residual_before_update=residual_before_norm / max(vector_norm(observed_data), 1e-14),
+                relative_data_residual_before_update=residual_before_norm / max(vector_norm(observed_vector), 1e-14),
                 mock_distance_mean=float(np.mean(mock_distances)) if mock_distances.size else math.nan,
                 vie_mock_distance_mean=float(np.mean(vie_mock_distances)) if vie_mock_distances.size else math.nan,
             ))
@@ -507,6 +519,7 @@ def _diagnostic_row(
     relative_data_residual_before_update: float = math.nan,
     mock_distance_mean: float = math.nan,
     vie_mock_distance_mean: float = math.nan,
+    bim_residual_space: str = "",
 ) -> dict[str, Any]:
     abs_img = np.abs(image)
     valid = np.asarray(disk_mask, dtype=bool)
@@ -530,6 +543,7 @@ def _diagnostic_row(
         "k": float(k),
         "iteration": int(iteration),
         "data_mode": data_mode,
+        "bim_residual_space": bim_residual_space,
         "retained_modes": int(retained_modes),
         "total_modes": int(total_modes),
         "data_residual_norm": float(data_residual_norm),

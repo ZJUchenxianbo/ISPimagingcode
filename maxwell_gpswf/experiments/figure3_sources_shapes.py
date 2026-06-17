@@ -70,6 +70,15 @@ def run_experiment(config: ExperimentConfig) -> Any:
     data_mode = getattr(config, 'data_mode', 'mock')
     p_nodes, matched_inc, matched_obs, mock_distances, data_info = generate_data_nodes(
         target_nodes, requested_measure_dirs, data_mode=data_mode, branch_count=3)
+    if data_mode == 'mock':
+        vie_physical_nodes, vie_matched_inc, vie_matched_obs, vie_mock_distances, _ = generate_data_nodes(
+            -target_nodes, requested_measure_dirs, data_mode=data_mode, branch_count=3)
+        vie_nodes = -vie_physical_nodes
+    else:
+        vie_nodes = target_nodes
+        vie_matched_inc = None
+        vie_matched_obs = None
+        vie_mock_distances = np.zeros(target_nodes.shape[0], dtype=float)
 
     # -- GPSWF basis --
     alpha_df = collect_alpha_pairs_cached(
@@ -161,10 +170,9 @@ def run_experiment(config: ExperimentConfig) -> Any:
         ))
 
         # --- VIE data (columns 2, 3): unified farfield → polarimetric → GPSWF ---
-        vie_nodes = target_nodes if data_mode == 'ideal' else p_nodes
         # In mock mode, pass matched direction pairs from generate_data_nodes
-        ext_inc = matched_inc if data_mode == 'mock' else None
-        ext_obs = matched_obs if data_mode == 'mock' else None
+        ext_inc = vie_matched_inc if data_mode == 'mock' else None
+        ext_obs = vie_matched_obs if data_mode == 'mock' else None
         # Full VIE
         ds_full = full_vie_farfield_dataset(
             shape_name, vie_nodes, kind=kind, k=k, R=R,
@@ -200,8 +208,8 @@ def run_experiment(config: ExperimentConfig) -> Any:
                 "row": int(row_idx), "column": 1, "data_source": "full_vie",
             },
             modes=modes, retained=retained,
-            target_nodes=target_nodes, p_nodes=effective_p_nodes,
-            mock_distances=effective_mock_distances,
+            target_nodes=target_nodes, p_nodes=vie_nodes,
+            mock_distances=vie_mock_distances,
             basis_matrix=target_basis, target_weights=target_weights,
             component_data=comp_full, coeffs=coeffs_full,
             image=rec_full, truth=truth, disk_mask=dm,
@@ -213,8 +221,8 @@ def run_experiment(config: ExperimentConfig) -> Any:
                 "row": int(row_idx), "column": 2, "data_source": "discrete_vie_born_farfield",
             },
             modes=modes, retained=retained,
-            target_nodes=target_nodes, p_nodes=effective_p_nodes,
-            mock_distances=effective_mock_distances,
+            target_nodes=target_nodes, p_nodes=vie_nodes,
+            mock_distances=vie_mock_distances,
             basis_matrix=target_basis, target_weights=target_weights,
             component_data=comp_born, coeffs=coeffs_bv,
             image=rec_bv, truth=truth, disk_mask=dm,

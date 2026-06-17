@@ -12,13 +12,16 @@ Layer 2 — inversion entry:
 """
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass, field
 
 import numpy as np
 from scipy.linalg import lu_factor, lu_solve
 
-from common.quadrature import admissible_farfield_pairs_from_nodes, orthonormal_basis_perp
+from common.quadrature import (
+    admissible_farfield_pairs_from_nodes,
+    orthonormal_basis_perp,
+    paired_farfield_fourier_nodes,
+)
 from common.phantom import TensorKind, reference_tensor, tensor_basis, tensor_coefficients_from_matrix
 
 
@@ -47,6 +50,57 @@ def _admissible_geometries(p_nodes: np.ndarray, n_geometries: int = 6):
         inc_list.append(inc); obs_list.append(obs)
     n_p = p_nodes.shape[0]
     return (np.concatenate(inc_list, axis=0), np.concatenate(obs_list, axis=0), n_p, n_geometries)
+
+
+def _resolve_direction_pairs(
+    p_nodes: np.ndarray,
+    n_geometries: int,
+    incident_dirs: np.ndarray | None,
+    obs_dirs: np.ndarray | None,
+    *,
+    vie_phase: bool = False,
+) -> tuple[np.ndarray, np.ndarray, int, int, dict]:
+    """Return direction pairs ordered by branch blocks.
+
+    ``p_nodes`` are always the reconstruction Fourier nodes.  For VIE data,
+    physical direction pairs are constructed for ``-p_nodes`` by default so
+    that the raw VIE phase ``exp(+i k(d-xhat).x)`` matches the project
+    convention ``exp(-i C p.x)``.
+    """
+    p_nodes = np.asarray(p_nodes, dtype=float)
+    if p_nodes.ndim != 2 or p_nodes.shape[1] != 3:
+        raise ValueError("p_nodes must have shape (n_nodes, 3)")
+    if (incident_dirs is None) != (obs_dirs is None):
+        raise ValueError("incident_dirs and obs_dirs must be provided together")
+
+    n_p = p_nodes.shape[0]
+    if incident_dirs is None:
+        physical_nodes = -p_nodes if vie_phase else p_nodes
+        inc, obs, _ = _admissible_geometries(physical_nodes, n_geometries)
+        physical_sign = -1 if vie_phase else 1
+    else:
+        inc = np.asarray(incident_dirs, dtype=float)
+        obs = np.asarray(obs_dirs, dtype=float)
+        if inc.shape != obs.shape or inc.ndim != 2 or inc.shape[1] != 3:
+            raise ValueError("incident_dirs and obs_dirs must both have shape (n_meas, 3)")
+        if inc.shape[0] % max(n_p, 1) != 0:
+            raise ValueError("number of direction pairs must be a multiple of p_nodes")
+        n_geometries = inc.shape[0] // max(n_p, 1)
+        paired_nodes = paired_farfield_fourier_nodes(inc, obs).reshape(n_geometries, n_p, 3)
+        err_plus = float(np.max(np.linalg.norm(paired_nodes - p_nodes[None, :, :], axis=2)))
+        err_minus = float(np.max(np.linalg.norm(paired_nodes + p_nodes[None, :, :], axis=2)))
+        physical_sign = -1 if err_minus <= err_plus else 1
+
+    metadata = {
+        "n_geometries": int(n_geometries),
+        "physical_node_sign": int(physical_sign),
+        "fourier_convention": "exp(-i C p.x)",
+    }
+    return inc, obs, n_p, int(n_geometries), metadata
+
+
+def _farfield_prefactor(k: float) -> float:
+    return float(k) ** 2 / (4.0 * np.pi)
 
 
 def _build_vie_contrast(shape_name: str, volume_nodes, tensor):
@@ -114,13 +168,9 @@ def analytic_born_farfield_dataset(
     """
     from common.phantom import _shape_truth_and_fourier
 
-    if incident_dirs is not None and obs_dirs is not None:
-        n_meas = incident_dirs.shape[0]
-        n_p = p_nodes.shape[0]
-        n_geometries = max(1, n_meas // n_p)
-    else:
-        incident_dirs, obs_dirs, n_p, n_geometries = _admissible_geometries(p_nodes, n_geometries)
-        n_meas = incident_dirs.shape[0]
+    incident_dirs, obs_dirs, n_p, n_geometries, geom_meta = _resolve_direction_pairs(
+        p_nodes, n_geometries, incident_dirs, obs_dirs, vie_phase=False)
+    n_meas = incident_dirs.shape[0]
 
     # Analytical Fourier Q̂ at each p (scalar)
     C = 2.0 * k
@@ -143,7 +193,13 @@ def analytic_born_farfield_dataset(
     return FarfieldDataset(
         p_nodes=p_nodes, incident_dirs=incident_dirs, obs_dirs=obs_dirs,
         farfield_data=farfield_data, data_source="analytic_born",
-        metadata={"kind": kind, "k": k, "n_geometries": n_geometries},
+        metadata={
+            **geom_meta,
+            "kind": kind,
+            "k": k,
+            "farfield_normalization": "M_c",
+            "prefactor_removed": 1.0,
+        },
     )
 
 
@@ -162,10 +218,8 @@ def discrete_vie_born_farfield_dataset(
     """VIE-discretised Born far-field: voxelised phantom, E = E_inc."""
     from forward.vie import ball_voxel_grid, maxwell_born_far_field
 
-    if incident_dirs is not None and obs_dirs is not None:
-        n_p = p_nodes.shape[0]; n_geometries = max(1, incident_dirs.shape[0] // n_p)
-    else:
-        incident_dirs, obs_dirs, n_p, n_geometries = _admissible_geometries(p_nodes, n_geometries)
+    incident_dirs, obs_dirs, n_p, n_geometries, geom_meta = _resolve_direction_pairs(
+        p_nodes, n_geometries, incident_dirs, obs_dirs, vie_phase=True)
     volume_nodes, volume_weights, _ = ball_voxel_grid(R, n_per_axis)
     tensor = reference_tensor(kind)
     Q = _build_vie_contrast(shape_name, volume_nodes, tensor)
@@ -179,12 +233,20 @@ def discrete_vie_born_farfield_dataset(
         for col in range(2):
             e = E_basis[:, col].astype(np.complex128)
             ff = maxwell_born_far_field(volume_nodes, volume_weights, Q, k, d, e, xhat[None, :])[0]
-            farfield_data[j, col * 3:(col + 1) * 3] = ff
+            farfield_data[j, col * 3:(col + 1) * 3] = ff / _farfield_prefactor(k)
 
     return FarfieldDataset(
         p_nodes=p_nodes, incident_dirs=incident_dirs, obs_dirs=obs_dirs,
         farfield_data=farfield_data, data_source="vie_born",
-        metadata={"kind": kind, "k": k, "R": R, "n_per_axis": n_per_axis},
+        metadata={
+            **geom_meta,
+            "kind": kind,
+            "k": k,
+            "R": R,
+            "n_per_axis": n_per_axis,
+            "farfield_normalization": "M_c",
+            "prefactor_removed": _farfield_prefactor(k),
+        },
     )
 
 
@@ -206,10 +268,8 @@ def full_vie_farfield_dataset(
         maxwell_far_field,
     )
 
-    if incident_dirs is not None and obs_dirs is not None:
-        n_p = p_nodes.shape[0]; n_geometries = max(1, incident_dirs.shape[0] // n_p)
-    else:
-        incident_dirs, obs_dirs, n_p, n_geometries = _admissible_geometries(p_nodes, n_geometries)
+    incident_dirs, obs_dirs, n_p, n_geometries, geom_meta = _resolve_direction_pairs(
+        p_nodes, n_geometries, incident_dirs, obs_dirs, vie_phase=True)
     volume_nodes, volume_weights, voxel_h = ball_voxel_grid(R, n_per_axis)
     tensor = reference_tensor(kind)
     Q = _build_vie_contrast(shape_name, volume_nodes, tensor)
@@ -228,12 +288,20 @@ def full_vie_farfield_dataset(
             rhs = incident_plane_wave(volume_nodes, k, d, e).reshape(-1)
             total_field = lu_solve(lu, rhs).reshape((-1, 3))
             ff = maxwell_far_field(volume_nodes, volume_weights, Q, total_field, k, xhat[None, :])[0]
-            farfield_data[j, col * 3:(col + 1) * 3] = ff
+            farfield_data[j, col * 3:(col + 1) * 3] = ff / _farfield_prefactor(k)
 
     return FarfieldDataset(
         p_nodes=p_nodes, incident_dirs=incident_dirs, obs_dirs=obs_dirs,
         farfield_data=farfield_data, data_source="full_vie",
-        metadata={"kind": kind, "k": k, "R": R, "n_per_axis": n_per_axis},
+        metadata={
+            **geom_meta,
+            "kind": kind,
+            "k": k,
+            "R": R,
+            "n_per_axis": n_per_axis,
+            "farfield_normalization": "M_c",
+            "prefactor_removed": _farfield_prefactor(k),
+        },
     )
 
 
@@ -262,6 +330,10 @@ def farfield_dataset_to_qhat(
     inc = dataset.incident_dirs; obs = dataset.obs_dirs; g_raw = dataset.farfield_data
     n_p = p_nodes.shape[0]
     n_meas = g_raw.shape[0]
+    if n_p <= 0:
+        return np.zeros((0, 0), dtype=np.complex128)
+    if n_meas % n_p != 0:
+        raise ValueError("farfield_data rows must be a multiple of p_nodes")
     n_geometries = max(1, n_meas // n_p)
     basis = tensor_basis(kind)
     n_coeffs = len(basis)
