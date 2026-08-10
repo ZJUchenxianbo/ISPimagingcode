@@ -7,13 +7,10 @@ import argparse
 from pathlib import Path
 
 from common import ExperimentConfig
-from experiments.figure1_noise_dimension import run_experiment as run_fig1
-from experiments.figure2_frequency_contrast import run_experiment as run_fig2
-from experiments.figure3_sources_shapes import run_experiment as run_fig3
-from experiments.figure4_scale_scaling import run_experiment as run_fig4
-from experiments.figure5_basis_comparison import run_experiment as run_fig5
-from experiments.figure6_tensor_blocks import run_experiment as run_fig6
-from experiments.figure7_bim_gpswf_frequency import run_experiment as run_fig7
+from experiments.exp1_dimension import run_experiment as run_exp1
+from experiments.exp2_noise import run_experiment as run_exp2
+from experiments.exp3_frequency import run_experiment as run_exp3
+from experiments.exp4_basis import run_experiment as run_exp4
 
 
 def parse_args():
@@ -21,9 +18,8 @@ def parse_args():
     p.add_argument("--out-dir", type=str, default="outputs")
     p.add_argument("--seed", type=int, default=12345)
     p.add_argument("--quick", action="store_true")
-    p.add_argument("--data-mode", choices=["mock", "ideal"], default="mock",
-                   help="mock: 06005-style nearest measured node; ideal: admissible direction pairs")
-    p.add_argument("--mode", choices=["fig1", "fig2", "fig3", "fig4", "fig5", "fig6", "fig7", "all"], default="all")
+    p.add_argument("--data-mode", choices=["mock", "ideal"], default="mock")
+    p.add_argument("--mode", choices=["exp1", "exp2", "exp3", "exp4", "all"], default="all")
     return p.parse_args()
 
 
@@ -39,33 +35,21 @@ def main():
         return ExperimentConfig(out_dir=_subdir(base, sub), seed=args.seed,
                                 quick=args.quick, data_mode=args.data_mode)
 
-    if args.mode in {"fig1", "all"}:
-        print(f"\n== Figure 1: Noise & dimension [{args.data_mode}] ==")
-        run_fig1(cfg("fig1"))
+    if args.mode in {"exp1", "all"}:
+        print("\n== Experiment 1: Dimension effects (single cube) ==")
+        run_exp1(cfg("exp1"))
 
-    if args.mode in {"fig2", "all"}:
-        print(f"\n== Figure 2: Frequency & contrast [{args.data_mode}] ==")
-        run_fig2(cfg("fig2"))
+    if args.mode in {"exp2", "all"}:
+        print("\n== Experiment 2: Noise effects (three blocks) ==")
+        run_exp2(cfg("exp2"))
 
-    if args.mode in {"fig3", "all"}:
-        print(f"\n== Figure 3: Sources & shapes [{args.data_mode}] ==")
-        run_fig3(cfg("fig3"))
+    if args.mode in {"exp3", "all"}:
+        print("\n== Experiment 3: Frequency effects (three blocks) ==")
+        run_exp3(cfg("exp3"))
 
-    if args.mode in {"fig4", "all"}:
-        print(f"\n== Figure 4: Scale scaling [{args.data_mode}] ==")
-        run_fig4(cfg("fig4"))
-
-    if args.mode in {"fig5", "all"}:
-        print(f"\n== Figure 5: Basis comparison [{args.data_mode}] ==")
-        run_fig5(cfg("fig5"))
-
-    if args.mode in {"fig6", "all"}:
-        print(f"\n== Figure 6: Tensor block reconstruction [{args.data_mode}] ==")
-        run_fig6(cfg("fig6"))
-
-    if args.mode in {"fig7", "all"}:
-        print(f"\n== Figure 7: BIM-GPSWF frequency experiment [{args.data_mode}] ==")
-        run_fig7(cfg("fig7"))
+    if args.mode in {"exp4", "all"}:
+        print("\n== Experiment 4: Basis comparison ==")
+        run_exp4(cfg("exp4"))
 
     print(f"\nDone. Output: {base}")
 

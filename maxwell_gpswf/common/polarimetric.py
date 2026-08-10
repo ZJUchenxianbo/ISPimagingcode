@@ -13,25 +13,70 @@ CArray = NDArray[np.complex128]
 TensorKind = Literal["full", "reciprocal", "isotropic"]
 
 
+def polarimetric_block_from_directions(
+    incident_dir: Array,
+    obs_dir: Array,
+    kind: TensorKind = "full",
+) -> CArray:
+    """Build the six-channel block for one direction configuration.
+
+    The two columns of the incident polarization basis are perpendicular to
+    ``incident_dir``.  Each tensor coefficient contributes three observed
+    components for each polarization, hence six rows per configuration.
+    """
+    from common.phantom import tensor_basis
+    from common.quadrature import orthonormal_basis_perp
+
+    incident_dir = np.asarray(incident_dir, dtype=float)
+    obs_dir = np.asarray(obs_dir, dtype=float)
+    if incident_dir.shape != (3,) or obs_dir.shape != (3,):
+        raise ValueError("incident_dir and obs_dir must have shape (3,)")
+
+    e1, e2 = orthonormal_basis_perp(incident_dir)
+    incident_polarizations = np.column_stack([e1, e2])
+    observation_projection = np.eye(3) - np.outer(obs_dir, obs_dir)
+    basis = tensor_basis(kind)
+    block = np.zeros((6, len(basis)), dtype=np.complex128)
+    for column, tensor in enumerate(basis):
+        projected = observation_projection @ tensor @ incident_polarizations
+        block[:, column] = projected.reshape(-1, order="F")
+    return block
+
+
+def build_polarimetric_matrix_from_directions(
+    incident_dirs: Array,
+    obs_dirs: Array,
+    kind: TensorKind = "full",
+) -> CArray:
+    """Stack polarimetric blocks for explicitly supplied direction pairs."""
+    incident_dirs = np.asarray(incident_dirs, dtype=float)
+    obs_dirs = np.asarray(obs_dirs, dtype=float)
+    if (
+        incident_dirs.shape != obs_dirs.shape
+        or incident_dirs.ndim != 2
+        or incident_dirs.shape[1] != 3
+    ):
+        raise ValueError(
+            "incident_dirs and obs_dirs must both have shape (n_configurations, 3)"
+        )
+    if incident_dirs.shape[0] == 0:
+        raise ValueError("at least one direction configuration is required")
+    return np.vstack([
+        polarimetric_block_from_directions(d, xhat, kind)
+        for d, xhat in zip(incident_dirs, obs_dirs)
+    ])
+
+
 def build_polarimetric_matrix(
     p: Array, kind: TensorKind = "full", J: int = 6
 ) -> CArray:
     """Build the polarimetric matrix ``M(p)`` from admissible geometries."""
-    from common.phantom import tensor_basis
     from common.quadrature import build_geometries_from_p
 
-    basis = tensor_basis(kind)
     geometries = build_geometries_from_p(p, J=J)
-    M = np.zeros((6 * J, len(basis)), dtype=np.complex128)
-    I = np.eye(3)
-    for r, T in enumerate(basis):
-        column_blocks = []
-        for _, xhat, E in geometries:
-            P_xhat = I - np.outer(xhat, xhat)
-            B = P_xhat @ T @ E
-            column_blocks.append(B.reshape(-1, order="F"))
-        M[:, r] = np.concatenate(column_blocks)
-    return M
+    incident_dirs = np.asarray([geometry[0] for geometry in geometries], dtype=float)
+    obs_dirs = np.asarray([geometry[1] for geometry in geometries], dtype=float)
+    return build_polarimetric_matrix_from_directions(incident_dirs, obs_dirs, kind)
 
 
 def recover_polarimetric_coefficients(

@@ -25,6 +25,7 @@ from forward.vie import (
 
 from forward.datasets import (
     FarfieldDataset,
+    analytic_block_born_farfield_dataset,
     analytic_born_farfield_dataset,
     discrete_vie_born_farfield_dataset,
     farfield_dataset_to_qhat,

@@ -14,6 +14,7 @@ from common.phantom import (
     TensorKind,
     ball_phantom,
     block_fourier_profile,
+    close_three_block_phantom,
     cube_phantom,
     dispersed_blocks_phantom,
     normalized_ball_fourier_profile,
@@ -41,9 +42,11 @@ from common.quadrature import (
     farfield_fourier_nodes,
     fibonacci_sphere_directions,
     generate_data_nodes,
+    generate_polarimetric_data_nodes,
     interior_ball_nodes,
     lebedev_sphere_quadrature,
     match_mock_quadrature_nodes,
+    match_mock_polarimetric_configurations,
     orthonormal_basis_perp,
     paired_farfield_fourier_nodes,
     sphere_quadrature,
@@ -51,6 +54,8 @@ from common.quadrature import (
 
 from common.polarimetric import (
     build_polarimetric_matrix,
+    build_polarimetric_matrix_from_directions,
+    polarimetric_block_from_directions,
     polarimetric_farfield_data,
     recover_polarimetric_coefficients,
     recover_polarimetric_coefficients_from_data,
@@ -128,5 +133,6 @@ from common.reconstruction import (
     build_gpswf_modes,
     gpswf_reconstruct_image,
     make_xy_grid,
+    select_complete_gpswf_multiplets,
     truncate_modes,
 )

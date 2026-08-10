@@ -207,6 +207,260 @@ def match_mock_quadrature_nodes(
     return np.asarray(indices, dtype=np.int64), np.asarray(distances, dtype=float)
 
 
+def match_mock_polarimetric_configurations(
+    target_nodes: Array,
+    available_nodes: Array,
+    available_incident_dirs: Array,
+    available_obs_dirs: Array,
+    *,
+    polarimetric_J: int = 6,
+    tensor_kind: str = "full",
+    candidate_count: int | None = None,
+) -> tuple[NDArray[np.int64], Array, dict[str, Array | int | float]]:
+    """Select nearby measurement configurations with a full-rank joint system.
+
+    The nearest measured Fourier node alone does not provide enough equations
+    for a general 3-by-3 tensor.  This routine searches a local candidate pool
+    for each target node and greedily selects ``polarimetric_J`` direction
+    pairs.  Matrix rank is prioritised first, conditioning second, and Fourier
+    distance third.
+
+    Returns branch-major indices and distances with shape ``(J, n_target)``.
+    """
+    from common.polarimetric import polarimetric_block_from_directions
+
+    target_nodes = np.asarray(target_nodes, dtype=float)
+    available_nodes = np.asarray(available_nodes, dtype=float)
+    available_incident_dirs = np.asarray(available_incident_dirs, dtype=float)
+    available_obs_dirs = np.asarray(available_obs_dirs, dtype=float)
+    if target_nodes.ndim != 2 or target_nodes.shape[1] != 3:
+        raise ValueError("target_nodes must have shape (n_target, 3)")
+    if available_nodes.ndim != 2 or available_nodes.shape[1] != 3:
+        raise ValueError("available_nodes must have shape (n_available, 3)")
+    if (
+        available_incident_dirs.shape != available_nodes.shape
+        or available_obs_dirs.shape != available_nodes.shape
+    ):
+        raise ValueError("available directions must align with available_nodes")
+    if polarimetric_J <= 0:
+        raise ValueError("polarimetric_J must be positive")
+    if available_nodes.shape[0] < polarimetric_J:
+        raise ValueError("not enough available measurement configurations")
+
+    pool_size = candidate_count
+    if pool_size is None:
+        pool_size = max(24, 4 * int(polarimetric_J))
+    pool_size = min(max(int(pool_size), int(polarimetric_J)), available_nodes.shape[0])
+
+    tree = cKDTree(available_nodes)
+    candidate_distances, candidate_indices = tree.query(target_nodes, k=pool_size)
+    candidate_distances = np.asarray(candidate_distances, dtype=float)
+    candidate_indices = np.asarray(candidate_indices, dtype=np.int64)
+    if candidate_indices.ndim == 1:
+        candidate_indices = candidate_indices[:, None]
+        candidate_distances = candidate_distances[:, None]
+
+    unique_candidates = np.unique(candidate_indices)
+    blocks = {
+        int(index): polarimetric_block_from_directions(
+            available_incident_dirs[index],
+            available_obs_dirs[index],
+            tensor_kind,
+        )
+        for index in unique_candidates
+    }
+    n_coeffs = next(iter(blocks.values())).shape[1]
+    selected_indices = np.empty((polarimetric_J, target_nodes.shape[0]), dtype=np.int64)
+    selected_distances = np.empty((polarimetric_J, target_nodes.shape[0]), dtype=float)
+    ranks = np.empty(target_nodes.shape[0], dtype=float)
+    sigma_min = np.empty(target_nodes.shape[0], dtype=float)
+    condition_numbers = np.empty(target_nodes.shape[0], dtype=float)
+
+    for target_index in range(target_nodes.shape[0]):
+        candidates = candidate_indices[target_index]
+        distances = candidate_distances[target_index]
+        selected_positions: list[int] = []
+        remaining_positions = list(range(pool_size))
+
+        for _ in range(polarimetric_J):
+            best_position = -1
+            best_score: tuple[int, float, float] | None = None
+            for candidate_position in remaining_positions:
+                trial_positions = selected_positions + [candidate_position]
+                trial_matrix = np.vstack([
+                    blocks[int(candidates[position])]
+                    for position in trial_positions
+                ])
+                singular_values = np.linalg.svd(trial_matrix, compute_uv=False)
+                tolerance = (
+                    max(trial_matrix.shape)
+                    * np.finfo(float).eps
+                    * max(float(singular_values[0]), 1.0)
+                )
+                rank = int(np.sum(singular_values > tolerance))
+                active_sigma = (
+                    float(singular_values[min(rank, n_coeffs) - 1])
+                    if rank > 0
+                    else 0.0
+                )
+                score = (rank, active_sigma, -float(distances[candidate_position]))
+                if best_score is None or score > best_score:
+                    best_score = score
+                    best_position = candidate_position
+
+            selected_positions.append(best_position)
+            remaining_positions.remove(best_position)
+
+        chosen = candidates[selected_positions]
+        joint_matrix = np.vstack([blocks[int(index)] for index in chosen])
+        singular_values = np.linalg.svd(joint_matrix, compute_uv=False)
+        rank = int(np.linalg.matrix_rank(joint_matrix))
+        if rank < n_coeffs:
+            raise ValueError(
+                "mock polarimetric selection is rank deficient at target "
+                f"{target_index}: rank={rank}, required={n_coeffs}, "
+                f"candidate_count={pool_size}, polarimetric_J={polarimetric_J}"
+            )
+
+        selected_indices[:, target_index] = chosen
+        selected_distances[:, target_index] = distances[selected_positions]
+        ranks[target_index] = rank
+        sigma_min[target_index] = float(singular_values[-1])
+        condition_numbers[target_index] = float(
+            singular_values[0] / max(singular_values[-1], 1e-14)
+        )
+
+    diagnostics: dict[str, Array | int | float] = {
+        "candidate_count": int(pool_size),
+        "polarimetric_J": int(polarimetric_J),
+        "polarimetric_ranks": ranks,
+        "polarimetric_sigma_min": sigma_min,
+        "polarimetric_condition_numbers": condition_numbers,
+    }
+    return selected_indices, selected_distances, diagnostics
+
+
+def generate_polarimetric_data_nodes(
+    target_nodes: Array,
+    requested_measure_dirs: int,
+    *,
+    data_mode: str = "mock",
+    polarimetric_J: int = 6,
+    tensor_kind: str = "full",
+    candidate_count: int | None = None,
+    angular_rule: SphereRule = "lebedev",
+) -> tuple[Array, Array, Array, Array, dict]:
+    """Generate non-deficient direction configurations for polarimetric data.
+
+    ``target_nodes`` remain the unique inversion nodes.  Direction pairs and
+    matching distances are returned in branch-major order with ``J*n_target``
+    rows so that all configurations for target ``i`` occur at indices
+    ``b*n_target + i``.
+    """
+    from common.polarimetric import build_polarimetric_matrix_from_directions
+
+    target_nodes = np.asarray(target_nodes, dtype=float)
+    if target_nodes.ndim != 2 or target_nodes.shape[1] != 3:
+        raise ValueError("target_nodes must have shape (n_target, 3)")
+    if polarimetric_J <= 0:
+        raise ValueError("polarimetric_J must be positive")
+
+    if data_mode == "ideal":
+        incident_list: list[Array] = []
+        obs_list: list[Array] = []
+        for branch_index in range(polarimetric_J):
+            incident, obs, _ = admissible_farfield_pairs_from_nodes(
+                target_nodes,
+                branch_index=branch_index,
+                branch_count=polarimetric_J,
+            )
+            incident_list.append(incident)
+            obs_list.append(obs)
+        incident_dirs = np.concatenate(incident_list, axis=0)
+        obs_dirs = np.concatenate(obs_list, axis=0)
+        matched_nodes = np.tile(target_nodes, (polarimetric_J, 1))
+        distances = np.zeros(polarimetric_J * target_nodes.shape[0], dtype=float)
+        measure_rule = "ideal_admissible"
+        n_measure_dirs = polarimetric_J * target_nodes.shape[0]
+        available_count = matched_nodes.shape[0]
+        candidate_pool = polarimetric_J
+    elif data_mode == "mock":
+        directions, _, measure_rule = sphere_quadrature(
+            requested_measure_dirs, angular_rule
+        )
+        n_measure_dirs = directions.shape[0]
+        raw_available = farfield_fourier_nodes(directions, directions)
+        interior_mask = np.linalg.norm(raw_available, axis=1) < 1.0 - 1e-12
+        available_nodes = raw_available[interior_mask]
+        incident_indices = np.repeat(
+            np.arange(n_measure_dirs), n_measure_dirs
+        )[interior_mask]
+        obs_indices = np.tile(np.arange(n_measure_dirs), n_measure_dirs)[interior_mask]
+        available_incident = directions[incident_indices]
+        available_obs = directions[obs_indices]
+
+        indices, distance_matrix, selection = match_mock_polarimetric_configurations(
+            target_nodes,
+            available_nodes,
+            available_incident,
+            available_obs,
+            polarimetric_J=polarimetric_J,
+            tensor_kind=tensor_kind,
+            candidate_count=candidate_count,
+        )
+        flat_indices = indices.reshape(-1)
+        incident_dirs = available_incident[flat_indices]
+        obs_dirs = available_obs[flat_indices]
+        matched_nodes = available_nodes[flat_indices]
+        distances = distance_matrix.reshape(-1)
+        available_count = available_nodes.shape[0]
+        candidate_pool = int(selection["candidate_count"])
+    else:
+        raise ValueError(f"Unknown data_mode: {data_mode!r}")
+
+    n_target = target_nodes.shape[0]
+    ranks = np.empty(n_target, dtype=float)
+    sigma_min = np.empty(n_target, dtype=float)
+    conditions = np.empty(n_target, dtype=float)
+    for target_index in range(n_target):
+        rows = target_index + np.arange(polarimetric_J) * n_target
+        matrix = build_polarimetric_matrix_from_directions(
+            incident_dirs[rows], obs_dirs[rows], tensor_kind
+        )
+        singular_values = np.linalg.svd(matrix, compute_uv=False)
+        ranks[target_index] = np.linalg.matrix_rank(matrix)
+        sigma_min[target_index] = float(singular_values[-1])
+        conditions[target_index] = float(
+            singular_values[0] / max(singular_values[-1], 1e-14)
+        )
+
+    n_coeffs = build_polarimetric_matrix_from_directions(
+        incident_dirs[np.arange(polarimetric_J) * n_target],
+        obs_dirs[np.arange(polarimetric_J) * n_target],
+        tensor_kind,
+    ).shape[1]
+    if np.any(ranks < n_coeffs):
+        bad_index = int(np.flatnonzero(ranks < n_coeffs)[0])
+        raise ValueError(
+            "polarimetric direction configurations are rank deficient at "
+            f"target {bad_index}: rank={int(ranks[bad_index])}, required={n_coeffs}"
+        )
+
+    info = {
+        "n_measure_dirs": int(n_measure_dirs),
+        "measure_rule": measure_rule,
+        "available_nodes": int(available_count),
+        "data_mode": data_mode,
+        "polarimetric_J": int(polarimetric_J),
+        "candidate_count": int(candidate_pool),
+        "matched_nodes": matched_nodes.reshape(polarimetric_J, n_target, 3),
+        "polarimetric_ranks": ranks,
+        "polarimetric_sigma_min": sigma_min,
+        "polarimetric_condition_numbers": conditions,
+    }
+    return target_nodes.copy(), incident_dirs, obs_dirs, distances, info
+
+
 # ---------------------------------------------------------------------------
 # Direction-pair geometry helpers
 # ---------------------------------------------------------------------------

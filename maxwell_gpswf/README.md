@@ -41,22 +41,26 @@ pandas 3.0.3
 ## 运行
 
 ```bash
-.venv/bin/python maxwell_gpswf/main.py --out-dir outputs                    # 全部
-.venv/bin/python maxwell_gpswf/main.py --mode fig1 --data-mode ideal        # 单图+理想模式
-.venv/bin/python maxwell_gpswf/main.py --mode fig5 --out-dir outputs        # 基函数与 DSM 对照
-.venv/bin/python maxwell_gpswf/main.py --mode fig6 --out-dir outputs        # 不同张量散射体
-.venv/bin/python maxwell_gpswf/main.py --mode fig7 --out-dir outputs        # BIM-GPSWF 非线性修正
-.venv/bin/python maxwell_gpswf/main.py --quick --out-dir outputs/smoke      # 快速检查
+.venv/bin/python maxwell_gpswf/main.py --out-dir outputs
+.venv/bin/python maxwell_gpswf/main.py --mode exp1 --data-mode mock --out-dir outputs
+.venv/bin/python maxwell_gpswf/main.py --mode exp3 --data-mode ideal --out-dir outputs_ideal
+.venv/bin/python maxwell_gpswf/main.py --mode all --quick --out-dir outputs/smoke
 ```
 
-每个主图会在对应输出目录生成成像图和运行时诊断文件：
+`--mode` 可取 `exp1`、`exp2`、`exp3`、`exp4`、`all`。默认数据模式为 `mock`。
+
+每个主实验会在对应输出目录生成成像图和运行时诊断文件：
 
 ```text
-figure*_*.png                 # 成像图
-figure*_diagnostics.csv       # 标量诊断表
-figure*_diagnostics_detail.npz # 标量诊断 NPZ 备份
-figure*_diagnostic_curves.png # 诊断曲线
+exp*/exp*_*.png                  # 成像图
+exp*/exp*_diagnostics.csv        # 标量诊断表
+exp*/exp*_diagnostics_detail.npz # 标量诊断 NPZ 备份
+exp*/exp*_diagnostic_curves.png  # 诊断曲线
 ```
+
+当前 `exp1`--`exp4` 的数值设置、公式、图表和结果说明见
+[output_guide.tex](output_guide.tex)。该文件是可由论文主文档直接
+`\input` 的 LaTeX section 片段。
 
 旧的论文表格型 `diagnostics/` 目录已删除。现在的诊断逻辑在 `common/diagnostics.py` 中，由各主图脚本在真实运行流程里调用。
 
@@ -84,6 +88,103 @@ Full VIE far-field
 
 在 Born 近似下，远场通道满足 `g(p)=M(p)c(p)`，其中 `c(p)` 是 `Qhat(p)` 在张量基下的系数。极化恢复指的是从远场通道 `g(p)` 解出 `c(p)`，然后再进入 GPSWF / Fourier / Bessel / DSM 成像。
 
+## 当前主实验
+
+| 实验 | 目的 | 散射体 | 远场噪声 |
+|------|------|--------|----------|
+| `exp1` | 比较固定保留维数 `N` | 单立方体 | `0.2` |
+| `exp2` | 比较噪声影响 | 三方块 | `0, 0.2, 0.4` |
+| `exp3` | 比较波数与近距离分辨率 | 最小间距 `0.20` 的三方块 | `0.2` |
+| `exp4` | 比较 GPSWF/Fourier/Bessel/DSM | 三方块 | `0.2` |
+
+`exp1` 中的 `N` 是保留维数上限。模式按 `(ell,n)` 分组，同一组的
+`m=-ell,...,ell` 必须完整保留；alpha 稳定平台内部按 Sturm-Liouville
+特征值 `chi` 排序。因此诊断中的 `retained_N` 可能小于 `requested_N`。
+当前三行维数依次为 `1, 5, 21`、`35, 57, 71` 和
+`135, 237, 496`，均对应完整简并层的实际保留维数。
+实验同时输出 `exp1_dimension.png` 和
+`exp1_dimension_individual_scale.png`：前者统一使用真值色轴 `[0,1]`，
+后者为每幅重构按自身球内 `min/max` 设置色轴并显示 colorbar，仅用于
+观察结构细节，不用于比较不同 `N` 的绝对幅值。
+实验一正式模式使用 `161×161` 成像网格，quick 模式保持 `51×51`。
+正式模式使用 974 个 Lebedev 入射方向和同一组 974 个观测方向，quick
+模式使用 110 个方向，以减小 mock Fourier 节点匹配误差对维数比较的影响。
+
+实验二同时输出 `exp2_noise.png` 和
+`exp2_noise_individual_scale.png`：前者对三个噪声水平统一使用真值色轴，
+后者为每幅图按自身球内 `min/max` 设置色轴并显示 colorbar。实验二正式
+模式同样使用 `161×161` 成像网格和 `bicubic` 显示插值，quick 模式保持
+`51×51`。正式模式使用 974 个 Lebedev 入射方向和同一组 974 个观测
+方向，quick 模式使用 110 个方向，避免方向离散误差形成固定误差底并
+干扰噪声水平比较。
+
+实验三同时输出 `exp3_frequency.png` 和
+`exp3_frequency_individual_scale.png`：前者对不同波数统一使用真值色轴，
+后者为每幅图按自身球内 `min/max` 设置色轴并显示 colorbar。面板标题显示
+对应的 `k` 和实际保留维数 `N`。实验三正式模式使用 `161×161` 成像网格
+和 `bicubic` 显示插值，quick 模式保持 `51×51`。
+
+实验三使用 `k=4, 6, 8, 10, 15, 20`。正式模式的六个波数统一使用
+974 个 Lebedev 入射方向和同一组 974 个观测方向，避免把方向密度变化
+混入频率比较。三个长方体的最小边界间距为 `0.20`；其解析 Born 公式在
+每组实际方向对应的 Fourier 节点生成远场，随后仍经过加噪声、极化恢复
+和 GPSWF 重构。诊断中的 `C_mock_distance_mean/p95/max` 用于判断 mock
+节点误差随波数产生的相位影响。上述方向数和 GPSWF 离散规模是经验参数。
+
+实验四使用 `k=8, 12, 15` 比较 GPSWF、Cube Fourier、Ball Bessel 和
+DSM。正式模式统一使用 974 个 Lebedev 入射方向和同一组 974 个观测
+方向，以减小 mock Fourier 节点匹配误差；quick 模式使用 110 个方向。
+实验同时输出 `exp4_basis.png` 和 `exp4_basis_individual_scale.png`：前者
+统一使用真值色轴比较绝对幅值，后者按每个方法在自身有效支撑区域内的
+`min/max` 设置色轴并显示 colorbar。正式模式使用 `161×161` 成像网格
+和 `bicubic` 显示插值，quick 模式保持 `51×51`。
+
+`exp3`、`exp4` 的 GPSWF 有效维数上限为：
+
+```text
+min(C^2/2, target_nodes/6, 512)
+```
+
+epsilon 筛选和上限截断同样不拆分 `(ell,n)` 简并层。两项实验与
+`exp1`、`exp2` 统一使用 `viridis` 色图和真值幅值范围。
+`exp4` 中 Fourier/Bessel 的候选模式数仍由 GPSWF 实际维数乘比例得到，
+但最终保留数也统一限制为不超过 512。
+
+四个实验采用相同的远场反演入口，但正向数据源不同：
+
+```text
+给定 Q(x)
+-> exp1/exp2/exp4: Discrete VIE-Born 生成远场通道
+   exp3: 长方体解析 Born 公式生成远场通道
+-> 在远场通道上添加复高斯相对噪声
+-> 极化恢复 Qhat(p)
+-> GPSWF 或其他基函数重构 Q(x)
+```
+
+### mock 极化配置
+
+mock 模式先固定有限 Lebedev 入射/观测方向，并形成实际测量节点
+`p_ab=(d_a-xhat_b)/2`。对每个目标求积节点，从 24 个近邻候选中选取
+`polarimetric_J=6` 个方向配置。选择顺序为联合矩阵秩、最小奇异值、
+节点距离；一般 `full` 张量对应的联合极化矩阵形状为 `36 x 9`，代码要求
+其列秩为 9，否则停止运行。
+
+诊断表新增或统一记录：
+
+- `polarimetric_J`
+- `polarimetric_rank_min`
+- `polarimetric_sigma_min_min/median`
+- `polarimetric_condition_median/max`
+- `candidate_count`
+- `mock_distance_mean/max/p95`
+
+---
+
+## 历史 figure1-figure7 说明
+
+以下内容对应保留在 `experiments/figure*.py` 中的旧实验脚本，不是当前
+`main.py` 的 `exp1`-`exp4` 主入口。
+
 ---
 
 ## 图1: 噪声与截断维数
@@ -105,9 +206,9 @@ Full VIE far-field
 | K | 60 | 40 | Jacobi 截断阶数 |
 | ℓ_max | 18 | 10 | 球谐角向最大阶数 |
 | n_modes_per_ℓ | 10 | 6 | 每个 ℓ 保留的径向模态数 |
-| 总模式数 | ∑(2ℓ+1)·10 = 1352 | ∑(2ℓ+1)·6 = 486 | (ℓ_max+1)² × n_modes_per_ℓ |
+| 总模式数 | ∑(2ℓ+1)·10 = 3610 | ∑(2ℓ+1)·6 = 486 | (ℓ_max+1)² × n_modes_per_ℓ |
 | target_nodes | 12×302 = 3624 | 6×110 = 660 | n_radial × n_angular |
-| ratio | **2.68** | 1.36 | nodes / modes |
+| ratio | 1.00 | 1.36 | nodes / modes |
 | N 值 | 5, 72, 144, 256, 512 | 5, 20, 40, 60 | 按 |α| 排序取前 N 个 |
 | 噪声 δ | 0, 0.1, 0.2, 0.3 | 同 | 相对噪声水平 |
 | 截断方式 | N 固定 | N 固定 | 用于比较截断维数的影响 |
@@ -218,7 +319,7 @@ Full VIE far-field
 
 ## 图4: 支撑半径缩放
 
-**目的**：固定 k=15，改变先验支撑球半径 R，观察 C=2kR 增大时 GPSWF 重构的变化。这里 R 表示 `supp(Q) ⊂ B(0,R)` 的支撑外包球半径，真实散射体 Q(x) 的物理尺寸不随 R 改变。
+**目的**：固定 k=8，改变先验支撑球半径 R，观察 C=2kR 增大时 GPSWF 重构的变化。这里 R 表示 `supp(Q) ⊂ B(0,R)` 的支撑外包球半径，真实散射体 Q(x) 的物理尺寸不随 R 改变。
 
 **布局**：5 列 (truth + R=1.0/1.5/2.0/3.0) × 5 行（同图3 散射体）
 
@@ -239,19 +340,19 @@ Q(x) = f_R(x/R) / R^3
 
 | R | C | ℓ_max | n_modes | K | n_radial | n_angular | modes | nodes | ratio |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 1.0 | 30 | 10 | 5 | 44 | 12 | 170 | 605 | 2040 | 3.37 |
-| 1.5 | 45 | 14 | 6 | 54 | 14 | 302 | 1350 | 4228 | 3.13 |
-| 2.0 | 60 | 18 | 7 | 68 | 16 | 434 | 2527 | 6944 | 2.75 |
-| 3.0 | 90 | 22 | 8 | 90 | 20 | 590 | 4232 | 11800 | 2.79 |
+| 1.0 | 16 | 7 | 3 | 28 | 8 | 86 | 192 | 688 | 3.58 |
+| 1.5 | 24 | 10 | 5 | 40 | 10 | 170 | 605 | 1700 | 2.81 |
+| 2.0 | 32 | 12 | 6 | 48 | 12 | 302 | 1014 | 3624 | 3.57 |
+| 3.0 | 48 | 16 | 7 | 60 | 14 | 302 | 2023 | 4228 | 2.09 |
 
 ### 参数
 
 | 参数 | 值 | 说明 |
 |------|-----|------|
-| k | 15 | 固定波数 |
+| k | 8 | 固定波数 |
 | R | 1.0, 1.5, 2.0, 3.0 | Q(x) 的先验支撑外包球半径 |
 | ε | 0.2 | |
-| N_cap | C²/2 (450~4050) | 随 C 增长 |
+| N_cap | C²/2 (128~1152) | 随 C 增长 |
 | 张量类型 | full (9 维) | |
 | 数据分量 | Q_11 | |
 | grid_size | 81×81 | 物理坐标范围固定为 `[-1,1]×[-1,1]` |

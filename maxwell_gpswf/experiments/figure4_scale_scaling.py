@@ -30,16 +30,16 @@ from common.phantom import Mode, _shape_truth_and_fourier
 
 
 def _row_params(R: float) -> dict:
-    """GPSWF parameters linked to C = 2kR (k=15 fixed)."""
-    C = 30.0 * R  # = 2 * 15 * R
+    """GPSWF parameters linked to C = 2kR (k=8 fixed)."""
+    C = 16.0 * R  # = 2 * 8 * R
     if R <= 1.0:
-        return {"ell_max": 10, "n_modes": 5,  "K": 44, "n_radial": 12, "n_angular": 170, "C": C}
+        return {"ell_max": 7, "n_modes": 3, "K": 28, "n_radial": 8, "n_angular": 86, "C": C}
     elif R <= 1.5:
-        return {"ell_max": 14, "n_modes": 6,  "K": 54, "n_radial": 14, "n_angular": 302, "C": C}
+        return {"ell_max": 10, "n_modes": 5, "K": 40, "n_radial": 10, "n_angular": 170, "C": C}
     elif R <= 2.0:
-        return {"ell_max": 18, "n_modes": 7,  "K": 68, "n_radial": 16, "n_angular": 434, "C": C}
+        return {"ell_max": 12, "n_modes": 6, "K": 48, "n_radial": 12, "n_angular": 302, "C": C}
     else:
-        return {"ell_max": 22, "n_modes": 8,  "K": 90, "n_radial": 20, "n_angular": 590, "C": C}
+        return {"ell_max": 16, "n_modes": 7, "K": 60, "n_radial": 14, "n_angular": 302, "C": C}
 
 
 SHAPES = ["sphere", "cube", "two_spheres_cube", "dispersed", "inhomogeneous"]
@@ -48,7 +48,7 @@ R_VALUES = [1.0, 1.5, 2.0, 3.0]
 
 def run_experiment(config: ExperimentConfig) -> Any:
     requested_measure_dirs = 110; grid_size = 81
-    k = 15.0; epsilon = 0.2; kind = "full"; component_index = 0
+    k = 8.0; epsilon = 0.2; kind = "full"; component_index = 0
     data_C = 2.0 * k
     quad_order = 160; r_eval_count = 120
     data_mode = getattr(config, "data_mode", "mock")

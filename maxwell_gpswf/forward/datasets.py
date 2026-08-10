@@ -22,7 +22,15 @@ from common.quadrature import (
     orthonormal_basis_perp,
     paired_farfield_fourier_nodes,
 )
-from common.phantom import TensorKind, reference_tensor, tensor_basis, tensor_coefficients_from_matrix
+from common.phantom import (
+    Block,
+    TensorKind,
+    block_fourier_profile,
+    reference_tensor,
+    tensor_basis,
+    tensor_coefficients_from_matrix,
+)
+from common.polarimetric import build_polarimetric_matrix_from_directions
 
 
 @dataclass
@@ -35,6 +43,27 @@ class FarfieldDataset:
     farfield_data: np.ndarray          # (n_meas, 6)  2-pol × 3-comp stacked
     data_source: str                   # "analytic_born" | "vie_born" | "full_vie"
     metadata: dict = field(default_factory=dict)
+
+
+def polarimetric_diagnostic_summary(dataset: FarfieldDataset) -> dict[str, float | int]:
+    """Return CSV-ready stability diagnostics after polarimetric recovery."""
+    metadata = dataset.metadata
+    return {
+        "polarimetric_J": int(metadata.get("polarimetric_J", 0)),
+        "polarimetric_rank_min": int(metadata.get("polarimetric_rank_min", 0)),
+        "polarimetric_sigma_min_min": float(
+            metadata.get("polarimetric_sigma_min_min", np.nan)
+        ),
+        "polarimetric_sigma_min_median": float(
+            metadata.get("polarimetric_sigma_min_median", np.nan)
+        ),
+        "polarimetric_condition_median": float(
+            metadata.get("polarimetric_condition_median", np.nan)
+        ),
+        "polarimetric_condition_max": float(
+            metadata.get("polarimetric_condition_max", np.nan)
+        ),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -76,7 +105,7 @@ def _resolve_direction_pairs(
     n_p = p_nodes.shape[0]
     if incident_dirs is None:
         physical_nodes = -p_nodes if vie_phase else p_nodes
-        inc, obs, _ = _admissible_geometries(physical_nodes, n_geometries)
+        inc, obs, n_p, n_geometries = _admissible_geometries(physical_nodes, n_geometries)
         physical_sign = -1 if vie_phase else 1
     else:
         inc = np.asarray(incident_dirs, dtype=float)
@@ -103,8 +132,11 @@ def _farfield_prefactor(k: float) -> float:
     return float(k) ** 2 / (4.0 * np.pi)
 
 
-def _build_vie_contrast(shape_name: str, volume_nodes, tensor):
-    """Build Q on voxel grid for any shape (matches figure3 logic)."""
+def _build_vie_contrast(shape_name: str, volume_nodes, tensor, **kwargs):
+    """Build Q on voxel grid for any shape (matches figure3 logic).
+
+    Extra kwargs are forwarded to shape constructors (e.g. ``cube_half_side``).
+    """
     from common.phantom import (
         Block, cube_phantom, two_spheres_cube_phantom, dispersed_blocks_phantom,
     )
@@ -128,7 +160,8 @@ def _build_vie_contrast(shape_name: str, volume_nodes, tensor):
                 Q[:, a, a] += scalar
         return Q
     elif name == "cube":
-        blocks = cube_phantom(center=(0.0, 0.0, 0.0), half_side=0.2, amplitude=1.0 + 0.0j)
+        half_side = float(kwargs.get("cube_half_side", 0.2))
+        blocks = cube_phantom(center=(0.0, 0.0, 0.0), half_side=half_side, amplitude=1.0 + 0.0j)
     elif name == "two_spheres_cube":
         blocks = two_spheres_cube_phantom()
     elif name == "dispersed":
@@ -203,6 +236,70 @@ def analytic_born_farfield_dataset(
     )
 
 
+def analytic_block_born_farfield_dataset(
+    blocks: list[Block],
+    target_p_nodes: np.ndarray,
+    kind: TensorKind = "full",
+    k: float = 15.0,
+    *,
+    incident_dirs: np.ndarray,
+    obs_dirs: np.ndarray,
+) -> FarfieldDataset:
+    """Analytical Born far-field for a piecewise-constant block phantom.
+
+    ``target_p_nodes`` are the Fourier-ball nodes used by the inverse
+    quadrature.  The far-field values themselves are evaluated at the actual
+    Fourier nodes associated with each supplied direction pair.  Consequently,
+    mock-node mismatch remains present in the generated data.
+
+    The VIE convention gives ``exp(+i k(d-xhat).x)``.  Under the project
+    convention ``exp(-i C p.x)``, ``C=2k``, the Fourier node used to evaluate
+    the block profile is therefore ``p=(xhat-d)/2``.
+    """
+    target_p_nodes = np.asarray(target_p_nodes, dtype=float)
+    incident_dirs = np.asarray(incident_dirs, dtype=float)
+    obs_dirs = np.asarray(obs_dirs, dtype=float)
+    if target_p_nodes.ndim != 2 or target_p_nodes.shape[1] != 3:
+        raise ValueError("target_p_nodes must have shape (n_nodes, 3)")
+    if incident_dirs.shape != obs_dirs.shape or incident_dirs.ndim != 2 or incident_dirs.shape[1] != 3:
+        raise ValueError("incident_dirs and obs_dirs must both have shape (n_meas, 3)")
+
+    n_p = target_p_nodes.shape[0]
+    n_meas = incident_dirs.shape[0]
+    if n_p <= 0 or n_meas % n_p != 0:
+        raise ValueError("number of direction pairs must be a multiple of target_p_nodes")
+
+    physical_nodes = paired_farfield_fourier_nodes(incident_dirs, obs_dirs)
+    actual_fourier_nodes = -physical_nodes
+    scalar_fourier = block_fourier_profile(actual_fourier_nodes, blocks, C=2.0 * float(k))
+    tensor = reference_tensor(kind)
+    farfield_data = np.zeros((n_meas, 6), dtype=np.complex128)
+
+    for measurement_index, (d, xhat) in enumerate(zip(incident_dirs, obs_dirs)):
+        projector = np.eye(3) - np.outer(xhat, xhat)
+        incident_polarizations = np.column_stack(orthonormal_basis_perp(d))
+        qhat = scalar_fourier[measurement_index] * tensor
+        farfield = projector @ qhat @ incident_polarizations
+        farfield_data[measurement_index] = farfield.reshape(-1, order="F")
+
+    return FarfieldDataset(
+        p_nodes=target_p_nodes,
+        incident_dirs=incident_dirs,
+        obs_dirs=obs_dirs,
+        farfield_data=farfield_data,
+        data_source="analytic_block_born",
+        metadata={
+            "kind": kind,
+            "k": float(k),
+            "n_geometries": int(n_meas // n_p),
+            "physical_node_sign": -1,
+            "fourier_convention": "exp(-i C p.x)",
+            "farfield_normalization": "M_c",
+            "prefactor_removed": 1.0,
+        },
+    )
+
+
 def discrete_vie_born_farfield_dataset(
     shape_name: str,
     p_nodes: np.ndarray,
@@ -214,15 +311,20 @@ def discrete_vie_born_farfield_dataset(
     *,
     incident_dirs: np.ndarray | None = None,
     obs_dirs: np.ndarray | None = None,
+    **shape_kwargs,
 ) -> FarfieldDataset:
-    """VIE-discretised Born far-field: voxelised phantom, E = E_inc."""
+    """VIE-discretised Born far-field: voxelised phantom, E = E_inc.
+
+    Extra keyword arguments are forwarded to ``_build_vie_contrast``
+    (e.g. ``cube_half_side=0.4``).
+    """
     from forward.vie import ball_voxel_grid, maxwell_born_far_field
 
     incident_dirs, obs_dirs, n_p, n_geometries, geom_meta = _resolve_direction_pairs(
         p_nodes, n_geometries, incident_dirs, obs_dirs, vie_phase=True)
     volume_nodes, volume_weights, _ = ball_voxel_grid(R, n_per_axis)
     tensor = reference_tensor(kind)
-    Q = _build_vie_contrast(shape_name, volume_nodes, tensor)
+    Q = _build_vie_contrast(shape_name, volume_nodes, tensor, **shape_kwargs)
 
     n_meas = incident_dirs.shape[0]
     farfield_data = np.zeros((n_meas, 6), dtype=np.complex128)
@@ -319,8 +421,9 @@ def farfield_dataset_to_qhat(
 ) -> np.ndarray:
     """Polarimetric recovery: g(p) → pinv(M(p)) → c(p).
 
-    Builds M(p) from the dataset's explicit incident/observation direction
-    pairs.  For each p, solves c = pinv(M) @ g.
+    Builds M from the dataset's explicit incident/observation direction pairs.
+    For mock data, nearby measured Fourier nodes are treated as samples of the
+    same target coefficient before the joint least-squares solve.
 
     Returns coefficients of shape ``(n_p, n_coeffs)``.
     """
@@ -334,29 +437,51 @@ def farfield_dataset_to_qhat(
         return np.zeros((0, 0), dtype=np.complex128)
     if n_meas % n_p != 0:
         raise ValueError("farfield_data rows must be a multiple of p_nodes")
-    n_geometries = max(1, n_meas // n_p)
+    polarimetric_J = max(1, n_meas // n_p)
     basis = tensor_basis(kind)
     n_coeffs = len(basis)
     recovered = np.zeros((n_p, n_coeffs), dtype=np.complex128)
+    ranks = np.empty(n_p, dtype=float)
+    sigma_min = np.empty(n_p, dtype=float)
+    condition_numbers = np.empty(n_p, dtype=float)
 
-    I = np.eye(3)
+    if noise_level > 0.0 and rng is None:
+        raise ValueError("rng is required when noise_level is positive")
+
     for idx in range(n_p):
-        # Collect geometries and data for this p
-        M = np.zeros((6 * n_geometries, n_coeffs), dtype=np.complex128)
-        g_vec = np.zeros(6 * n_geometries, dtype=np.complex128)
-        for b in range(n_geometries):
-            j = b * n_p + idx
-            g_vec[b * 6:(b + 1) * 6] = g_raw[j]
-            d = inc[j]; xhat = obs[j]
-            P = I - np.outer(xhat, xhat)
-            e1, e2 = orthonormal_basis_perp(d)
-            E = np.column_stack([e1, e2])
-            for r, T in enumerate(basis):
-                B = P @ T @ E
-                M[b * 6:(b + 1) * 6, r] = B.reshape(-1, order='F')
+        rows = idx + np.arange(polarimetric_J) * n_p
+        M = build_polarimetric_matrix_from_directions(inc[rows], obs[rows], kind)
+        g_vec = g_raw[rows].reshape(-1)
 
-        if noise_level > 0.0 and rng is not None:
+        singular_values = np.linalg.svd(M, compute_uv=False)
+        rank = int(np.linalg.matrix_rank(M))
+        ranks[idx] = rank
+        sigma_min[idx] = float(singular_values[-1])
+        condition_numbers[idx] = float(
+            singular_values[0] / max(singular_values[-1], 1e-14)
+        )
+        if rank < n_coeffs:
+            raise ValueError(
+                "polarimetric recovery is rank deficient at target "
+                f"{idx}: matrix_shape={M.shape}, rank={rank}, "
+                f"required={n_coeffs}, polarimetric_J={polarimetric_J}"
+            )
+
+        if noise_level > 0.0:
             g_vec = g_vec + complex_relative_noise(g_vec, noise_level, rng)
         recovered[idx] = np.linalg.pinv(M) @ g_vec
+
+    dataset.metadata.update({
+        "polarimetric_J": int(polarimetric_J),
+        "polarimetric_ranks": ranks,
+        "polarimetric_rank_min": int(np.min(ranks)),
+        "polarimetric_sigma_min": sigma_min,
+        "polarimetric_sigma_min_min": float(np.min(sigma_min)),
+        "polarimetric_sigma_min_median": float(np.median(sigma_min)),
+        "polarimetric_condition_numbers": condition_numbers,
+        "polarimetric_condition_median": float(np.median(condition_numbers)),
+        "polarimetric_condition_max": float(np.max(condition_numbers)),
+        "farfield_noise_level": float(noise_level),
+    })
 
     return recovered
