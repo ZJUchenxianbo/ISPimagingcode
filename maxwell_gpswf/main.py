@@ -18,7 +18,6 @@ def parse_args():
     p.add_argument("--out-dir", type=str, default="outputs")
     p.add_argument("--seed", type=int, default=12345)
     p.add_argument("--quick", action="store_true")
-    p.add_argument("--data-mode", choices=["mock", "ideal"], default="mock")
     p.add_argument("--mode", choices=["exp1", "exp2", "exp3", "exp4", "all"], default="all")
     return p.parse_args()
 
@@ -33,7 +32,7 @@ def main():
 
     def cfg(sub: str) -> ExperimentConfig:
         return ExperimentConfig(out_dir=_subdir(base, sub), seed=args.seed,
-                                quick=args.quick, data_mode=args.data_mode)
+                                quick=args.quick)
 
     if args.mode in {"exp1", "all"}:
         print("\n== Experiment 1: Dimension effects (single cube) ==")

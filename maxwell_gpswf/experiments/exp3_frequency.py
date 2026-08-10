@@ -138,7 +138,6 @@ def run_experiment(config: ExperimentConfig) -> Any:
                 generate_polarimetric_data_nodes(
                     -target_nodes,
                     requested_measure_dirs,
-                    data_mode=config.data_mode,
                     polarimetric_J=polarimetric_J,
                     tensor_kind=kind,
                 )
@@ -236,7 +235,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
                     "requested_measure_dirs": int(requested_measure_dirs),
                     "actual_measure_dirs": int(data_info["n_measure_dirs"]),
                     "candidate_count": int(data_info["candidate_count"]),
-                    "data_mode": config.data_mode,
+                    "data_mode": "mock",
                     "data_source": "analytic_block_born",
                     "shape": "close_three_blocks_gap_0.20",
                     "C_mock_distance_mean": float(C * np.mean(mock_distances)),
@@ -314,7 +313,6 @@ def parse_args():
     p.add_argument("--out-dir", type=str, default="outputs/figures")
     p.add_argument("--seed", type=int, default=12345)
     p.add_argument("--quick", action="store_true")
-    p.add_argument("--data-mode", choices=["mock", "ideal"], default="mock")
     return p.parse_args()
 
 
@@ -325,7 +323,6 @@ def main():
         out_dir=out_dir,
         seed=args.seed,
         quick=args.quick,
-        data_mode=args.data_mode,
     ))
 
 

@@ -89,14 +89,12 @@ column rank nine and records its smallest singular value and condition number.
 
 Radial integration uses a Gauss--Jacobi rule adapted to the volume measure in
 the unit ball, and angular integration uses a Lebedev rule on the unit sphere.
-In the mock data mode, finite incident and observation direction sets first
+Finite incident and observation direction sets first
 produce measurable Fourier nodes through~\eqref{eq:maxwell-fourier-node}. For
 each target quadrature node, $J=6$ configurations are selected from a pool of
 24 nearby candidates by prioritizing full rank, conditioning, and Fourier-node
-distance. All formal mock experiments use 974 Lebedev incident directions and
-the same 974 observation directions. In the ideal data mode, admissible
-direction pairs satisfying~\eqref{eq:maxwell-fourier-node} are constructed
-directly from the target nodes, so that nearest-neighbor mismatch is absent.
+distance. All formal experiments use 974 Lebedev incident directions and the
+same 974 observation directions.
 
 \subsection{Far-field data, noise, and spectral truncation}
 \label{subsec:maxwell-gpswf-data}
@@ -361,8 +359,5 @@ projection, and image scaling.
 The four formal experiments can be generated from the project root with
 \begin{verbatim}
 .venv/bin/python maxwell_gpswf/main.py \
-    --mode all --data-mode mock --out-dir outputs
+    --mode all --out-dir outputs
 \end{verbatim}
-The ideal data mode is obtained by replacing \texttt{mock} with
-\texttt{ideal}; it should be written to a separate output directory to avoid
-overwriting the mock results.

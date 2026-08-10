@@ -344,7 +344,6 @@ def generate_polarimetric_data_nodes(
     target_nodes: Array,
     requested_measure_dirs: int,
     *,
-    data_mode: str = "mock",
     polarimetric_J: int = 6,
     tensor_kind: str = "full",
     candidate_count: int | None = None,
@@ -365,58 +364,36 @@ def generate_polarimetric_data_nodes(
     if polarimetric_J <= 0:
         raise ValueError("polarimetric_J must be positive")
 
-    if data_mode == "ideal":
-        incident_list: list[Array] = []
-        obs_list: list[Array] = []
-        for branch_index in range(polarimetric_J):
-            incident, obs, _ = admissible_farfield_pairs_from_nodes(
-                target_nodes,
-                branch_index=branch_index,
-                branch_count=polarimetric_J,
-            )
-            incident_list.append(incident)
-            obs_list.append(obs)
-        incident_dirs = np.concatenate(incident_list, axis=0)
-        obs_dirs = np.concatenate(obs_list, axis=0)
-        matched_nodes = np.tile(target_nodes, (polarimetric_J, 1))
-        distances = np.zeros(polarimetric_J * target_nodes.shape[0], dtype=float)
-        measure_rule = "ideal_admissible"
-        n_measure_dirs = polarimetric_J * target_nodes.shape[0]
-        available_count = matched_nodes.shape[0]
-        candidate_pool = polarimetric_J
-    elif data_mode == "mock":
-        directions, _, measure_rule = sphere_quadrature(
-            requested_measure_dirs, angular_rule
-        )
-        n_measure_dirs = directions.shape[0]
-        raw_available = farfield_fourier_nodes(directions, directions)
-        interior_mask = np.linalg.norm(raw_available, axis=1) < 1.0 - 1e-12
-        available_nodes = raw_available[interior_mask]
-        incident_indices = np.repeat(
-            np.arange(n_measure_dirs), n_measure_dirs
-        )[interior_mask]
-        obs_indices = np.tile(np.arange(n_measure_dirs), n_measure_dirs)[interior_mask]
-        available_incident = directions[incident_indices]
-        available_obs = directions[obs_indices]
+    directions, _, measure_rule = sphere_quadrature(
+        requested_measure_dirs, angular_rule
+    )
+    n_measure_dirs = directions.shape[0]
+    raw_available = farfield_fourier_nodes(directions, directions)
+    interior_mask = np.linalg.norm(raw_available, axis=1) < 1.0 - 1e-12
+    available_nodes = raw_available[interior_mask]
+    incident_indices = np.repeat(
+        np.arange(n_measure_dirs), n_measure_dirs
+    )[interior_mask]
+    obs_indices = np.tile(np.arange(n_measure_dirs), n_measure_dirs)[interior_mask]
+    available_incident = directions[incident_indices]
+    available_obs = directions[obs_indices]
 
-        indices, distance_matrix, selection = match_mock_polarimetric_configurations(
-            target_nodes,
-            available_nodes,
-            available_incident,
-            available_obs,
-            polarimetric_J=polarimetric_J,
-            tensor_kind=tensor_kind,
-            candidate_count=candidate_count,
-        )
-        flat_indices = indices.reshape(-1)
-        incident_dirs = available_incident[flat_indices]
-        obs_dirs = available_obs[flat_indices]
-        matched_nodes = available_nodes[flat_indices]
-        distances = distance_matrix.reshape(-1)
-        available_count = available_nodes.shape[0]
-        candidate_pool = int(selection["candidate_count"])
-    else:
-        raise ValueError(f"Unknown data_mode: {data_mode!r}")
+    indices, distance_matrix, selection = match_mock_polarimetric_configurations(
+        target_nodes,
+        available_nodes,
+        available_incident,
+        available_obs,
+        polarimetric_J=polarimetric_J,
+        tensor_kind=tensor_kind,
+        candidate_count=candidate_count,
+    )
+    flat_indices = indices.reshape(-1)
+    incident_dirs = available_incident[flat_indices]
+    obs_dirs = available_obs[flat_indices]
+    matched_nodes = available_nodes[flat_indices]
+    distances = distance_matrix.reshape(-1)
+    available_count = available_nodes.shape[0]
+    candidate_pool = int(selection["candidate_count"])
 
     n_target = target_nodes.shape[0]
     ranks = np.empty(n_target, dtype=float)
@@ -450,7 +427,7 @@ def generate_polarimetric_data_nodes(
         "n_measure_dirs": int(n_measure_dirs),
         "measure_rule": measure_rule,
         "available_nodes": int(available_count),
-        "data_mode": data_mode,
+        "data_mode": "mock",
         "polarimetric_J": int(polarimetric_J),
         "candidate_count": int(candidate_pool),
         "matched_nodes": matched_nodes.reshape(polarimetric_J, n_target, 3),
@@ -526,23 +503,13 @@ def generate_data_nodes(
     target_nodes: Array,
     requested_measure_dirs: int,
     *,
-    data_mode: str = "mock",
-    branch_count: int = 3,
     angular_rule: SphereRule = "lebedev",
 ) -> tuple[Array, Array, Array, Array, dict]:
-    """Generate far-field data nodes from target quadrature nodes.
+    """Match target quadrature nodes to finite-direction Fourier nodes.
 
-    Two modes:
-
-    ``"mock"`` (06005-style)
-        Finite incident/observation directions → measured nodes
-        ``p = (d-x̂)/2`` → nearest measured node for each target node.
-        Returns mock distances as a quality diagnostic.
-
-    ``"ideal"``
-        For each target node *p*, construct admissible direction pairs
-        via :func:`admissible_farfield_pairs_from_nodes` so that
-        ``p = (d-x̂)/2`` exactly.  No mock-quadrature error.
+    Finite incident and observation directions generate measured nodes
+    ``p = (d-xhat)/2``. Each target node is replaced by its nearest measured
+    node, and the matching distances are returned as diagnostics.
 
     Returns
     -------
@@ -551,53 +518,30 @@ def generate_data_nodes(
     incident_dirs : (n_target, 3)
     obs_dirs : (n_target, 3)
     mock_distances : (n_target,)
-        Zero for ``"ideal"`` mode.
     info : dict
-        ``n_measure_dirs``, ``measure_rule``, ``available_nodes`` (mock only).
+        ``n_measure_dirs``, ``measure_rule``, and ``available_nodes``.
     """
     target_nodes = np.asarray(target_nodes, dtype=float)
-
-    if data_mode == "ideal":
-        n_target = target_nodes.shape[0]
-        # Use multiple branches to get enough geometries per node
-        incident_list, obs_list = [], []
-        branches_per_node = max(1, branch_count)
-        for b in range(branches_per_node):
-            inc, obs, _ = admissible_farfield_pairs_from_nodes(
-                target_nodes, branch_index=b, branch_count=branches_per_node)
-            incident_list.append(inc)
-            obs_list.append(obs)
-        incident_dirs = np.concatenate(incident_list, axis=0)
-        obs_dirs = np.concatenate(obs_list, axis=0)
-        # Each target node appears branch_count times
-        p_nodes = np.tile(target_nodes, (branches_per_node, 1))
-        mock_distances = np.zeros(p_nodes.shape[0], dtype=float)
-        info = {"n_measure_dirs": branches_per_node * target_nodes.shape[0],
-                "measure_rule": "ideal_admissible",
-                "data_mode": "ideal"}
-        return p_nodes, incident_dirs, obs_dirs, mock_distances, info
-
-    elif data_mode == "mock":
-        directions, _, measure_rule = sphere_quadrature(requested_measure_dirs, angular_rule)
-        n_measure_dirs = directions.shape[0]
-        raw_available = farfield_fourier_nodes(directions, directions)
-        available_nodes = interior_ball_nodes(raw_available)
-        indices, distances = match_mock_quadrature_nodes(target_nodes, available_nodes)
-        p_nodes = available_nodes[indices]
-        # Extract matched direction pairs
-        interior_mask = np.linalg.norm(raw_available, axis=1) < 1.0 - 1e-12
-        inc_idx = np.repeat(np.arange(n_measure_dirs), n_measure_dirs)[interior_mask]
-        obs_idx = np.tile(np.arange(n_measure_dirs), n_measure_dirs)[interior_mask]
-        incident_dirs = directions[inc_idx[indices]]
-        obs_dirs = directions[obs_idx[indices]]
-        info = {"n_measure_dirs": int(n_measure_dirs),
-                "measure_rule": measure_rule,
-                "available_nodes": int(available_nodes.shape[0]),
-                "data_mode": "mock"}
-        return p_nodes, incident_dirs, obs_dirs, distances, info
-
-    else:
-        raise ValueError(f"Unknown data_mode: {data_mode!r}")
+    directions, _, measure_rule = sphere_quadrature(
+        requested_measure_dirs, angular_rule
+    )
+    n_measure_dirs = directions.shape[0]
+    raw_available = farfield_fourier_nodes(directions, directions)
+    available_nodes = interior_ball_nodes(raw_available)
+    indices, distances = match_mock_quadrature_nodes(target_nodes, available_nodes)
+    p_nodes = available_nodes[indices]
+    interior_mask = np.linalg.norm(raw_available, axis=1) < 1.0 - 1e-12
+    inc_idx = np.repeat(np.arange(n_measure_dirs), n_measure_dirs)[interior_mask]
+    obs_idx = np.tile(np.arange(n_measure_dirs), n_measure_dirs)[interior_mask]
+    incident_dirs = directions[inc_idx[indices]]
+    obs_dirs = directions[obs_idx[indices]]
+    info = {
+        "n_measure_dirs": int(n_measure_dirs),
+        "measure_rule": measure_rule,
+        "available_nodes": int(available_nodes.shape[0]),
+        "data_mode": "mock",
+    }
+    return p_nodes, incident_dirs, obs_dirs, distances, info
 
 
 def build_geometries_from_p(
