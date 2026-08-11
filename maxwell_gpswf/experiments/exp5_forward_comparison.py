@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Experiment 4: compare four reconstruction methods across wavenumbers.
+"""Experiment 5: compare forward data sources at fixed wavenumber.
 
-Rows use ``k = 8, 12, 15``.  Every row is generated from finite-direction
-Discrete VIE-Born far-field data with relative far-field noise 0.2.  Columns
-are GPSWF, cube Fourier, ball Bessel, and DSM.
+The three rows use Analytic Born, Discrete VIE-Born, and Full VIE far-field
+data.  All rows share ``k=12``, the same finite-direction mock geometries, the
+same standard complex noise sample at relative level 0.2, and the same four
+inverse reconstruction methods.
 """
 from __future__ import annotations
 
@@ -21,22 +22,25 @@ from common.config import ExperimentConfig
 
 def run_experiment(config: ExperimentConfig) -> Any:
     rows = [
-        BasisComparisonRow(k=float(k), label=f"k = {k:g}", data_source="vie_born")
-        for k in (8, 12, 15)
+        BasisComparisonRow(k=12.0, label="Analytic Born", data_source="analytic_born"),
+        BasisComparisonRow(k=12.0, label="Discrete VIE-Born", data_source="vie_born"),
+        BasisComparisonRow(k=12.0, label="Full VIE", data_source="full_vie"),
     ]
     return run_basis_comparison(
         config,
-        experiment_number=4,
+        experiment_number=5,
         row_specs=rows,
-        output_stem="exp4_basis",
-        figure_title="noise = 0.2",
+        output_stem="exp5_forward_comparison",
+        figure_title="k = 12, noise = 0.2",
         noise_level=0.2,
-        shared_noise_for_equal_k=False,
+        shared_noise_for_equal_k=True,
     )
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Experiment 4: basis comparison")
+    parser = argparse.ArgumentParser(
+        description="Experiment 5: forward-data comparison",
+    )
     parser.add_argument("--out-dir", type=str, default="outputs/figures")
     parser.add_argument("--seed", type=int, default=12345)
     parser.add_argument("--quick", action="store_true")

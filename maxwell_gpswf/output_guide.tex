@@ -6,7 +6,7 @@
 \section{Numerical experiments}
 \label{sec:maxwell-gpswf-numerics}
 
-We present four tests of low-rank inversion with 3D Maxwell far-field data.
+We present five tests of low-rank inversion with 3D Maxwell far-field data.
 They examine the dimension of the ball GPSWF space, measurement noise, the
 wavenumber, and the reconstruction basis. The forward and inverse stages are
 kept separate in every experiment. A prescribed tensor contrast
@@ -151,11 +151,11 @@ while still retaining complete multiplets. The present implementation of
 Experiment 2 uses the same prolate-eigenvalue threshold and then applies
 $C^2/2$ as the total mode cap.
 
-Table~\ref{tab:maxwell-experiment-summary} summarizes the four formal
+Table~\ref{tab:maxwell-experiment-summary} summarizes the five formal
 experiments.
 \begin{table}[htbp]
     \centering
-    \caption{Main settings of the four Maxwell reconstruction experiments.}
+    \caption{Main settings of the five Maxwell reconstruction experiments.}
     \label{tab:maxwell-experiment-summary}
     \begin{tabular}{lllll}
         \toprule
@@ -165,6 +165,7 @@ experiments.
         2 & Noise level & $15$ & $0,0.2,0.4$ & VIE--Born\\
         3 & Frequency and resolution & $4,6,8,10,15,20$ & $0.2$ & Analytic Born\\
         4 & Reconstruction method & $8,12,15$ & $0.2$ & VIE--Born\\
+        5 & Forward data source & $12$ & $0.2$ & Analytic Born/VIE--Born/Full VIE\\
         \bottomrule
     \end{tabular}
 \end{table}
@@ -323,6 +324,58 @@ mode counts in addition to the independently scaled images.
     \label{fig:maxwell-exp4-bases}
 \end{figure}
 
+\subsection{Comparison of forward data sources}
+\label{subsec:maxwell-exp5}
+
+Experiment 5 fixes $k=12$, $C=24$, and $\delta=0.2$, and applies the four
+reconstruction methods from Experiment 4 to three forward data sources. The
+analytic Born source evaluates the block Fourier integrals at the actual mock
+measurement nodes. The discrete VIE--Born source replaces those integrals by
+voxel quadrature while setting the total field equal to the incident field.
+The Full VIE source first solves
+\begin{equation}
+    \mathbf{E}(\mathbf{x})
+    =\mathbf{E}^{\mathrm{i}}(\mathbf{x})
+    +k^2\int_B \mathbf{G}_k(\mathbf{x},\mathbf{y})
+    \mathbf{Q}(\mathbf{y})\mathbf{E}(\mathbf{y})\,\mathrm{d}\mathbf{y},
+    \label{eq:maxwell-full-vie}
+\end{equation}
+and then evaluates the far-field integral with the computed total field. Hence
+the three rows respectively expose the continuous-block analytic Born formula,
+voxel quadrature error within the Born model, and the combined effects of VIE
+discretization and multiple scattering.
+
+All rows use the same three-block phantom, 974 incident directions, 974
+observation directions, target quadrature nodes, mock configurations,
+polarimetric matrices, and modal truncations. They also use the same standard
+complex Gaussian noise realization, normalized separately to relative level
+$0.2$ for each far-field data set. Thus, every row follows
+\begin{equation}
+    \text{far-field data}
+    \longrightarrow \widehat{\mathbf{Q}}^{\delta}(\mathbf{p})
+    \longrightarrow Q_{11}^{\delta}(\mathbf{x}),
+    \label{eq:maxwell-exp5-pipeline}
+\end{equation}
+and no row sends an exact Fourier transform of the phantom directly to a
+reconstruction method.
+
+The formal Full VIE discretization uses $n_{\mathrm{axis}}=14$, giving 1472
+voxel nodes and 4416 electric-field unknowns. The system matrix is assembled
+and factorized once. The two incident polarizations are solved as multiple
+right-hand sides, and the total fields are reused for all observation
+directions associated with the same incident direction. This reuse changes
+only the computational organization, not the VIE model or far-field formula.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]
+    {outputs/exp5/exp5_forward_comparison_individual_scale.png}
+    \caption{GPSWF, cube Fourier, spherical Bessel, and DSM reconstructions
+    from analytic Born, discrete VIE--Born, and Full VIE far-field data. Here
+    $k=12$ and $\delta=0.2$. Every panel has an independent color scale.}
+    \label{fig:maxwell-exp5-forward-sources}
+\end{figure}
+
 \subsection{Diagnostics and reproducibility}
 \label{subsec:maxwell-gpswf-diagnostics}
 
@@ -356,8 +409,20 @@ condition number, the coefficient norm, the target-region amplitude, and the
 errors originating from direction matching, polarimetric recovery, modal
 projection, and image scaling.
 
-The four formal experiments can be generated from the project root with
+Experiment 5 additionally records the relative far-field and recovered
+$\widehat{\mathbf{Q}}$ differences with respect to analytic Born data. For the
+Full VIE row it records the voxel and unknown counts, the number of unique
+incident directions and right-hand sides, and sampled linear-system residuals.
+
+Experiments 1--4 can be generated from the project root with
 \begin{verbatim}
 .venv/bin/python maxwell_gpswf/main.py \
     --mode all --out-dir outputs
+\end{verbatim}
+Experiment 5 is deliberately excluded from \texttt{--mode all} because the
+formal Full VIE solve is substantially more expensive. It is run explicitly
+with
+\begin{verbatim}
+.venv/bin/python maxwell_gpswf/main.py \
+    --mode exp5 --out-dir outputs
 \end{verbatim}

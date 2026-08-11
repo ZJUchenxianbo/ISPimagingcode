@@ -364,7 +364,14 @@ def full_vie_farfield_dataset(
     incident_dirs: np.ndarray | None = None,
     obs_dirs: np.ndarray | None = None,
 ) -> FarfieldDataset:
-    """Full Maxwell VIE far-field: solve total field, compute E∞."""
+    """Full Maxwell VIE far-field: solve total field, compute E∞.
+
+    Direction pairs produced by the finite measurement grid often share the
+    same incident direction.  The total field depends on the incident
+    direction and polarization, but not on the observation direction.  We
+    therefore solve the two polarization right-hand sides once per unique
+    incident direction and reuse those fields for every associated observer.
+    """
     from forward.vie import (
         assemble_vie_matrix, ball_voxel_grid, incident_plane_wave,
         maxwell_far_field,
@@ -382,15 +389,44 @@ def full_vie_farfield_dataset(
     n_meas = incident_dirs.shape[0]
     farfield_data = np.zeros((n_meas, 6), dtype=np.complex128)
 
-    for j in range(n_meas):
-        d = incident_dirs[j]; xhat = obs_dirs[j]
-        E_basis = np.column_stack(orthonormal_basis_perp(d))
+    unique_incident_dirs, inverse_indices = np.unique(
+        incident_dirs,
+        axis=0,
+        return_inverse=True,
+    )
+    residual_samples: list[float] = []
+    residual_sample_group_limit = 3
+
+    for incident_index, d in enumerate(unique_incident_dirs):
+        measurement_indices = np.flatnonzero(inverse_indices == incident_index)
+        E_basis = np.column_stack(orthonormal_basis_perp(d)).astype(np.complex128)
+        rhs = np.column_stack([
+            incident_plane_wave(volume_nodes, k, d, E_basis[:, col]).reshape(-1)
+            for col in range(2)
+        ])
+        total_fields_flat = lu_solve(lu, rhs)
+
+        if incident_index < residual_sample_group_limit:
+            residual = A @ total_fields_flat - rhs
+            denominator = np.maximum(np.linalg.norm(rhs, axis=0), 1e-14)
+            residual_samples.extend(
+                (np.linalg.norm(residual, axis=0) / denominator).astype(float).tolist()
+            )
+
+        selected_observers = obs_dirs[measurement_indices]
         for col in range(2):
-            e = E_basis[:, col].astype(np.complex128)
-            rhs = incident_plane_wave(volume_nodes, k, d, e).reshape(-1)
-            total_field = lu_solve(lu, rhs).reshape((-1, 3))
-            ff = maxwell_far_field(volume_nodes, volume_weights, Q, total_field, k, xhat[None, :])[0]
-            farfield_data[j, col * 3:(col + 1) * 3] = ff / _farfield_prefactor(k)
+            total_field = total_fields_flat[:, col].reshape((-1, 3))
+            ff = maxwell_far_field(
+                volume_nodes,
+                volume_weights,
+                Q,
+                total_field,
+                k,
+                selected_observers,
+            )
+            farfield_data[measurement_indices, col * 3:(col + 1) * 3] = (
+                ff / _farfield_prefactor(k)
+            )
 
     return FarfieldDataset(
         p_nodes=p_nodes, incident_dirs=incident_dirs, obs_dirs=obs_dirs,
@@ -401,6 +437,14 @@ def full_vie_farfield_dataset(
             "k": k,
             "R": R,
             "n_per_axis": n_per_axis,
+            "vie_voxel_nodes": int(volume_nodes.shape[0]),
+            "vie_unknowns": int(3 * volume_nodes.shape[0]),
+            "vie_unique_incident_directions": int(unique_incident_dirs.shape[0]),
+            "vie_rhs_count": int(2 * unique_incident_dirs.shape[0]),
+            "vie_residual_sample_count": int(len(residual_samples)),
+            "vie_linear_residual_sample_max": (
+                float(np.max(residual_samples)) if residual_samples else np.nan
+            ),
             "farfield_normalization": "M_c",
             "prefactor_removed": _farfield_prefactor(k),
         },
@@ -418,6 +462,7 @@ def farfield_dataset_to_qhat(
     *,
     noise_level: float = 0.0,
     rng: np.random.Generator | None = None,
+    standard_noise: np.ndarray | None = None,
 ) -> np.ndarray:
     """Polarimetric recovery: g(p) → pinv(M(p)) → c(p).
 
@@ -445,8 +490,14 @@ def farfield_dataset_to_qhat(
     sigma_min = np.empty(n_p, dtype=float)
     condition_numbers = np.empty(n_p, dtype=float)
 
-    if noise_level > 0.0 and rng is None:
-        raise ValueError("rng is required when noise_level is positive")
+    if standard_noise is not None:
+        standard_noise = np.asarray(standard_noise, dtype=np.complex128)
+        if standard_noise.shape != g_raw.shape:
+            raise ValueError("standard_noise must have the same shape as farfield_data")
+    if noise_level > 0.0 and rng is None and standard_noise is None:
+        raise ValueError(
+            "rng or standard_noise is required when noise_level is positive"
+        )
 
     for idx in range(n_p):
         rows = idx + np.arange(polarimetric_J) * n_p
@@ -468,7 +519,18 @@ def farfield_dataset_to_qhat(
             )
 
         if noise_level > 0.0:
-            g_vec = g_vec + complex_relative_noise(g_vec, noise_level, rng)
+            if standard_noise is None:
+                assert rng is not None
+                noise = complex_relative_noise(g_vec, noise_level, rng)
+            else:
+                eta = standard_noise[rows].reshape(-1)
+                eta_norm = max(float(np.linalg.norm(eta)), 1e-14)
+                noise = (
+                    eta / eta_norm
+                    * float(noise_level)
+                    * float(np.linalg.norm(g_vec))
+                )
+            g_vec = g_vec + noise
         recovered[idx] = np.linalg.pinv(M) @ g_vec
 
     dataset.metadata.update({

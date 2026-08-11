@@ -9,7 +9,7 @@ maxwell_gpswf/
 ├── common/          # 配置、phantom、求积、极化恢复、GPSWF 与其他重构方法
 ├── forward/         # Analytic Born、Discrete VIE-Born 和 Full VIE 数据生成
 ├── nonlinear/       # 可复用的 BIM-GPSWF 非线性模块
-├── experiments/     # exp1-exp4 正式实验
+├── experiments/     # exp1-exp5 正式实验
 ├── main.py          # 统一入口
 ├── output_guide.tex # 数值实验 LaTeX section
 └── README.md
@@ -32,10 +32,13 @@ maxwell_gpswf/
 .venv/bin/python maxwell_gpswf/main.py --out-dir outputs
 .venv/bin/python maxwell_gpswf/main.py --mode exp1 --out-dir outputs
 .venv/bin/python maxwell_gpswf/main.py --mode exp3 --out-dir outputs
+.venv/bin/python maxwell_gpswf/main.py --mode exp5 --out-dir outputs
 .venv/bin/python maxwell_gpswf/main.py --mode all --quick --out-dir outputs_smoke
 ```
 
-`--mode` 可取 `exp1`、`exp2`、`exp3`、`exp4` 或 `all`。
+`--mode` 可取 `exp1`、`exp2`、`exp3`、`exp4`、`exp5` 或 `all`。由于
+`exp5` 包含稠密 Full VIE 求解，`all` 只运行 `exp1`--`exp4`；实验 5
+必须用 `--mode exp5` 显式运行。
 
 ## 统一数据流程
 
@@ -67,8 +70,13 @@ p = (d - xhat) / 2
 | `exp2` | 比较噪声影响 | 三方块 | Discrete VIE-Born | `0, 0.2, 0.4` |
 | `exp3` | 比较波数与近距离分辨率 | 最小间距 `0.20` 的三方块 | Analytic Born | `0.2` |
 | `exp4` | 比较 GPSWF/Fourier/Bessel/DSM | 三方块 | Discrete VIE-Born | `0.2` |
+| `exp5` | 比较正向数据源及其反演结果 | 三方块 | Analytic Born / Discrete VIE-Born / Full VIE | `0.2` |
 
-四个实验的完整公式、参数表和 individual-scale 图像见 [output_guide.tex](output_guide.tex)。
+五个实验的完整公式、参数表和 individual-scale 图像见 [output_guide.tex](output_guide.tex)。
+实验 5 固定 `k=12`，三类数据共用方向配置、极化矩阵、标准复高斯噪声样本、
+目标求积节点和四种重构参数。正式 Full VIE 使用 `n_per_axis=14`，形成
+1472 个体素和 4416 个电场未知量；代码按唯一入射方向复用两个极化总场，
+但正式运行仍需要较多内存和时间。
 
 ## 极化恢复
 
@@ -83,6 +91,6 @@ outputs/exp*/exp*_diagnostics_detail.npz # 详细压缩诊断
 outputs/exp*/exp*_diagnostic_curves.png  # 稳定性与泄漏曲线
 ```
 
-主要诊断包括 `retained_modes`、`target_nodes_per_retained_modes`、`mock_distance_mean/max/p95`、极化矩阵秩与条件数、GPSWF Gram 矩阵条件数、系数范数、目标区域幅值和背景 95% 分位幅值。
+主要诊断包括 `retained_modes`、`target_nodes_per_retained_modes`、`mock_distance_mean/max/p95`、极化矩阵秩与条件数、GPSWF Gram 矩阵条件数、系数范数、目标区域幅值和背景 95% 分位幅值。实验 5 还记录相对 Analytic Born 的远场与极化恢复后 `Qhat` 误差，以及 Full VIE 的体素数、未知量数、唯一入射方向数、右端项数和抽样线性残差。
 
 实验输出的临时测试目录应在验证后删除。已有 `outputs/fig*` 和 `outputs2/fig*` 仅作为历史数值结果保留，不再对应活动实验脚本。

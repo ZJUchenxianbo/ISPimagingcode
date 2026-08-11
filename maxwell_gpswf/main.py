@@ -11,14 +11,20 @@ from experiments.exp1_dimension import run_experiment as run_exp1
 from experiments.exp2_noise import run_experiment as run_exp2
 from experiments.exp3_frequency import run_experiment as run_exp3
 from experiments.exp4_basis import run_experiment as run_exp4
+from experiments.exp5_forward_comparison import run_experiment as run_exp5
 
 
 def parse_args():
-    p = argparse.ArgumentParser(description="Run Maxwell-Born imaging experiments.")
+    p = argparse.ArgumentParser(description="Run Maxwell far-field imaging experiments.")
     p.add_argument("--out-dir", type=str, default="outputs")
     p.add_argument("--seed", type=int, default=12345)
     p.add_argument("--quick", action="store_true")
-    p.add_argument("--mode", choices=["exp1", "exp2", "exp3", "exp4", "all"], default="all")
+    p.add_argument(
+        "--mode",
+        choices=["exp1", "exp2", "exp3", "exp4", "exp5", "all"],
+        default="all",
+        help="'all' runs exp1-exp4; run exp5 explicitly because Full VIE is expensive",
+    )
     return p.parse_args()
 
 
@@ -49,6 +55,10 @@ def main():
     if args.mode in {"exp4", "all"}:
         print("\n== Experiment 4: Basis comparison ==")
         run_exp4(cfg("exp4"))
+
+    if args.mode == "exp5":
+        print("\n== Experiment 5: Forward-data comparison at k=12 ==")
+        run_exp5(cfg("exp5"))
 
     print(f"\nDone. Output: {base}")
 
