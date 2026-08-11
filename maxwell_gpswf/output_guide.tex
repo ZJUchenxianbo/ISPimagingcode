@@ -209,8 +209,9 @@ a smaller reconstruction error.
 \subsection{Robustness with respect to far-field noise}
 \label{subsec:maxwell-exp2}
 
-Experiment 2 fixes $k=15$ and uses three rectangular blocks with different
-complex amplitudes. Relative noise levels $\delta=0,0.2,0.4$ are added directly
+Experiment 2 fixes $k=15$ and uses the common three-block geometry with minimum
+boundary separation $0.20$ and different complex amplitudes. Relative noise
+levels $\delta=0,0.2,0.4$ are added directly
 to the far-field channels. The direction sets, quadrature nodes, polarimetric
 configurations, and GPSWF truncation are identical in all three cases, so the
 only varying parameter is the noise level. The principal diagnostics are the
@@ -222,9 +223,9 @@ coefficients.
     \centering
     \includegraphics[width=0.96\textwidth]
     {outputs/exp2/exp2_noise_individual_scale.png}
-    \caption{Reconstruction of the three-block phantom for relative far-field
-    noise levels $\delta=0,0.2,0.4$. Here $k=15$. Each panel uses its own color
-    scale.}
+    \caption{Reconstruction of the gap-$0.20$ three-block phantom for relative
+    far-field noise levels $\delta=0,0.2,0.4$. Here $k=15$. Each panel uses its
+    own color scale.}
     \label{fig:maxwell-exp2-noise}
 \end{figure}
 
@@ -281,7 +282,8 @@ mode is useful.
 \subsection{Comparison of reconstruction methods}
 \label{subsec:maxwell-exp4}
 
-Experiment 4 fixes the same VIE--Born far-field data, polarimetrically recovered
+Experiment 4 uses the same gap-$0.20$ three-block geometry and fixes the same
+VIE--Born far-field data, polarimetrically recovered
 $\widehat{Q}_{11}(\mathbf{p})$, and target quadrature nodes, and compares ball
 GPSWFs, a cube Fourier basis, a spherical-harmonic Bessel basis, and the direct
 sampling method (DSM). We use $k=8,12,15$ and $\delta=0.2$. Consequently, the
@@ -345,8 +347,8 @@ the three rows respectively expose the continuous-block analytic Born formula,
 voxel quadrature error within the Born model, and the combined effects of VIE
 discretization and multiple scattering.
 
-All rows use the same three-block phantom, 974 incident directions, 974
-observation directions, target quadrature nodes, mock configurations,
+All rows use the same gap-$0.20$ three-block phantom, 974 incident directions,
+974 observation directions, target quadrature nodes, mock configurations,
 polarimetric matrices, and modal truncations. They also use the same standard
 complex Gaussian noise realization, normalized separately to relative level
 $0.2$ for each far-field data set. Thus, every row follows

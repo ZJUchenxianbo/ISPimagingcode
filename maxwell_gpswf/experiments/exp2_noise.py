@@ -162,7 +162,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
                 "candidate_count": int(data_info["candidate_count"]),
                 "data_mode": "mock",
                 "data_source": "vie_born",
-                "shape": "three_blocks",
+                "shape": "three_blocks_gap_0.20",
                 **polarimetric_diagnostics,
             },
             modes=modes,

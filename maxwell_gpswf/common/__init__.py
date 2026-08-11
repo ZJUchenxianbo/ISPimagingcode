@@ -14,7 +14,6 @@ from common.phantom import (
     TensorKind,
     ball_phantom,
     block_fourier_profile,
-    close_three_block_phantom,
     cube_phantom,
     dispersed_blocks_phantom,
     normalized_ball_fourier_profile,

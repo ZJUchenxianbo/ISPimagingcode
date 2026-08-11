@@ -67,12 +67,13 @@ p = (d - xhat) / 2
 | 实验 | 目的 | 散射体 | 数据源 | 远场噪声 |
 |------|------|--------|--------|----------|
 | `exp1` | 比较 GPSWF 保留维数 `N` | 单立方体 | Discrete VIE-Born | `0.2` |
-| `exp2` | 比较噪声影响 | 三方块 | Discrete VIE-Born | `0, 0.2, 0.4` |
+| `exp2` | 比较噪声影响 | 最小间距 `0.20` 的三方块 | Discrete VIE-Born | `0, 0.2, 0.4` |
 | `exp3` | 比较波数与近距离分辨率 | 最小间距 `0.20` 的三方块 | Analytic Born | `0.2` |
-| `exp4` | 比较 GPSWF/Fourier/Bessel/DSM | 三方块 | Discrete VIE-Born | `0.2` |
-| `exp5` | 比较正向数据源及其反演结果 | 三方块 | Analytic Born / Discrete VIE-Born / Full VIE | `0.2` |
+| `exp4` | 比较 GPSWF/Fourier/Bessel/DSM | 最小间距 `0.20` 的三方块 | Discrete VIE-Born | `0.2` |
+| `exp5` | 比较正向数据源及其反演结果 | 最小间距 `0.20` 的三方块 | Analytic Born / Discrete VIE-Born / Full VIE | `0.2` |
 
 五个实验的完整公式、参数表和 individual-scale 图像见 [output_guide.tex](output_guide.tex)。
+实验 2--5 共用同一组三方块几何，其最小边界间距为 `0.20`。
 实验 5 固定 `k=12`，三类数据共用方向配置、极化矩阵、标准复高斯噪声样本、
 目标求积节点和四种重构参数。正式 Full VIE 使用 `n_per_axis=14`，形成
 1472 个体素和 4416 个电场未知量；代码按唯一入射方向复用两个极化总场，

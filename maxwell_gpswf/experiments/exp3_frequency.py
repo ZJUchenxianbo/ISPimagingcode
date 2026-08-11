@@ -41,7 +41,7 @@ from common import (
     tensor_coefficients_from_matrix,
     write_diagnostics_csv,
 )
-from common.phantom import Mode, close_three_block_phantom, truth_image_2d
+from common.phantom import Mode, three_block_phantom, truth_image_2d
 from forward.datasets import (
     analytic_block_born_farfield_dataset,
     farfield_dataset_to_qhat,
@@ -109,7 +109,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
     rng = np.random.default_rng(config.seed + 300)
 
     # Truth image (same phantom for all k, computed per k for consistency)
-    blocks = close_three_block_phantom()
+    blocks = three_block_phantom("born")
     coeff0 = tensor_coefficients_from_matrix(reference_tensor(kind), kind)
 
     n_rows = len(k_pairs); n_cols = 2
@@ -237,7 +237,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
                     "candidate_count": int(data_info["candidate_count"]),
                     "data_mode": "mock",
                     "data_source": "analytic_block_born",
-                    "shape": "close_three_blocks_gap_0.20",
+                    "shape": "three_blocks_gap_0.20",
                     "C_mock_distance_mean": float(C * np.mean(mock_distances)),
                     "C_mock_distance_p95": float(C * np.percentile(mock_distances, 95)),
                     "C_mock_distance_max": float(C * np.max(mock_distances)),

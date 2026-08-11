@@ -540,7 +540,7 @@ def _case_common(
         "candidate_count": int(setup.data_info["candidate_count"]),
         "data_mode": "mock",
         "data_source": forward_row.spec.data_source,
-        "shape": "three_blocks",
+        "shape": "three_blocks_gap_0.20",
         "farfield_error_vs_analytic": float(forward_row.farfield_error_vs_analytic),
         "qhat_error_vs_analytic": float(forward_row.qhat_error_vs_analytic),
         "component_qhat_error_vs_analytic": float(

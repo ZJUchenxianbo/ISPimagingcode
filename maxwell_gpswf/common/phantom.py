@@ -55,7 +55,7 @@ class Mode:
 
 
 def three_block_phantom(variant: str = "born") -> list[Block]:
-    """Three-block phantom used in the GPSWF reconstruction experiments.
+    """Three-block phantom with minimum boundary separation 0.20.
 
     Parameters
     ----------
@@ -65,38 +65,24 @@ def three_block_phantom(variant: str = "born") -> list[Block]:
     """
     if variant == "born":
         return [
-            Block(center=(-0.42, 0.30, 0.0), half_width=(0.16, 0.16, 0.16), amplitude=1.00 + 0.10j),
-            Block(center=(0.28, 0.28, 0.0), half_width=(0.15, 0.15, 0.16), amplitude=0.85 + 0.05j),
-            Block(center=(0.00, -0.35, 0.0), half_width=(0.18, 0.14, 0.16), amplitude=1.15 - 0.05j),
+            Block(center=(-0.26, 0.25, 0.0), half_width=(0.16, 0.16, 0.16), amplitude=1.00 + 0.10j),
+            Block(center=(0.25, 0.25, 0.0), half_width=(0.15, 0.15, 0.16), amplitude=0.85 + 0.05j),
+            Block(center=(0.00, -0.25, 0.0), half_width=(0.18, 0.14, 0.16), amplitude=1.15 - 0.05j),
         ]
     if variant == "vie":
         return [
-            Block(center=(-0.42, 0.30, 0.0), half_width=(0.16, 0.16, 0.16), amplitude=0.60 + 0.05j),
-            Block(center=(0.28, 0.28, 0.0), half_width=(0.15, 0.15, 0.16), amplitude=1.15 + 0.10j),
-            Block(center=(0.00, -0.35, 0.0), half_width=(0.18, 0.14, 0.16), amplitude=1.80 - 0.10j),
+            Block(center=(-0.26, 0.25, 0.0), half_width=(0.16, 0.16, 0.16), amplitude=0.60 + 0.05j),
+            Block(center=(0.25, 0.25, 0.0), half_width=(0.15, 0.15, 0.16), amplitude=1.15 + 0.10j),
+            Block(center=(0.00, -0.25, 0.0), half_width=(0.18, 0.14, 0.16), amplitude=1.80 - 0.10j),
         ]
     raise ValueError(f"Unknown three_block_phantom variant: {variant!r}")
 
 
-def close_three_block_phantom() -> list[Block]:
-    """Three blocks with minimum boundary separation 0.20.
-
-    This geometry is reserved for Experiment 3.  It preserves the dimensions,
-    amplitudes, and tensor model of :func:`three_block_phantom` while moving the
-    supports closer together for the frequency-resolution comparison.
-    """
-    return [
-        Block(center=(-0.26, 0.25, 0.0), half_width=(0.16, 0.16, 0.16), amplitude=1.00 + 0.10j),
-        Block(center=(0.25, 0.25, 0.0), half_width=(0.15, 0.15, 0.16), amplitude=0.85 + 0.05j),
-        Block(center=(0.00, -0.25, 0.0), half_width=(0.18, 0.14, 0.16), amplitude=1.15 - 0.05j),
-    ]
-
-
 def three_tensor_block_phantom() -> list[TensorBlock]:
-    """Three blocks with different full anisotropic tensor contrasts."""
+    """Three gap-0.20 blocks with different anisotropic tensor contrasts."""
     return [
         TensorBlock(
-            center=(-0.42, 0.30, 0.0),
+            center=(-0.26, 0.25, 0.0),
             half_width=(0.16, 0.16, 0.16),
             tensor=np.asarray(
                 [
@@ -108,7 +94,7 @@ def three_tensor_block_phantom() -> list[TensorBlock]:
             ),
         ),
         TensorBlock(
-            center=(0.28, 0.28, 0.0),
+            center=(0.25, 0.25, 0.0),
             half_width=(0.15, 0.15, 0.16),
             tensor=np.asarray(
                 [
@@ -120,7 +106,7 @@ def three_tensor_block_phantom() -> list[TensorBlock]:
             ),
         ),
         TensorBlock(
-            center=(0.00, -0.35, 0.0),
+            center=(0.00, -0.25, 0.0),
             half_width=(0.18, 0.14, 0.16),
             tensor=np.asarray(
                 [
