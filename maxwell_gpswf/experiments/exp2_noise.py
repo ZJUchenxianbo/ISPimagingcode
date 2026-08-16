@@ -5,7 +5,7 @@
 Layout: 1 row x 3 cols = 3 reconstructions (no truth column).
   Noise = 0, 0.2, 0.4
 
-Data: VIE Born far-field, mock measurement mode, k=15.
+Data: Full VIE far-field, mock measurement mode, k=15.
 Truncation: three-layer (GPSWF params -> epsilon=0.2 -> N_cap=C^2/2).
 """
 from __future__ import annotations
@@ -36,8 +36,9 @@ from common import (
 )
 from common.phantom import Mode, three_block_phantom, truth_image_2d
 from forward.datasets import (
-    discrete_vie_born_farfield_dataset,
     farfield_dataset_to_qhat,
+    forward_solver_diagnostic_summary,
+    full_vie_farfield_dataset,
     polarimetric_diagnostic_summary,
 )
 
@@ -66,7 +67,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
     # -- Target quadrature nodes --
     target_nodes, target_weights, _ = ball_quadrature_nodes(n_radial, n_angular)
 
-    # -- VIE Born data with mock-matched direction pairs (figure3 pattern) --
+    # -- Full VIE data with mock-matched direction pairs --
     vie_physical, vie_inc, vie_obs, vie_dist, data_info = generate_polarimetric_data_nodes(
         -target_nodes,
         requested_measure_dirs,
@@ -75,7 +76,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
     )
     vie_nodes = -vie_physical
 
-    ds = discrete_vie_born_farfield_dataset(
+    ds = full_vie_farfield_dataset(
         "three_blocks", vie_nodes, kind=kind, k=k, R=1.0,
         n_per_axis=n_per_axis, n_geometries=polarimetric_J,
         incident_dirs=vie_inc, obs_dirs=vie_obs)
@@ -133,6 +134,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
             ds, kind=kind, noise_level=noise_level, rng=rng)
         comp_data = rec_c[:, component_index]
         polarimetric_diagnostics = polarimetric_diagnostic_summary(ds)
+        forward_diagnostics = forward_solver_diagnostic_summary(ds)
 
         coeffs = quadrature_modal_coefficients(
             comp_data, target_basis, target_weights, modes, retained)
@@ -161,9 +163,10 @@ def run_experiment(config: ExperimentConfig) -> Any:
                 "requested_measure_dirs": int(requested_measure_dirs),
                 "candidate_count": int(data_info["candidate_count"]),
                 "data_mode": "mock",
-                "data_source": "vie_born",
+                "data_source": "full_vie",
                 "shape": "three_blocks_gap_0.20",
                 **polarimetric_diagnostics,
+                **forward_diagnostics,
             },
             modes=modes,
             retained=retained,

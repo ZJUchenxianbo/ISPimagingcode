@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Experiment 3: Frequency / resolution effects with close three blocks.
+"""Experiment 3: Full VIE frequency and resolution effects.
 
 Layout: 3 rows × 2 cols = 6 reconstructions (no truth column).
   Row 1: k = 4, 6
   Row 2: k = 8, 10
   Row 3: k = 15, 20
 
-Data: analytical block Born far-field, finite-direction mock measurement mode,
+Data: Full VIE far-field, finite-direction mock measurement mode,
 far-field noise=0.2.  All frequencies use the same incident/observation
 direction set.  Six nearby configurations are selected per target node with a
 full-rank polarimetric constraint.
@@ -29,6 +29,7 @@ from common import (
     ball_quadrature_nodes,
     collect_alpha_pairs_cached,
     collect_reconstruction_diagnostics,
+    direct_sampling_component_indicator,
     generate_polarimetric_data_nodes,
     make_table,
     modal_matrix,
@@ -43,8 +44,9 @@ from common import (
 )
 from common.phantom import Mode, three_block_phantom, truth_image_2d
 from forward.datasets import (
-    analytic_block_born_farfield_dataset,
     farfield_dataset_to_qhat,
+    forward_solver_diagnostic_summary,
+    full_vie_farfield_dataset,
     polarimetric_diagnostic_summary,
 )
 
@@ -96,6 +98,13 @@ def _settings(quick: bool):
     return 161, 160, 120
 
 
+def _n_per_axis_for_k(k: float, quick: bool) -> int:
+    """Return the Full VIE voxel-grid side count for one wavenumber."""
+    if quick:
+        return 7
+    return max(11, min(19, int(1.2 * float(k))))
+
+
 def run_experiment(config: ExperimentConfig) -> Any:
     (grid_size, quad_order, r_eval_count) = _settings(config.quick)
     k_pairs = [(4, 6), (8, 10), (15, 20)]
@@ -120,6 +129,8 @@ def run_experiment(config: ExperimentConfig) -> Any:
         axes = axes[None, :]
     diagnostic_rows: list[dict[str, Any]] = []
     reconstruction_panels: list[tuple[np.ndarray, str]] = []
+    dsm_diagnostic_rows: list[dict[str, Any]] = []
+    dsm_panels: list[tuple[np.ndarray, str]] = []
 
     for row_idx, (k1, k2) in enumerate(k_pairs):
         for col_idx, k in enumerate([k1, k2]):
@@ -130,11 +141,12 @@ def run_experiment(config: ExperimentConfig) -> Any:
             K_val = int(rp["K"])
             n_radial = int(rp["n_radial"])
             n_angular = int(rp["n_angular"])
+            n_per_axis = _n_per_axis_for_k(k, config.quick)
             # Target quadrature
             target_nodes, target_weights, _ = ball_quadrature_nodes(n_radial, n_angular)
 
-            # Analytical Born data at actual finite-direction Fourier nodes.
-            _, farfield_inc, farfield_obs, mock_distances, data_info = (
+            # Full VIE data at finite-direction mock-matched Fourier nodes.
+            physical_nodes, farfield_inc, farfield_obs, mock_distances, data_info = (
                 generate_polarimetric_data_nodes(
                     -target_nodes,
                     requested_measure_dirs,
@@ -142,11 +154,15 @@ def run_experiment(config: ExperimentConfig) -> Any:
                     tensor_kind=kind,
                 )
             )
-            ds = analytic_block_born_farfield_dataset(
-                blocks,
-                target_nodes,
+            measurement_nodes = -physical_nodes
+            ds = full_vie_farfield_dataset(
+                "three_blocks",
+                measurement_nodes,
                 kind=kind,
                 k=k,
+                R=1.0,
+                n_per_axis=n_per_axis,
+                n_geometries=polarimetric_J,
                 incident_dirs=farfield_inc,
                 obs_dirs=farfield_obs,
             )
@@ -155,6 +171,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
             )
             comp_data = rec_c[:, component_index]
             polarimetric_diagnostics = polarimetric_diagnostic_summary(ds)
+            forward_diagnostics = forward_solver_diagnostic_summary(ds)
 
             # GPSWF basis + truncation
             alpha_df = collect_alpha_pairs_cached(
@@ -231,17 +248,19 @@ def run_experiment(config: ExperimentConfig) -> Any:
                     "noise_level": float(noise_level),
                     "n_radial": int(n_radial),
                     "n_angular_requested": int(n_angular),
+                    "n_per_axis": int(n_per_axis),
                     "n_geometries": int(polarimetric_J),
                     "requested_measure_dirs": int(requested_measure_dirs),
                     "actual_measure_dirs": int(data_info["n_measure_dirs"]),
                     "candidate_count": int(data_info["candidate_count"]),
                     "data_mode": "mock",
-                    "data_source": "analytic_block_born",
+                    "data_source": "full_vie",
                     "shape": "three_blocks_gap_0.20",
                     "C_mock_distance_mean": float(C * np.mean(mock_distances)),
                     "C_mock_distance_p95": float(C * np.percentile(mock_distances, 95)),
                     "C_mock_distance_max": float(C * np.max(mock_distances)),
                     **polarimetric_diagnostics,
+                    **forward_diagnostics,
                 },
                 modes=modes,
                 retained=retained,
@@ -261,6 +280,54 @@ def run_experiment(config: ExperimentConfig) -> Any:
             real_rec = np.real(rec)
             reconstruction_panels.append((real_rec, title))
             _imshow(axes[row_idx, col_idx], real_rec, title, vmin, vmax)
+
+            dsm_values, dsm_meta = direct_sampling_component_indicator(
+                comp_data,
+                target_nodes,
+                target_weights,
+                grid_points,
+                C,
+                normalize=True,
+            )
+            dsm_image = np.real(dsm_values.reshape(grid_size, grid_size))
+            dsm_image[~disk_mask] = 0.0
+            dsm_panels.append((dsm_image, f"k={k:g}, nodes={dsm_meta['dsm_nodes']}"))
+            target_mask = disk_mask & (np.abs(truth) > 1e-12)
+            background_mask = disk_mask & ~target_mask
+            dsm_diagnostic_rows.append({
+                "experiment": 3,
+                "case_id": f"k{k:g}_dsm",
+                "method": "dsm",
+                "row": int(row_idx),
+                "column": int(col_idx),
+                "k": float(k),
+                "C": float(C),
+                "noise_level": float(noise_level),
+                "n_radial": int(n_radial),
+                "n_angular_requested": int(n_angular),
+                "n_per_axis": int(n_per_axis),
+                "n_geometries": int(polarimetric_J),
+                "requested_measure_dirs": int(requested_measure_dirs),
+                "candidate_count": int(data_info["candidate_count"]),
+                "target_nodes": int(target_nodes.shape[0]),
+                "p_nodes": int(ds.p_nodes.shape[0]),
+                "data_mode": "mock",
+                "data_source": "full_vie",
+                "shape": "three_blocks_gap_0.20",
+                "data_norm": float(dsm_meta["data_norm"]),
+                "data_max_abs": float(dsm_meta["data_max_abs"]),
+                "dsm_nodes": int(dsm_meta["dsm_nodes"]),
+                "dsm_normalized": int(dsm_meta["dsm_normalized"]),
+                "dsm_raw_max": float(dsm_meta["dsm_raw_max"]),
+                "dsm_raw_l2": float(dsm_meta["dsm_raw_l2"]),
+                "image_max_abs": float(np.max(np.abs(dsm_image))),
+                "target_mean_abs": float(np.mean(np.abs(dsm_image[target_mask]))),
+                "background_p95_abs": float(np.percentile(
+                    np.abs(dsm_image[background_mask]), 95
+                )),
+                **polarimetric_diagnostics,
+                **forward_diagnostics,
+            })
 
     fig.supylabel(f"noise = {noise_level:g}", fontsize=10)
     fig.savefig(config.out_dir / "exp3_frequency.png", dpi=200)
@@ -287,14 +354,34 @@ def run_experiment(config: ExperimentConfig) -> Any:
     )
     plt.close(adaptive_fig)
 
+    dsm_fig, dsm_axes = plt.subplots(
+        n_rows,
+        n_cols,
+        figsize=(3.8 * n_cols, 3.1 * n_rows),
+        constrained_layout=True,
+    )
+    dsm_axes = np.asarray(dsm_axes).reshape(n_rows, n_cols)
+    for flat_idx, (image, title) in enumerate(dsm_panels):
+        ax = dsm_axes[flat_idx // n_cols, flat_idx % n_cols]
+        plotted = _imshow(ax, image, title, 0.0, 1.0)
+        dsm_fig.colorbar(plotted, ax=ax, fraction=0.046, pad=0.03)
+    dsm_fig.supylabel(f"DSM, noise = {noise_level:g}", fontsize=10)
+    dsm_fig.savefig(config.out_dir / "exp3_frequency_dsm.png", dpi=200)
+    plt.close(dsm_fig)
+
     write_diagnostics_csv(diagnostic_rows, config.out_dir / "exp3_diagnostics.csv")
     save_diagnostics_npz(diagnostic_rows, config.out_dir / "exp3_diagnostics_detail.npz")
+    write_diagnostics_csv(
+        dsm_diagnostic_rows,
+        config.out_dir / "exp3_dsm_diagnostics.csv",
+    )
     plot_diagnostic_curves(
         diagnostic_rows,
         config.out_dir / "exp3_diagnostic_curves.png",
         title="Experiment 3 diagnostics",
     )
     print(f"Saved {config.out_dir / 'exp3_frequency.png'}")
+    print(f"Saved {config.out_dir / 'exp3_frequency_dsm.png'}")
     return make_table([{"experiment": 3, "status": "ok"}])
 
 
@@ -309,7 +396,7 @@ def _imshow(ax, img, title, vmin, vmax):
 
 
 def parse_args():
-    p = argparse.ArgumentParser(description="Experiment 3: frequency effects (close three blocks)")
+    p = argparse.ArgumentParser(description="Experiment 3: Full VIE frequency effects")
     p.add_argument("--out-dir", type=str, default="outputs/figures")
     p.add_argument("--seed", type=int, default=12345)
     p.add_argument("--quick", action="store_true")

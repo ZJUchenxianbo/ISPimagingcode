@@ -7,10 +7,14 @@ Layout: 3 rows x 3 cols = 9 reconstructions (no truth column).
   Row 2: N = 35, 57, 71
   Row 3: N = 135, 237, 496
 
-Data: VIE Born far-field, finite-direction mock measurement mode, k=15,
-far-field noise=0.2.
+Data: Full VIE far-field, finite-direction mock measurement mode, k=15,
+far-field noise=0.2, and tensor contrast Q(x)=0.2 Q0 inside the cube.
 Truncation: sort complete (ell, n) multiplets by |alpha| and use N as an
 upper bound without splitting the m degeneracy.
+
+The experiment also compares noiseless Full VIE and analytical Born data on
+the same direction configurations.  This diagnostic is separate from the
+noisy dimension-reconstruction panels.
 """
 from __future__ import annotations
 
@@ -41,8 +45,10 @@ from common import (
 )
 from common.phantom import Mode, cube_phantom, truth_image_2d
 from forward.datasets import (
-    discrete_vie_born_farfield_dataset,
+    analytic_block_born_farfield_dataset,
     farfield_dataset_to_qhat,
+    forward_solver_diagnostic_summary,
+    full_vie_farfield_dataset,
     polarimetric_diagnostic_summary,
 )
 
@@ -52,7 +58,141 @@ def _settings(quick: bool):
     if quick:
         # Smaller N set, lighter quadrature
         return 110, 10, 170, 51, 7, [1, 5, 21, 35, 57, 71, 135, 135, 135], 100, 80
-    return 974, 12, 230, 161, 19, [1, 5, 21, 35, 57, 71, 135, 237, 496], 160, 120
+    return 974, 12, 230, 161, 23, [1, 5, 21, 35, 57, 71, 135, 237, 496], 160, 120
+
+
+def _relative_error(values: np.ndarray, reference: np.ndarray) -> float:
+    """Return ||values-reference|| / ||reference|| with a safe denominator."""
+    denominator = max(float(np.linalg.norm(reference)), 1e-14)
+    return float(np.linalg.norm(values - reference) / denominator)
+
+
+def _complex_gain(values: np.ndarray, reference: np.ndarray) -> complex:
+    """Least-squares complex gain mapping ``reference`` to ``values``."""
+    denominator = np.vdot(reference, reference)
+    if abs(denominator) <= 1e-14:
+        return complex(np.nan, np.nan)
+    return complex(np.vdot(reference, values) / denominator)
+
+
+def _forward_model_diagnostics(
+    *,
+    full_dataset,
+    born_dataset,
+    full_qhat: np.ndarray,
+    born_qhat: np.ndarray,
+    target_nodes: np.ndarray,
+    component_index: int,
+    contrast_scale: float,
+    k: float,
+    n_per_axis: int,
+    out_dir: Path,
+) -> dict[str, float | int | str]:
+    """Compare noiseless Full VIE and analytical Born data."""
+    full_farfield = np.asarray(full_dataset.farfield_data, dtype=np.complex128)
+    born_farfield = np.asarray(born_dataset.farfield_data, dtype=np.complex128)
+    full_component = np.asarray(full_qhat[:, component_index], dtype=np.complex128)
+    born_component = np.asarray(born_qhat[:, component_index], dtype=np.complex128)
+
+    farfield_gain = _complex_gain(full_farfield, born_farfield)
+    qhat_gain = _complex_gain(full_component, born_component)
+    summary: dict[str, float | int | str] = {
+        "experiment": 1,
+        "case_id": "full_vie_vs_analytic_born",
+        "k": float(k),
+        "contrast_scale": float(contrast_scale),
+        "n_per_axis": int(n_per_axis),
+        "farfield_model_error_over_full": _relative_error(
+            born_farfield, full_farfield
+        ),
+        "farfield_error_vs_born": _relative_error(full_farfield, born_farfield),
+        "qhat_error_vs_born": _relative_error(full_qhat, born_qhat),
+        "qhat11_error_vs_born": _relative_error(full_component, born_component),
+        "farfield_gain_abs": float(abs(farfield_gain)),
+        "farfield_gain_phase_deg": float(np.angle(farfield_gain, deg=True)),
+        "qhat11_gain_abs": float(abs(qhat_gain)),
+        "qhat11_gain_phase_deg": float(np.angle(qhat_gain, deg=True)),
+        **forward_solver_diagnostic_summary(full_dataset),
+    }
+
+    radii = np.linalg.norm(np.asarray(target_nodes, dtype=float), axis=1)
+    edges = np.linspace(0.0, 1.0, 11)
+    centers = 0.5 * (edges[:-1] + edges[1:])
+    born_amplitude = np.full(centers.shape, np.nan, dtype=float)
+    full_amplitude = np.full(centers.shape, np.nan, dtype=float)
+    relative_error = np.full(centers.shape, np.nan, dtype=float)
+    cross_phase_deg = np.full(centers.shape, np.nan, dtype=float)
+    bin_counts = np.zeros(centers.shape, dtype=int)
+    for index, (lower, upper) in enumerate(zip(edges[:-1], edges[1:])):
+        if index == centers.size - 1:
+            mask = (radii >= lower) & (radii <= upper)
+        else:
+            mask = (radii >= lower) & (radii < upper)
+        bin_counts[index] = int(np.count_nonzero(mask))
+        if not np.any(mask):
+            continue
+        born_bin = born_component[mask]
+        full_bin = full_component[mask]
+        born_amplitude[index] = float(np.sqrt(np.mean(np.abs(born_bin) ** 2)))
+        full_amplitude[index] = float(np.sqrt(np.mean(np.abs(full_bin) ** 2)))
+        relative_error[index] = _relative_error(full_bin, born_bin)
+        cross_phase_deg[index] = float(
+            np.angle(_complex_gain(full_bin, born_bin), deg=True)
+        )
+
+    fig, axes = plt.subplots(2, 2, figsize=(10, 7), constrained_layout=True)
+    axes[0, 0].plot(centers, born_amplitude, "o-", label="Analytic Born")
+    axes[0, 0].plot(centers, full_amplitude, "s-", label="Full VIE")
+    axes[0, 0].set_title(r"Radial RMS of $|\widehat{Q}_{11}|$")
+    axes[0, 0].set_ylabel("RMS amplitude")
+    axes[0, 0].legend(fontsize=8)
+
+    axes[0, 1].plot(centers, relative_error, "o-")
+    axes[0, 1].set_title(r"Relative error of $\widehat{Q}_{11}$")
+    axes[0, 1].set_ylabel("relative error")
+
+    axes[1, 0].plot(centers, cross_phase_deg, "o-")
+    axes[1, 0].axhline(0.0, color="black", linewidth=0.8, alpha=0.5)
+    axes[1, 0].set_title("Full VIE phase relative to Born")
+    axes[1, 0].set_ylabel("phase (degrees)")
+
+    axes[1, 1].axis("off")
+    lines = [
+        rf"$k={k:g}$, contrast scale $={contrast_scale:g}$",
+        rf"Full-normalized far-field error $={summary['farfield_model_error_over_full']:.3f}$",
+        rf"Born-normalized far-field error $={summary['farfield_error_vs_born']:.3f}$",
+        rf"Full $\widehat{{Q}}$ error $={summary['qhat_error_vs_born']:.3f}$",
+        rf"$\widehat{{Q}}_{{11}}$ error $={summary['qhat11_error_vs_born']:.3f}$",
+        rf"$\widehat{{Q}}_{{11}}$ gain $={summary['qhat11_gain_abs']:.3f}$",
+        rf"$\widehat{{Q}}_{{11}}$ phase $={summary['qhat11_gain_phase_deg']:.1f}^\circ$",
+        rf"VIE grid $n_{{\mathrm{{axis}}}}={n_per_axis}$",
+    ]
+    axes[1, 1].text(0.02, 0.98, "\n".join(lines), va="top", fontsize=10)
+    for ax in axes.ravel()[:3]:
+        ax.set_xlabel(r"Fourier radius $|p|$")
+        ax.grid(True, alpha=0.25)
+    fig.suptitle("Experiment 1: Full VIE versus analytic Born", fontsize=12)
+    fig.savefig(out_dir / "exp1_full_vs_born_diagnostics.png", dpi=200)
+    plt.close(fig)
+
+    write_diagnostics_csv(
+        [summary], out_dir / "exp1_forward_model_diagnostics.csv"
+    )
+    np.savez_compressed(
+        out_dir / "exp1_forward_model_diagnostics_detail.npz",
+        p_radius=radii,
+        qhat_full=full_qhat,
+        qhat_born=born_qhat,
+        qhat11_difference=full_component - born_component,
+        radial_edges=edges,
+        radial_centers=centers,
+        radial_bin_counts=bin_counts,
+        radial_born_rms=born_amplitude,
+        radial_full_rms=full_amplitude,
+        radial_relative_error=relative_error,
+        radial_cross_phase_deg=cross_phase_deg,
+    )
+    return summary
 
 
 def run_experiment(config: ExperimentConfig) -> Any:
@@ -64,6 +204,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
     polarimetric_J = 6
     noise_level = 0.2
     cube_half_side = 0.4
+    contrast_scale = 0.2
 
     # GPSWF params for k=15 (figure1/figure3 pattern)
     ell_max = 12
@@ -75,7 +216,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
     # -- Target quadrature nodes --
     target_nodes, target_weights, _ = ball_quadrature_nodes(n_radial, n_angular)
 
-    # -- VIE Born data with mock-matched direction pairs (figure3 pattern) --
+    # -- Full VIE data with mock-matched direction pairs --
     vie_physical, vie_inc, vie_obs, vie_dist, data_info = generate_polarimetric_data_nodes(
         -target_nodes,
         requested_measure_dirs,
@@ -84,20 +225,47 @@ def run_experiment(config: ExperimentConfig) -> Any:
     )
     vie_nodes = -vie_physical
 
-    ds = discrete_vie_born_farfield_dataset(
+    ds = full_vie_farfield_dataset(
         "cube", vie_nodes, kind=kind, k=k, R=1.0,
         n_per_axis=n_per_axis, n_geometries=polarimetric_J,
         incident_dirs=vie_inc, obs_dirs=vie_obs,
-        cube_half_side=cube_half_side)
+        cube_half_side=cube_half_side,
+        contrast_scale=contrast_scale)
+    blocks = cube_phantom(
+        center=(0.0, 0.0, 0.0),
+        half_side=cube_half_side,
+        amplitude=contrast_scale + 0.0j,
+    )
+    born_ds = analytic_block_born_farfield_dataset(
+        blocks,
+        vie_nodes,
+        kind=kind,
+        k=k,
+        incident_dirs=vie_inc,
+        obs_dirs=vie_obs,
+    )
+    full_qhat_clean = farfield_dataset_to_qhat(ds, kind=kind)
+    born_qhat_clean = farfield_dataset_to_qhat(born_ds, kind=kind)
+    forward_model_diagnostics = _forward_model_diagnostics(
+        full_dataset=ds,
+        born_dataset=born_ds,
+        full_qhat=full_qhat_clean,
+        born_qhat=born_qhat_clean,
+        target_nodes=target_nodes,
+        component_index=component_index,
+        contrast_scale=contrast_scale,
+        k=k,
+        n_per_axis=n_per_axis,
+        out_dir=config.out_dir,
+    )
     rec_c = farfield_dataset_to_qhat(
         ds, kind=kind, noise_level=noise_level, rng=rng
     )
     comp_data = rec_c[:, component_index]
     polarimetric_diagnostics = polarimetric_diagnostic_summary(ds)
+    forward_diagnostics = forward_solver_diagnostic_summary(ds)
 
     # -- Truth image (for vmin/vmax) --
-    blocks = cube_phantom(center=(0.0, 0.0, 0.0), half_side=cube_half_side,
-                          amplitude=1.0 + 0.0j)
     coeff0 = tensor_coefficients_from_matrix(reference_tensor(kind), kind)
     truth, grid_points, disk_mask = truth_image_2d(grid_size, blocks, coeff0[component_index])
     vmin = float(np.nanmin(np.real(truth)))
@@ -168,6 +336,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
                 "partial_multiplets": int(truncation_info["partial_multiplets"]),
                 "alpha_plateau_rtol": float(truncation_info["alpha_plateau_rtol"]),
                 "noise_level": float(noise_level),
+                "contrast_scale": float(contrast_scale),
                 "n_radial": int(n_radial),
                 "n_angular_requested": int(n_angular),
                 "n_per_axis": int(n_per_axis),
@@ -175,9 +344,28 @@ def run_experiment(config: ExperimentConfig) -> Any:
                 "requested_measure_dirs": int(requested_measure_dirs),
                 "candidate_count": int(data_info["candidate_count"]),
                 "data_mode": "mock",
-                "data_source": "vie_born",
+                "data_source": "full_vie",
                 "shape": "cube",
                 **polarimetric_diagnostics,
+                **forward_diagnostics,
+                "farfield_model_error_over_full": float(
+                    forward_model_diagnostics["farfield_model_error_over_full"]
+                ),
+                "farfield_error_vs_born": float(
+                    forward_model_diagnostics["farfield_error_vs_born"]
+                ),
+                "qhat_error_vs_born": float(
+                    forward_model_diagnostics["qhat_error_vs_born"]
+                ),
+                "qhat11_error_vs_born": float(
+                    forward_model_diagnostics["qhat11_error_vs_born"]
+                ),
+                "qhat11_gain_abs": float(
+                    forward_model_diagnostics["qhat11_gain_abs"]
+                ),
+                "qhat11_gain_phase_deg": float(
+                    forward_model_diagnostics["qhat11_gain_phase_deg"]
+                ),
             },
             modes=modes,
             retained=retained,
@@ -237,6 +425,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
         title="Experiment 1 diagnostics",
     )
     print(f"Saved {config.out_dir / 'exp1_dimension.png'}")
+    print(f"Saved {config.out_dir / 'exp1_full_vs_born_diagnostics.png'}")
     return make_table([{"experiment": 1, "status": "ok"}])
 
 

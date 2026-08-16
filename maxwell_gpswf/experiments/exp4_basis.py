@@ -3,8 +3,8 @@
 """Experiment 4: compare four reconstruction methods across wavenumbers.
 
 Rows use ``k = 8, 12, 15``.  Every row is generated from finite-direction
-Discrete VIE-Born far-field data with relative far-field noise 0.2.  Columns
-are GPSWF, cube Fourier, ball Bessel, and DSM.
+Full VIE far-field data with relative far-field noise 0.2.  Columns are GPSWF,
+cube Fourier, ball Bessel, and DSM.
 """
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ from common.config import ExperimentConfig
 
 def run_experiment(config: ExperimentConfig) -> Any:
     rows = [
-        BasisComparisonRow(k=float(k), label=f"k = {k:g}", data_source="vie_born")
+        BasisComparisonRow(k=float(k), label=f"k = {k:g}", data_source="full_vie")
         for k in (8, 12, 15)
     ]
     return run_basis_comparison(

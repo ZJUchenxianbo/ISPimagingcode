@@ -99,14 +99,17 @@ same 974 observation directions.
 \subsection{Far-field data, noise, and spectral truncation}
 \label{subsec:maxwell-gpswf-data}
 
-Two Born data generators are used. Experiments 1, 2, and 4 discretize the
-piecewise tensor contrast on a voxel grid in the unit ball and set the total
-field equal to the incident field, yielding a discrete VIE--Born far field.
-Experiment 3 evaluates the Fourier integral of each constant block
-analytically, but it evaluates this formula at the actual Fourier nodes induced
-by the finite measurement directions. Thus, the mock-node mismatch is retained
-instead of being removed artificially. Both data generators feed the same
-inverse pipeline,
+Experiments 1--4 use Full VIE far-field data. For every incident direction and
+polarization, the total field is obtained from
+\begin{equation}
+    \mathbf{E}(\mathbf{x})
+    =\mathbf{E}^{\mathrm{i}}(\mathbf{x})
+    +k^2\int_B \mathbf{G}_k(\mathbf{x},\mathbf{y})
+    \mathbf{Q}(\mathbf{y})\mathbf{E}(\mathbf{y})\,\mathrm{d}\mathbf{y}.
+    \label{eq:maxwell-full-vie}
+\end{equation}
+The far field generated from this total field is then passed to the same
+Born-based inverse pipeline,
 \begin{equation}
     \text{far-field data}
     \longrightarrow \widehat{\mathbf{Q}}(\mathbf{p})
@@ -161,10 +164,10 @@ experiments.
         \toprule
         Experiment & Quantity varied & Wavenumber $k$ & Noise $\delta$ & Data source\\
         \midrule
-        1 & Low-rank dimension & $15$ & $0.2$ & VIE--Born\\
-        2 & Noise level & $15$ & $0,0.2,0.4$ & VIE--Born\\
-        3 & Frequency and resolution & $4,6,8,10,15,20$ & $0.2$ & Analytic Born\\
-        4 & Reconstruction method & $8,12,15$ & $0.2$ & VIE--Born\\
+        1 & Low-rank dimension & $15$ & $0.2$ & Full VIE\\
+        2 & Noise level & $15$ & $0,0.2,0.4$ & Full VIE\\
+        3 & Frequency and resolution & $4,6,8,10,15,20$ & $0.2$ & Full VIE\\
+        4 & Reconstruction method & $8,12,15$ & $0.2$ & Full VIE\\
         5 & Forward data source & $12$ & $0.2$ & Analytic Born/VIE--Born/Full VIE\\
         \bottomrule
     \end{tabular}
@@ -179,8 +182,10 @@ between panels.
 \label{subsec:maxwell-exp1}
 
 Experiment 1 uses a cube centered at the origin with half-side length $0.4$.
+Inside this cube the contrast is $\mathbf{Q}(\mathbf{x})=0.2\mathbf{Q}_0$.
 We fix $k=15$, $C=30$, and $\delta=0.2$. The GPSWF discretization uses
-$K=48$, $\ell_{\max}=12$, and seven radial modes for each $\ell$. The retained
+$K=48$, $\ell_{\max}=12$, and seven radial modes for each $\ell$. The Full VIE
+volume grid uses $n_{\mathrm{axis}}=23$. The retained
 dimensions are arranged as
 \[
 \begin{array}{ccc}
@@ -206,18 +211,47 @@ a smaller reconstruction error.
     \label{fig:maxwell-exp1-dimension}
 \end{figure}
 
+To separate forward-model error from the noisy dimension experiment, we also
+generate noiseless analytic Born and Full VIE far-field data using the same
+incident directions, observation directions, polarizations, and target nodes.
+Let $\mathbf{g}_{\mathrm{B}}$ and $\mathbf{g}_{\mathrm{F}}$ denote these two
+far-field arrays. We record both
+\begin{equation}
+    e_{\mathrm{model}}
+    =\frac{\|\mathbf{g}_{\mathrm{B}}-\mathbf{g}_{\mathrm{F}}\|_2}
+    {\|\mathbf{g}_{\mathrm{F}}\|_2},
+    \qquad
+    e_{\mathrm{Born}}
+    =\frac{\|\mathbf{g}_{\mathrm{F}}-\mathbf{g}_{\mathrm{B}}\|_2}
+    {\|\mathbf{g}_{\mathrm{B}}\|_2},
+\end{equation}
+as well as the relative errors of the recovered full tensor
+$\widehat{\mathbf{Q}}$ and its $(1,1)$ component. Radial bins in $|\mathbf{p}|$
+show the RMS amplitude, relative error, and cross phase of
+$\widehat{Q}_{11}$. No random noise is added to this diagnostic comparison.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.88\textwidth]
+    {outputs/exp1/exp1_full_vs_born_diagnostics.png}
+    \caption{Noiseless Full VIE versus analytic Born diagnostics for
+    Experiment 1. The curves expose the forward-model discrepancy separately
+    from the noisy GPSWF dimension reconstructions.}
+    \label{fig:maxwell-exp1-forward-diagnostics}
+\end{figure}
+
 \subsection{Robustness with respect to far-field noise}
 \label{subsec:maxwell-exp2}
 
 Experiment 2 fixes $k=15$ and uses the common three-block geometry with minimum
 boundary separation $0.20$ and different complex amplitudes. Relative noise
 levels $\delta=0,0.2,0.4$ are added directly
-to the far-field channels. The direction sets, quadrature nodes, polarimetric
+to one common Full VIE far-field data set, computed with
+$n_{\mathrm{axis}}=19$. The direction sets, quadrature nodes, polarimetric
 configurations, and GPSWF truncation are identical in all three cases, so the
 only varying parameter is the noise level. The principal diagnostics are the
 mean target amplitude, the 95th percentile of the background amplitude, the
-polarimetric condition number, and the norm of the reconstruction
-coefficients.
+polarimetric condition number, and the norm of the reconstruction coefficients.
 
 \begin{figure}[htbp]
     \centering
@@ -233,28 +267,27 @@ coefficients.
 \label{subsec:maxwell-exp3}
 
 Experiment 3 uses three rectangular blocks whose minimum boundary separation
-is $0.20$, and considers $k=4,6,8,10,15,20$. The relative noise level is fixed
+is $0.20$, and considers $k=4,6,8,10,15,20$. Full VIE generates the far-field
+data at every frequency. The relative noise level is fixed
 at $\delta=0.2$, and all six cases use the same 974 incident and observation
-directions. The Born Fourier integral of the piecewise-constant contrast is
-evaluated analytically at the actual measurement nodes, thereby avoiding voxel
-quadrature error in the frequency comparison. The GPSWF parameters are listed
+directions. The GPSWF and Full VIE parameters are listed
 in Table~\ref{tab:maxwell-exp3-parameters}.
 
 \begin{table}[htbp]
     \centering
-    \caption{Ball GPSWF discretization parameters in Experiment 3.}
+    \caption{Ball GPSWF and Full VIE discretization parameters in Experiment 3.}
     \label{tab:maxwell-exp3-parameters}
-    \begin{tabular}{rrrrrrr}
+    \begin{tabular}{rrrrrrrr}
         \toprule
         $k$ & $C$ & $K$ & $\ell_{\max}$ & $n_{\ell}$
-        & $n_r$ & $n_{\mathrm{ang}}$\\
+        & $n_r$ & $n_{\mathrm{ang}}$ & $n_{\mathrm{axis}}$\\
         \midrule
-        4  & 8  & 20 & 4  & 2 & 6  & 74\\
-        6  & 12 & 26 & 5  & 3 & 8  & 110\\
-        8  & 16 & 32 & 7  & 3 & 10 & 146\\
-        10 & 20 & 40 & 8  & 5 & 12 & 194\\
-        15 & 30 & 64 & 12 & 6 & 20 & 302\\
-        20 & 40 & 80 & 14 & 7 & 28 & 434\\
+        4  & 8  & 20 & 4  & 2 & 6  & 74  & 11\\
+        6  & 12 & 26 & 5  & 3 & 8  & 110 & 11\\
+        8  & 16 & 32 & 7  & 3 & 10 & 146 & 11\\
+        10 & 20 & 40 & 8  & 5 & 12 & 194 & 12\\
+        15 & 30 & 64 & 12 & 6 & 20 & 302 & 18\\
+        20 & 40 & 80 & 14 & 7 & 28 & 434 & 19\\
         \bottomrule
     \end{tabular}
 \end{table}
@@ -279,11 +312,30 @@ mode is useful.
     \label{fig:maxwell-exp3-frequency}
 \end{figure}
 
+The same recovered $\widehat{Q}_{11}(\mathbf{p})$ is also passed to the
+normalized DSM indicator
+\begin{equation}
+    I_{\mathrm{DSM}}(\mathbf{z})
+    =\left|\sum_s w_s\widehat{Q}_{11}(\mathbf{p}_s)
+    \exp(\mathrm{i}C\mathbf{p}_s\cdot\mathbf{z})\right|.
+\end{equation}
+Thus, the GPSWF and DSM frequency figures differ only in the final imaging
+operator, not in the Full VIE data, noise, or polarimetric recovery.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.72\textwidth]
+    {outputs/exp3/exp3_frequency_dsm.png}
+    \caption{Normalized DSM indicators from the same Full VIE data used in
+    Figure~\ref{fig:maxwell-exp3-frequency}.}
+    \label{fig:maxwell-exp3-dsm}
+\end{figure}
+
 \subsection{Comparison of reconstruction methods}
 \label{subsec:maxwell-exp4}
 
 Experiment 4 uses the same gap-$0.20$ three-block geometry and fixes the same
-VIE--Born far-field data, polarimetrically recovered
+Full VIE far-field data, polarimetrically recovered
 $\widehat{Q}_{11}(\mathbf{p})$, and target quadrature nodes, and compares ball
 GPSWFs, a cube Fourier basis, a spherical-harmonic Bessel basis, and the direct
 sampling method (DSM). We use $k=8,12,15$ and $\delta=0.2$. Consequently, the
@@ -334,15 +386,8 @@ reconstruction methods from Experiment 4 to three forward data sources. The
 analytic Born source evaluates the block Fourier integrals at the actual mock
 measurement nodes. The discrete VIE--Born source replaces those integrals by
 voxel quadrature while setting the total field equal to the incident field.
-The Full VIE source first solves
-\begin{equation}
-    \mathbf{E}(\mathbf{x})
-    =\mathbf{E}^{\mathrm{i}}(\mathbf{x})
-    +k^2\int_B \mathbf{G}_k(\mathbf{x},\mathbf{y})
-    \mathbf{Q}(\mathbf{y})\mathbf{E}(\mathbf{y})\,\mathrm{d}\mathbf{y},
-    \label{eq:maxwell-full-vie}
-\end{equation}
-and then evaluates the far-field integral with the computed total field. Hence
+The Full VIE source solves~\eqref{eq:maxwell-full-vie} and then evaluates the
+far-field integral with the computed total field. Hence
 the three rows respectively expose the continuous-block analytic Born formula,
 voxel quadrature error within the Born model, and the combined effects of VIE
 discretization and multiple scattering.
@@ -399,6 +444,14 @@ roles.
         \texttt{exp*\_diagnostics.csv} & Readable scalar diagnostics\\
         \texttt{exp*\_diagnostics\_detail.npz} & Compressed detailed diagnostics\\
         \texttt{exp*\_diagnostic\_curves.png} & Stability and leakage curves\\
+        \texttt{exp3\_frequency\_dsm.png} & DSM frequency-comparison panels\\
+        \texttt{exp3\_dsm\_diagnostics.csv} & DSM scalar diagnostics\\
+        \texttt{exp1\_full\_vs\_born\_diagnostics.png}
+        & Full VIE/Born radial diagnostic curves\\
+        \texttt{exp1\_forward\_model\_diagnostics.csv}
+        & Full VIE/Born scalar diagnostics\\
+        \texttt{exp1\_forward\_model\_diagnostics\_detail.npz}
+        & Full VIE/Born nodewise diagnostics\\
         \bottomrule
     \end{tabular}
 \end{table}
@@ -421,9 +474,16 @@ Experiments 1--4 can be generated from the project root with
 .venv/bin/python maxwell_gpswf/main.py \
     --mode all --out-dir outputs
 \end{verbatim}
-Experiment 5 is deliberately excluded from \texttt{--mode all} because the
-formal Full VIE solve is substantially more expensive. It is run explicitly
-with
+This command performs several dense Full VIE solves. In particular,
+Experiment 1 uses $n_{\mathrm{axis}}=23$, corresponding to 19209 complex field
+unknowns. Its dense matrix alone requires approximately 5.50 GiB, and LU
+factorization requires additional memory. Experiment 2 and the $k=20$ case of
+Experiment 3 use $n_{\mathrm{axis}}=19$, corresponding to 11085 unknowns and
+approximately 1.83 GiB for the dense matrix. Formal runs should therefore be
+executed only on a machine with sufficient memory. Quick-mode VIE grids are
+intended only for code-path validation and not for physical accuracy claims.
+Experiment 5 is a supplementary forward-source comparison and is deliberately
+excluded from \texttt{--mode all}. It is run explicitly with
 \begin{verbatim}
 .venv/bin/python maxwell_gpswf/main.py \
     --mode exp5 --out-dir outputs

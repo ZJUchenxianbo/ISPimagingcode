@@ -66,6 +66,27 @@ def polarimetric_diagnostic_summary(dataset: FarfieldDataset) -> dict[str, float
     }
 
 
+def forward_solver_diagnostic_summary(
+    dataset: FarfieldDataset,
+) -> dict[str, float | int]:
+    """Return CSV-ready diagnostics specific to the forward solver."""
+    metadata = dataset.metadata
+    return {
+        "vie_voxel_nodes": int(metadata.get("vie_voxel_nodes", 0)),
+        "vie_unknowns": int(metadata.get("vie_unknowns", 0)),
+        "vie_unique_incident_directions": int(
+            metadata.get("vie_unique_incident_directions", 0)
+        ),
+        "vie_rhs_count": int(metadata.get("vie_rhs_count", 0)),
+        "vie_residual_sample_count": int(
+            metadata.get("vie_residual_sample_count", 0)
+        ),
+        "vie_linear_residual_sample_max": float(
+            metadata.get("vie_linear_residual_sample_max", np.nan)
+        ),
+    }
+
+
 # ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------
@@ -135,7 +156,9 @@ def _farfield_prefactor(k: float) -> float:
 def _build_vie_contrast(shape_name: str, volume_nodes, tensor, **kwargs):
     """Build Q on voxel grid for any shape (matches figure3 logic).
 
-    Extra kwargs are forwarded to shape constructors (e.g. ``cube_half_side``).
+    ``contrast_scale`` uniformly scales the tensor contrast while preserving
+    its anisotropic structure.  Remaining keyword arguments are forwarded to
+    shape constructors (for example, ``cube_half_side``).
     """
     from common.phantom import (
         Block, cube_phantom, two_spheres_cube_phantom, dispersed_blocks_phantom,
@@ -143,9 +166,11 @@ def _build_vie_contrast(shape_name: str, volume_nodes, tensor, **kwargs):
     from forward.vie import tensor_ball_contrast, tensor_blocks_contrast
 
     name = shape_name
+    contrast_scale = complex(kwargs.pop("contrast_scale", 1.0))
     if name == "sphere":
         return tensor_ball_contrast(volume_nodes, 0.25, tensor,
-                                    scale=1.0, center=np.array([0.0, 0.0, 0.0]))
+                                    scale=contrast_scale,
+                                    center=np.array([0.0, 0.0, 0.0]))
     elif name == "inhomogeneous":
         Q = np.zeros((volume_nodes.shape[0], 3, 3), dtype=np.complex128)
         bumps = [
@@ -158,7 +183,7 @@ def _build_vie_contrast(shape_name: str, volume_nodes, tensor, **kwargs):
             scalar = complex(amp) * np.exp(-0.5 * r_sq / sigma**2)
             for a in range(3):
                 Q[:, a, a] += scalar
-        return Q
+        return contrast_scale * Q
     elif name == "cube":
         half_side = float(kwargs.get("cube_half_side", 0.2))
         blocks = cube_phantom(center=(0.0, 0.0, 0.0), half_side=half_side, amplitude=1.0 + 0.0j)
@@ -174,7 +199,7 @@ def _build_vie_contrast(shape_name: str, volume_nodes, tensor, **kwargs):
     return tensor_blocks_contrast(
         volume_nodes,
         [(np.asarray(b.center, dtype=float), np.asarray(b.half_width, dtype=float),
-          complex(b.amplitude)) for b in blocks],
+          contrast_scale * complex(b.amplitude)) for b in blocks],
         tensor)
 
 
@@ -363,6 +388,7 @@ def full_vie_farfield_dataset(
     *,
     incident_dirs: np.ndarray | None = None,
     obs_dirs: np.ndarray | None = None,
+    **shape_kwargs,
 ) -> FarfieldDataset:
     """Full Maxwell VIE far-field: solve total field, compute E∞.
 
@@ -381,7 +407,7 @@ def full_vie_farfield_dataset(
         p_nodes, n_geometries, incident_dirs, obs_dirs, vie_phase=True)
     volume_nodes, volume_weights, voxel_h = ball_voxel_grid(R, n_per_axis)
     tensor = reference_tensor(kind)
-    Q = _build_vie_contrast(shape_name, volume_nodes, tensor)
+    Q = _build_vie_contrast(shape_name, volume_nodes, tensor, **shape_kwargs)
 
     A = assemble_vie_matrix(volume_nodes, volume_weights, Q, k, h=voxel_h)
     lu = lu_factor(A)

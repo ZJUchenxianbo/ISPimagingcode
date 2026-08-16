@@ -23,7 +23,10 @@ def parse_args():
         "--mode",
         choices=["exp1", "exp2", "exp3", "exp4", "exp5", "all"],
         default="all",
-        help="'all' runs exp1-exp4; run exp5 explicitly because Full VIE is expensive",
+        help=(
+            "'all' runs the Full VIE experiments exp1-exp4; "
+            "run exp5 explicitly"
+        ),
     )
     return p.parse_args()
 

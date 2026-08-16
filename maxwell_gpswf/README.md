@@ -37,8 +37,8 @@ maxwell_gpswf/
 ```
 
 `--mode` 可取 `exp1`、`exp2`、`exp3`、`exp4`、`exp5` 或 `all`。由于
-`exp5` 包含稠密 Full VIE 求解，`all` 只运行 `exp1`--`exp4`；实验 5
-必须用 `--mode exp5` 显式运行。
+`exp1`--`exp4` 均包含稠密 Full VIE 求解，正式 `all` 计算量很大。
+`all` 仍只运行 `exp1`--`exp4`；实验 5 必须用 `--mode exp5` 显式运行。
 
 ## 统一数据流程
 
@@ -66,14 +66,20 @@ p = (d - xhat) / 2
 
 | 实验 | 目的 | 散射体 | 数据源 | 远场噪声 |
 |------|------|--------|--------|----------|
-| `exp1` | 比较 GPSWF 保留维数 `N` | 单立方体 | Discrete VIE-Born | `0.2` |
-| `exp2` | 比较噪声影响 | 最小间距 `0.20` 的三方块 | Discrete VIE-Born | `0, 0.2, 0.4` |
-| `exp3` | 比较波数与近距离分辨率 | 最小间距 `0.20` 的三方块 | Analytic Born | `0.2` |
-| `exp4` | 比较 GPSWF/Fourier/Bessel/DSM | 最小间距 `0.20` 的三方块 | Discrete VIE-Born | `0.2` |
+| `exp1` | 比较 GPSWF 保留维数 `N` | 单立方体，`Q=0.2 Q0` | Full VIE | `0.2` |
+| `exp2` | 比较噪声影响 | 最小间距 `0.20` 的三方块 | Full VIE | `0, 0.2, 0.4` |
+| `exp3` | 比较波数、分辨率及 GPSWF/DSM | 最小间距 `0.20` 的三方块 | Full VIE | `0.2` |
+| `exp4` | 比较 GPSWF/Fourier/Bessel/DSM | 最小间距 `0.20` 的三方块 | Full VIE | `0.2` |
 | `exp5` | 比较正向数据源及其反演结果 | 最小间距 `0.20` 的三方块 | Analytic Born / Discrete VIE-Born / Full VIE | `0.2` |
 
 五个实验的完整公式、参数表和 individual-scale 图像见 [output_guide.tex](output_guide.tex)。
 实验 2--5 共用同一组三方块几何，其最小边界间距为 `0.20`。
+实验 3 额外输出 `exp3_frequency_dsm.png`，它与 GPSWF 主图共用同一份
+Full VIE 远场、噪声和极化恢复后的 `Qhat_11`。
+实验 1 使用较弱但仍保持非对称各向异性结构的介质对比度 `Q=0.2 Q0`，
+正式 Full VIE 网格为 `n_per_axis=23`。实验同时用相同方向配置生成无噪声
+解析 Born 数据，并输出 Full VIE/Born 的远场、`Qhat`、径向幅值和相位差
+诊断；这些诊断不包含主成像使用的 `0.2` 随机噪声。
 实验 5 固定 `k=12`，三类数据共用方向配置、极化矩阵、标准复高斯噪声样本、
 目标求积节点和四种重构参数。正式 Full VIE 使用 `n_per_axis=14`，形成
 1472 个体素和 4416 个电场未知量；代码按唯一入射方向复用两个极化总场，
@@ -90,8 +96,21 @@ outputs/exp*/exp*_*.png                  # 成像图
 outputs/exp*/exp*_diagnostics.csv        # 可读标量诊断
 outputs/exp*/exp*_diagnostics_detail.npz # 详细压缩诊断
 outputs/exp*/exp*_diagnostic_curves.png  # 稳定性与泄漏曲线
+outputs/exp3/exp3_frequency_dsm.png       # 实验 3 DSM 波数对照图
+outputs/exp3/exp3_dsm_diagnostics.csv    # 实验 3 DSM 诊断
+outputs/exp1/exp1_full_vs_born_diagnostics.png
+outputs/exp1/exp1_forward_model_diagnostics.csv
+outputs/exp1/exp1_forward_model_diagnostics_detail.npz
 ```
 
 主要诊断包括 `retained_modes`、`target_nodes_per_retained_modes`、`mock_distance_mean/max/p95`、极化矩阵秩与条件数、GPSWF Gram 矩阵条件数、系数范数、目标区域幅值和背景 95% 分位幅值。实验 5 还记录相对 Analytic Born 的远场与极化恢复后 `Qhat` 误差，以及 Full VIE 的体素数、未知量数、唯一入射方向数、右端项数和抽样线性残差。
+
+正式 Full VIE 的开销随体素数快速增长。实验 1 使用 `n_per_axis=23`，约有
+6403 个体素和 19209 个复电场未知量，单个稠密复矩阵约占 `5.50 GiB`；
+LU 分解还需要额外内存。实验 2 使用 `n_per_axis=19`；实验 3 在 `k=20`
+时也使用同一网格规模，约有 3695 个体素和 11085 个未知量，单个矩阵约
+占 `1.83 GiB`。实验 4 在 `k=15` 时使用 `n_per_axis=18`。因此正式 `all`
+只适合在内存充足的环境中运行。`--quick` 中的粗 VIE 网格只验证代码
+链路，不用于评价正式 Full VIE 精度或成像效果。
 
 实验输出的临时测试目录应在验证后删除。已有 `outputs/fig*` 和 `outputs2/fig*` 仅作为历史数值结果保留，不再对应活动实验脚本。
