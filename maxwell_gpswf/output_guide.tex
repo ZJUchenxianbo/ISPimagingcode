@@ -93,8 +93,12 @@ Finite incident and observation direction sets first
 produce measurable Fourier nodes through~\eqref{eq:maxwell-fourier-node}. For
 each target quadrature node, $J=6$ configurations are selected from a pool of
 24 nearby candidates by prioritizing full rank, conditioning, and Fourier-node
-distance. All formal experiments use 974 Lebedev incident directions and the
-same 974 observation directions.
+distance. Experiments 1 and 2 use 974 Lebedev incident and observation
+directions at the anchor $k=15$. Experiments 3 and 4 vary the direction count
+with frequency, approximately as
+$k^{3/2}$ and rounded upward to a supported positive-weight Lebedev rule, so
+that the scaled mock-node error $C\,\mathrm{dist}(p,p_{\rm mock})$ remains more
+comparable across rows.
 
 \subsection{Far-field data, noise, and spectral truncation}
 \label{subsec:maxwell-gpswf-data}
@@ -247,7 +251,9 @@ Experiment 2 fixes $k=15$ and uses the common three-block geometry with minimum
 boundary separation $0.20$ and different complex amplitudes. Relative noise
 levels $\delta=0,0.2,0.4$ are added directly
 to one common Full VIE far-field data set, computed with
-$n_{\mathrm{axis}}=19$. The direction sets, quadrature nodes, polarimetric
+$n_{\mathrm{axis}}=23$. The three noise levels use the same standard complex
+noise realization scaled to the requested relative norm. The direction sets,
+quadrature nodes, polarimetric
 configurations, and GPSWF truncation are identical in all three cases, so the
 only varying parameter is the noise level. The principal diagnostics are the
 mean target amplitude, the 95th percentile of the background amplitude, the
@@ -268,26 +274,26 @@ polarimetric condition number, and the norm of the reconstruction coefficients.
 
 Experiment 3 uses three rectangular blocks whose minimum boundary separation
 is $0.20$, and considers $k=4,6,8,10,15,20$. Full VIE generates the far-field
-data at every frequency. The relative noise level is fixed
-at $\delta=0.2$, and all six cases use the same 974 incident and observation
-directions. The GPSWF and Full VIE parameters are listed
+data at every frequency. The relative noise level is fixed at $\delta=0.2$.
+The direction count grows with frequency from the Experiment 1 anchor
+$k=15$, $N_{\rm dir}=974$. The GPSWF, Full VIE, and direction parameters are listed
 in Table~\ref{tab:maxwell-exp3-parameters}.
 
 \begin{table}[htbp]
     \centering
     \caption{Ball GPSWF and Full VIE discretization parameters in Experiment 3.}
     \label{tab:maxwell-exp3-parameters}
-    \begin{tabular}{rrrrrrrr}
+    \begin{tabular}{rrrrrrrrr}
         \toprule
         $k$ & $C$ & $K$ & $\ell_{\max}$ & $n_{\ell}$
-        & $n_r$ & $n_{\mathrm{ang}}$ & $n_{\mathrm{axis}}$\\
+        & $n_r$ & $n_{\mathrm{ang}}$ & $n_{\mathrm{axis}}$ & $N_{\rm dir}$\\
         \midrule
-        4  & 8  & 20 & 4  & 2 & 6  & 74  & 11\\
-        6  & 12 & 26 & 5  & 3 & 8  & 110 & 11\\
-        8  & 16 & 32 & 7  & 3 & 10 & 146 & 11\\
-        10 & 20 & 40 & 8  & 5 & 12 & 194 & 12\\
-        15 & 30 & 64 & 12 & 6 & 20 & 302 & 18\\
-        20 & 40 & 80 & 14 & 7 & 28 & 434 & 19\\
+        4  & 8  & 20 & 4  & 2 & 6  & 74  & 11 & 170\\
+        6  & 12 & 26 & 5  & 3 & 8  & 110 & 11 & 302\\
+        8  & 16 & 32 & 7  & 3 & 10 & 146 & 13 & 434\\
+        10 & 20 & 40 & 8  & 5 & 12 & 194 & 16 & 590\\
+        15 & 30 & 48 & 12 & 7 & 12 & 230 & 23 & 974\\
+        20 & 40 & 80 & 14 & 7 & 28 & 434 & 31 & 1730\\
         \bottomrule
     \end{tabular}
 \end{table}
@@ -347,14 +353,14 @@ forward data or polarimetric recovery procedures.
     \centering
     \caption{GPSWF discretization parameters in Experiment 4.}
     \label{tab:maxwell-exp4-parameters}
-    \begin{tabular}{rrrrrrr}
+    \begin{tabular}{rrrrrrrrr}
         \toprule
         $k$ & $C$ & $K$ & $\ell_{\max}$ & $n_{\ell}$
-        & $n_r$ & $n_{\mathrm{ang}}$\\
+        & $n_r$ & $n_{\mathrm{ang}}$ & $n_{\mathrm{axis}}$ & $N_{\rm dir}$\\
         \midrule
-        8  & 16 & 28 & 7  & 3 & 8  & 86\\
-        12 & 24 & 40 & 9  & 5 & 10 & 170\\
-        15 & 30 & 48 & 12 & 6 & 12 & 230\\
+        8  & 16 & 28 & 7  & 3 & 8  & 86  & 13 & 434\\
+        12 & 24 & 40 & 9  & 5 & 10 & 170 & 19 & 770\\
+        15 & 30 & 48 & 12 & 7 & 12 & 230 & 23 & 974\\
         \bottomrule
     \end{tabular}
 \end{table}
@@ -475,11 +481,12 @@ Experiments 1--4 can be generated from the project root with
     --mode all --out-dir outputs
 \end{verbatim}
 This command performs several dense Full VIE solves. In particular,
-Experiment 1 uses $n_{\mathrm{axis}}=23$, corresponding to 19209 complex field
-unknowns. Its dense matrix alone requires approximately 5.50 GiB, and LU
-factorization requires additional memory. Experiment 2 and the $k=20$ case of
-Experiment 3 use $n_{\mathrm{axis}}=19$, corresponding to 11085 unknowns and
-approximately 1.83 GiB for the dense matrix. Formal runs should therefore be
+Experiment 1, Experiment 2, and the $k=15$ rows of Experiments 3 and 4 use
+$n_{\mathrm{axis}}=23$, corresponding to 19209 complex field unknowns. The
+dense matrix alone requires approximately 5.50 GiB, and LU factorization
+requires additional memory. The $k=20$ row of Experiment 3 uses
+$n_{\mathrm{axis}}=31$, corresponding to 46545 unknowns and approximately
+32.28 GiB for the dense matrix before LU workspace. Formal runs should therefore be
 executed only on a machine with sufficient memory. Quick-mode VIE grids are
 intended only for code-path validation and not for physical accuracy claims.
 Experiment 5 is a supplementary forward-source comparison and is deliberately

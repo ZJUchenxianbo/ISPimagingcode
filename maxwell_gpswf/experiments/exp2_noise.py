@@ -47,7 +47,9 @@ def _settings(quick: bool):
     """Return (n_measure, n_radial, n_angular, grid_size, n_per_axis, quad_order, r_eval)."""
     if quick:
         return 110, 10, 170, 51, 7, 100, 80
-    return 974, 12, 230, 161, 19, 160, 120
+    # Match Experiment 1 at k=15 so that the noise study changes only the
+    # phantom and noise level, not the formal Full VIE resolution.
+    return 974, 12, 230, 161, 23, 160, 120
 
 
 def run_experiment(config: ExperimentConfig) -> Any:
@@ -129,9 +131,17 @@ def run_experiment(config: ExperimentConfig) -> Any:
     diagnostic_rows: list[dict[str, Any]] = []
     reconstruction_panels: list[tuple[np.ndarray, str]] = []
 
+    standard_noise = (
+        rng.normal(size=ds.farfield_data.shape)
+        + 1j * rng.normal(size=ds.farfield_data.shape)
+    )
     for col_idx, noise_level in enumerate(noise_levels):
         rec_c = farfield_dataset_to_qhat(
-            ds, kind=kind, noise_level=noise_level, rng=rng)
+            ds,
+            kind=kind,
+            noise_level=noise_level,
+            standard_noise=standard_noise,
+        )
         comp_data = rec_c[:, component_index]
         polarimetric_diagnostics = polarimetric_diagnostic_summary(ds)
         forward_diagnostics = forward_solver_diagnostic_summary(ds)

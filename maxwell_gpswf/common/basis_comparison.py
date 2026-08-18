@@ -84,6 +84,7 @@ class _MeasurementSetup:
     data_info: dict[str, Any]
     params: dict[str, float | int]
     n_per_axis: int
+    requested_measure_dirs: int
 
 
 @dataclass(frozen=True)
@@ -139,7 +140,7 @@ def basis_row_params(k: float) -> dict[str, float | int]:
     if k <= 12:
         return {"ell_max": 9, "n_modes": 5, "K": 40, "n_radial": 10, "n_angular": 170, "C": C}
     if k <= 16:
-        return {"ell_max": 12, "n_modes": 6, "K": 48, "n_radial": 12, "n_angular": 230, "C": C}
+        return {"ell_max": 12, "n_modes": 7, "K": 48, "n_radial": 12, "n_angular": 230, "C": C}
     if k <= 20:
         return {"ell_max": 14, "n_modes": 7, "K": 54, "n_radial": 14, "n_angular": 302, "C": C}
     return {"ell_max": 16, "n_modes": 7, "K": 60, "n_radial": 14, "n_angular": 302, "C": C}
@@ -167,11 +168,37 @@ def basis_row_params_quick(k: float) -> dict[str, float | int]:
     return {"ell_max": 14, "n_modes": 5, "K": 36, "n_radial": 10, "n_angular": 170, "C": C}
 
 
-def basis_n_per_axis(k: float, quick: bool) -> int:
+def basis_n_per_axis(
+    k: float,
+    quick: bool,
+    experiment_number: int | None = None,
+) -> int:
     """Return the voxel-grid side count used by VIE-based data sources."""
     if quick:
         return 7
+    if experiment_number == 4:
+        formal_values = {8: 13, 12: 19, 15: 23}
+        key = int(k)
+        if float(key) == float(k) and key in formal_values:
+            return formal_values[key]
+        return max(11, int(math.ceil((23.0 / 15.0) * float(k))))
     return max(11, min(19, int(k * 1.2)))
+
+
+def basis_measure_dirs(
+    k: float,
+    quick: bool,
+    experiment_number: int | None = None,
+) -> int:
+    """Return finite measurement directions anchored at k=15 -> 974."""
+    if quick:
+        return 110
+    if experiment_number == 4:
+        formal_values = {8: 434, 12: 770, 15: 974}
+        key = int(k)
+        if float(key) == float(k) and key in formal_values:
+            return formal_values[key]
+    return 974
 
 
 def _settings(quick: bool) -> tuple[int, int, int]:
@@ -230,10 +257,15 @@ def _measurement_setup(
     k: float,
     *,
     quick: bool,
-    requested_measure_dirs: int,
+    experiment_number: int,
     polarimetric_J: int,
 ) -> _MeasurementSetup:
     params = basis_row_params_quick(k) if quick else basis_row_params(k)
+    requested_measure_dirs = basis_measure_dirs(
+        k,
+        quick,
+        experiment_number=experiment_number,
+    )
     target_nodes, target_weights, _ = ball_quadrature_nodes(
         int(params["n_radial"]),
         int(params["n_angular"]),
@@ -255,7 +287,12 @@ def _measurement_setup(
         mock_distances=distances,
         data_info=data_info,
         params=params,
-        n_per_axis=basis_n_per_axis(k, quick),
+        n_per_axis=basis_n_per_axis(
+            k,
+            quick,
+            experiment_number=experiment_number,
+        ),
+        requested_measure_dirs=requested_measure_dirs,
     )
 
 
@@ -282,7 +319,6 @@ def _prepare_forward_rows(
     *,
     experiment_number: int,
     noise_level: float,
-    requested_measure_dirs: int,
     polarimetric_J: int,
     shared_noise_for_equal_k: bool,
 ) -> list[_ForwardRow]:
@@ -294,7 +330,7 @@ def _prepare_forward_rows(
             setup = _measurement_setup(
                 spec.k,
                 quick=config.quick,
-                requested_measure_dirs=requested_measure_dirs,
+                experiment_number=experiment_number,
                 polarimetric_J=polarimetric_J,
             )
             setup_cache[float(spec.k)] = setup
@@ -518,7 +554,6 @@ def _case_common(
     column_index: int,
     method: str,
     noise_level: float,
-    requested_measure_dirs: int,
     polarimetric_J: int,
 ) -> dict[str, Any]:
     setup = forward_row.setup
@@ -536,7 +571,7 @@ def _case_common(
         "n_angular_requested": int(params["n_angular"]),
         "n_per_axis": int(setup.n_per_axis),
         "n_geometries": int(polarimetric_J),
-        "requested_measure_dirs": int(requested_measure_dirs),
+        "requested_measure_dirs": int(setup.requested_measure_dirs),
         "candidate_count": int(setup.data_info["candidate_count"]),
         "data_mode": "mock",
         "data_source": forward_row.spec.data_source,
@@ -587,7 +622,6 @@ def run_basis_comparison(
 
     grid_size, quad_order, r_eval_count = _settings(config.quick)
     polarimetric_J = 6
-    requested_measure_dirs = 110 if config.quick else 974
     epsilon = 0.2
     half_side = 1.0
     bandwidth_factor = 2.0
@@ -601,7 +635,6 @@ def run_basis_comparison(
         row_specs,
         experiment_number=experiment_number,
         noise_level=noise_level,
-        requested_measure_dirs=requested_measure_dirs,
         polarimetric_J=polarimetric_J,
         shared_noise_for_equal_k=shared_noise_for_equal_k,
     )
@@ -670,7 +703,6 @@ def run_basis_comparison(
             column_index=0,
             method="gpswf",
             noise_level=noise_level,
-            requested_measure_dirs=requested_measure_dirs,
             polarimetric_J=polarimetric_J,
         )
         gpswf_case.update({
@@ -734,7 +766,6 @@ def run_basis_comparison(
             column_index=1,
             method="cube_fourier",
             noise_level=noise_level,
-            requested_measure_dirs=requested_measure_dirs,
             polarimetric_J=polarimetric_J,
         )
         fourier_case.update({
@@ -787,7 +818,6 @@ def run_basis_comparison(
             column_index=2,
             method="ball_bessel",
             noise_level=noise_level,
-            requested_measure_dirs=requested_measure_dirs,
             polarimetric_J=polarimetric_J,
         )
         bessel_case.update({
@@ -837,7 +867,6 @@ def run_basis_comparison(
             column_index=3,
             method="dsm",
             noise_level=noise_level,
-            requested_measure_dirs=requested_measure_dirs,
             polarimetric_J=polarimetric_J,
         )
         dsm_case.update({
@@ -924,6 +953,7 @@ def _case_id(
 __all__ = [
     "BasisComparisonRow",
     "basis_n_per_axis",
+    "basis_measure_dirs",
     "basis_row_params",
     "basis_row_params_quick",
     "run_basis_comparison",

@@ -8,9 +8,9 @@ Layout: 3 rows × 2 cols = 6 reconstructions (no truth column).
   Row 3: k = 15, 20
 
 Data: Full VIE far-field, finite-direction mock measurement mode,
-far-field noise=0.2.  All frequencies use the same incident/observation
-direction set.  Six nearby configurations are selected per target node with a
-full-rank polarimetric constraint.
+far-field noise=0.2.  Formal measurement-direction counts grow with frequency
+from the Experiment 1 anchor k=15 -> 974.  Six nearby configurations are
+selected per target node with a full-rank polarimetric constraint.
 Truncation: epsilon filtering followed by the theoretical, discrete, and hard
 dimension caps, without splitting complete ``(ell,n)`` multiplets.
 """
@@ -59,7 +59,9 @@ def _row_params(k: float) -> dict[str, float | int]:
         6: {"ell_max": 5, "n_modes": 3, "K": 26, "n_radial": 8, "n_angular": 110},
         8: {"ell_max": 7, "n_modes": 3, "K": 32, "n_radial": 10, "n_angular": 146},
         10: {"ell_max": 8, "n_modes": 5, "K": 40, "n_radial": 12, "n_angular": 194},
-        15: {"ell_max": 12, "n_modes": 6, "K": 64, "n_radial": 20, "n_angular": 302},
+        # Keep the k=15 row identical to the formal Experiment 1 basis and
+        # quadrature settings so the two experiments can be compared directly.
+        15: {"ell_max": 12, "n_modes": 7, "K": 48, "n_radial": 12, "n_angular": 230},
         20: {"ell_max": 14, "n_modes": 7, "K": 80, "n_radial": 28, "n_angular": 434},
     }
     key = int(k)
@@ -102,7 +104,28 @@ def _n_per_axis_for_k(k: float, quick: bool) -> int:
     """Return the Full VIE voxel-grid side count for one wavenumber."""
     if quick:
         return 7
-    return max(11, min(19, int(1.2 * float(k))))
+    formal_values = {4: 11, 6: 11, 8: 13, 10: 16, 15: 23, 20: 31}
+    key = int(k)
+    if float(key) != float(k) or key not in formal_values:
+        raise ValueError(f"unsupported Experiment 3 wavenumber: {k}")
+    return formal_values[key]
+
+
+def _requested_measure_dirs_for_k(k: float, quick: bool) -> int:
+    """Return the finite measurement-direction count for one wavenumber.
+
+    Formal counts are anchored at Experiment 1 (k=15 -> 974) and increase
+    approximately like k^(3/2), rounded upward to supported positive-weight
+    Lebedev rules.  This keeps C times the mock-node spacing more comparable
+    across the frequency sweep.
+    """
+    if quick:
+        return 110
+    formal_values = {4: 170, 6: 302, 8: 434, 10: 590, 15: 974, 20: 1730}
+    key = int(k)
+    if float(key) != float(k) or key not in formal_values:
+        raise ValueError(f"unsupported Experiment 3 wavenumber: {k}")
+    return formal_values[key]
 
 
 def run_experiment(config: ExperimentConfig) -> Any:
@@ -113,7 +136,6 @@ def run_experiment(config: ExperimentConfig) -> Any:
     epsilon = 0.2
     polarimetric_J = 6
     noise_level = 0.2
-    requested_measure_dirs = 110 if config.quick else 974
 
     rng = np.random.default_rng(config.seed + 300)
 
@@ -142,6 +164,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
             n_radial = int(rp["n_radial"])
             n_angular = int(rp["n_angular"])
             n_per_axis = _n_per_axis_for_k(k, config.quick)
+            requested_measure_dirs = _requested_measure_dirs_for_k(k, config.quick)
             # Target quadrature
             target_nodes, target_weights, _ = ball_quadrature_nodes(n_radial, n_angular)
 
