@@ -2,10 +2,9 @@
 # -*- coding: utf-8 -*-
 """Experiment 3: Full VIE frequency and resolution effects.
 
-Layout: 3 rows × 2 cols = 6 reconstructions (no truth column).
-  Row 1: k = 4, 6
-  Row 2: k = 8, 10
-  Row 3: k = 15, 20
+Layout: 2 rows × 3 cols = 6 reconstructions (no truth column).
+  Row 1: k = 5, 6, 7
+  Row 2: k = 8, 10, 15
 
 Data: Full VIE far-field, finite-direction mock measurement mode,
 far-field noise=0.2.  Formal measurement-direction counts grow with frequency
@@ -30,6 +29,7 @@ from common import (
     collect_alpha_pairs_cached,
     collect_reconstruction_diagnostics,
     direct_sampling_component_indicator,
+    direct_sampling_explicit_farfield_indicator,
     generate_polarimetric_data_nodes,
     make_table,
     modal_matrix,
@@ -44,6 +44,7 @@ from common import (
 )
 from common.phantom import Mode, three_block_phantom, truth_image_2d
 from forward.datasets import (
+    farfield_data_with_relative_noise,
     farfield_dataset_to_qhat,
     forward_solver_diagnostic_summary,
     full_vie_farfield_dataset,
@@ -55,14 +56,14 @@ def _row_params(k: float) -> dict[str, float | int]:
     """Empirical 3D GPSWF discretisation parameters for each frequency."""
     C = 2.0 * k
     parameters = {
-        4: {"ell_max": 4, "n_modes": 2, "K": 20, "n_radial": 6, "n_angular": 74},
+        5: {"ell_max": 5, "n_modes": 3, "K": 24, "n_radial": 7, "n_angular": 86},
         6: {"ell_max": 5, "n_modes": 3, "K": 26, "n_radial": 8, "n_angular": 110},
+        7: {"ell_max": 6, "n_modes": 3, "K": 30, "n_radial": 9, "n_angular": 110},
         8: {"ell_max": 7, "n_modes": 3, "K": 32, "n_radial": 10, "n_angular": 146},
         10: {"ell_max": 8, "n_modes": 5, "K": 40, "n_radial": 12, "n_angular": 194},
         # Keep the k=15 row identical to the formal Experiment 1 basis and
         # quadrature settings so the two experiments can be compared directly.
         15: {"ell_max": 12, "n_modes": 7, "K": 48, "n_radial": 12, "n_angular": 230},
-        20: {"ell_max": 14, "n_modes": 7, "K": 80, "n_radial": 28, "n_angular": 434},
     }
     key = int(k)
     if float(key) != float(k) or key not in parameters:
@@ -104,7 +105,7 @@ def _n_per_axis_for_k(k: float, quick: bool) -> int:
     """Return the Full VIE voxel-grid side count for one wavenumber."""
     if quick:
         return 7
-    formal_values = {4: 11, 6: 11, 8: 13, 10: 16, 15: 23, 20: 31}
+    formal_values = {5: 11, 6: 11, 7: 12, 8: 13, 10: 16, 15: 23}
     key = int(k)
     if float(key) != float(k) or key not in formal_values:
         raise ValueError(f"unsupported Experiment 3 wavenumber: {k}")
@@ -121,7 +122,7 @@ def _requested_measure_dirs_for_k(k: float, quick: bool) -> int:
     """
     if quick:
         return 110
-    formal_values = {4: 170, 6: 302, 8: 434, 10: 590, 15: 974, 20: 1730}
+    formal_values = {5: 230, 6: 302, 7: 350, 8: 434, 10: 590, 15: 974}
     key = int(k)
     if float(key) != float(k) or key not in formal_values:
         raise ValueError(f"unsupported Experiment 3 wavenumber: {k}")
@@ -130,7 +131,7 @@ def _requested_measure_dirs_for_k(k: float, quick: bool) -> int:
 
 def run_experiment(config: ExperimentConfig) -> Any:
     (grid_size, quad_order, r_eval_count) = _settings(config.quick)
-    k_pairs = [(4, 6), (8, 10), (15, 20)]
+    k_rows = [(5, 6, 7), (8, 10, 15)]
 
     kind = "full"; component_index = 0
     epsilon = 0.2
@@ -143,7 +144,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
     blocks = three_block_phantom("born")
     coeff0 = tensor_coefficients_from_matrix(reference_tensor(kind), kind)
 
-    n_rows = len(k_pairs); n_cols = 2
+    n_rows = len(k_rows); n_cols = 3
     fig, axes = plt.subplots(n_rows, n_cols,
                              figsize=(3.1 * n_cols, 3.1 * n_rows),
                              constrained_layout=True)
@@ -153,9 +154,11 @@ def run_experiment(config: ExperimentConfig) -> Any:
     reconstruction_panels: list[tuple[np.ndarray, str]] = []
     dsm_diagnostic_rows: list[dict[str, Any]] = []
     dsm_panels: list[tuple[np.ndarray, str]] = []
+    farfield_dsm_diagnostic_rows: list[dict[str, Any]] = []
+    farfield_dsm_panels: list[tuple[np.ndarray, str]] = []
 
-    for row_idx, (k1, k2) in enumerate(k_pairs):
-        for col_idx, k in enumerate([k1, k2]):
+    for row_idx, row_wavenumbers in enumerate(k_rows):
+        for col_idx, k in enumerate(row_wavenumbers):
             rp = _row_params_quick(k) if config.quick else _row_params(k)
             C = float(rp["C"])
             ell_max = int(rp["ell_max"])
@@ -189,8 +192,20 @@ def run_experiment(config: ExperimentConfig) -> Any:
                 incident_dirs=farfield_inc,
                 obs_dirs=farfield_obs,
             )
+            standard_noise = (
+                rng.normal(size=ds.farfield_data.shape)
+                + 1j * rng.normal(size=ds.farfield_data.shape)
+            )
+            noisy_farfield = farfield_data_with_relative_noise(
+                ds,
+                noise_level,
+                standard_noise=standard_noise,
+            )
             rec_c = farfield_dataset_to_qhat(
-                ds, kind=kind, noise_level=noise_level, rng=rng
+                ds,
+                kind=kind,
+                noise_level=noise_level,
+                prepared_farfield_data=noisy_farfield,
             )
             comp_data = rec_c[:, component_index]
             polarimetric_diagnostics = polarimetric_diagnostic_summary(ds)
@@ -320,7 +335,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
             dsm_diagnostic_rows.append({
                 "experiment": 3,
                 "case_id": f"k{k:g}_dsm",
-                "method": "dsm",
+                "method": "qhat_dsm",
                 "row": int(row_idx),
                 "column": int(col_idx),
                 "k": float(k),
@@ -347,6 +362,57 @@ def run_experiment(config: ExperimentConfig) -> Any:
                 "target_mean_abs": float(np.mean(np.abs(dsm_image[target_mask]))),
                 "background_p95_abs": float(np.percentile(
                     np.abs(dsm_image[background_mask]), 95
+                )),
+                **polarimetric_diagnostics,
+                **forward_diagnostics,
+            })
+
+            farfield_dsm_values, farfield_dsm_meta = (
+                direct_sampling_explicit_farfield_indicator(
+                    noisy_farfield,
+                    target_nodes,
+                    target_weights,
+                    grid_points,
+                    C,
+                    ds.incident_dirs,
+                    ds.obs_dirs,
+                    kind=kind,
+                    normalize=True,
+                )
+            )
+            farfield_dsm_image = np.real(
+                farfield_dsm_values.reshape(grid_size, grid_size)
+            )
+            farfield_dsm_image[~disk_mask] = 0.0
+            farfield_dsm_panels.append((
+                farfield_dsm_image,
+                f"k={k:g}, nodes={farfield_dsm_meta['em_dsm_nodes']}",
+            ))
+            farfield_dsm_diagnostic_rows.append({
+                "experiment": 3,
+                "case_id": f"k{k:g}_farfield_dsm",
+                "method": "farfield_em_dsm",
+                "row": int(row_idx),
+                "column": int(col_idx),
+                "k": float(k),
+                "C": float(C),
+                "noise_level": float(noise_level),
+                "n_radial": int(n_radial),
+                "n_angular_requested": int(n_angular),
+                "n_per_axis": int(n_per_axis),
+                "n_geometries": int(polarimetric_J),
+                "requested_measure_dirs": int(requested_measure_dirs),
+                "candidate_count": int(data_info["candidate_count"]),
+                "target_nodes": int(target_nodes.shape[0]),
+                "p_nodes": int(ds.p_nodes.shape[0]),
+                "data_mode": "mock",
+                "data_source": "full_vie",
+                "shape": "three_blocks_gap_0.20",
+                **farfield_dsm_meta,
+                "image_max_abs": float(np.max(np.abs(farfield_dsm_image))),
+                "target_mean_abs": float(np.mean(np.abs(farfield_dsm_image[target_mask]))),
+                "background_p95_abs": float(np.percentile(
+                    np.abs(farfield_dsm_image[background_mask]), 95
                 )),
                 **polarimetric_diagnostics,
                 **forward_diagnostics,
@@ -388,15 +454,38 @@ def run_experiment(config: ExperimentConfig) -> Any:
         ax = dsm_axes[flat_idx // n_cols, flat_idx % n_cols]
         plotted = _imshow(ax, image, title, 0.0, 1.0)
         dsm_fig.colorbar(plotted, ax=ax, fraction=0.046, pad=0.03)
-    dsm_fig.supylabel(f"DSM, noise = {noise_level:g}", fontsize=10)
+    dsm_fig.supylabel(f"Qhat DSM, noise = {noise_level:g}", fontsize=10)
     dsm_fig.savefig(config.out_dir / "exp3_frequency_dsm.png", dpi=200)
     plt.close(dsm_fig)
+
+    farfield_dsm_fig, farfield_dsm_axes = plt.subplots(
+        n_rows,
+        n_cols,
+        figsize=(3.8 * n_cols, 3.1 * n_rows),
+        constrained_layout=True,
+    )
+    farfield_dsm_axes = np.asarray(farfield_dsm_axes).reshape(n_rows, n_cols)
+    for flat_idx, (image, title) in enumerate(farfield_dsm_panels):
+        ax = farfield_dsm_axes[flat_idx // n_cols, flat_idx % n_cols]
+        plotted = _imshow(ax, image, title, 0.0, 1.0)
+        farfield_dsm_fig.colorbar(plotted, ax=ax, fraction=0.046, pad=0.03)
+    farfield_dsm_fig.supylabel(
+        f"Far-field EM DSM, noise = {noise_level:g}", fontsize=10
+    )
+    farfield_dsm_fig.savefig(
+        config.out_dir / "exp3_frequency_farfield_dsm.png", dpi=200
+    )
+    plt.close(farfield_dsm_fig)
 
     write_diagnostics_csv(diagnostic_rows, config.out_dir / "exp3_diagnostics.csv")
     save_diagnostics_npz(diagnostic_rows, config.out_dir / "exp3_diagnostics_detail.npz")
     write_diagnostics_csv(
         dsm_diagnostic_rows,
         config.out_dir / "exp3_dsm_diagnostics.csv",
+    )
+    write_diagnostics_csv(
+        farfield_dsm_diagnostic_rows,
+        config.out_dir / "exp3_farfield_dsm_diagnostics.csv",
     )
     plot_diagnostic_curves(
         diagnostic_rows,
@@ -405,6 +494,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
     )
     print(f"Saved {config.out_dir / 'exp3_frequency.png'}")
     print(f"Saved {config.out_dir / 'exp3_frequency_dsm.png'}")
+    print(f"Saved {config.out_dir / 'exp3_frequency_farfield_dsm.png'}")
     return make_table([{"experiment": 3, "status": "ok"}])
 
 

@@ -1,0 +1,18 @@
+\contentsline {section}{\numberline {1}Introduction}{2}{section.1}%
+\contentsline {section}{\numberline {2}Anisotropic Maxwell scattering model}{4}{section.2}%
+\contentsline {section}{\numberline {3}Born approximation and polarimetric Fourier data}{6}{section.3}%
+\contentsline {section}{\numberline {4}Scaling and ball GPSWF diagonalization}{9}{section.4}%
+\contentsline {section}{\numberline {5}Low-rank tensor reconstruction and stability}{12}{section.5}%
+\contentsline {section}{\numberline {6}Discretization and implementation}{14}{section.6}%
+\contentsline {section}{\numberline {7}Comparing it with the Fourier basis}{15}{section.7}%
+\contentsline {section}{\numberline {8}Numerical experiments}{15}{section.8}%
+\contentsline {subsection}{\numberline {8.1}Common numerical setting}{15}{subsection.8.1}%
+\contentsline {subsection}{\numberline {8.2}Effect of the low-rank dimension}{16}{subsection.8.2}%
+\contentsline {subsection}{\numberline {8.3}Robustness with respect to far-field noise}{16}{subsection.8.3}%
+\contentsline {subsection}{\numberline {8.4}Wavenumber and resolution}{16}{subsection.8.4}%
+\contentsline {subsection}{\numberline {8.5}In comparison with Fourier basis and Bessel basis}{18}{subsection.8.5}%
+\contentsline {subsection}{\numberline {8.6}In comparison with DSM method}{20}{subsection.8.6}%
+\contentsline {subsubsection}{\numberline {8.6.1}DSM from far field data}{20}{subsubsection.8.6.1}%
+\contentsline {subsubsection}{\numberline {8.6.2}DSM from $\setbox \z@ \hbox {\mathsurround \z@ $\textstyle Q$}\mathaccent "0362{Q}$}{20}{subsubsection.8.6.2}%
+\contentsline {section}{\numberline {9}Conclusion}{23}{section.9}%
+\contentsline {section}{\numberline {A}Full Maxwell data and Born modeling error}{23}{appendix.A}%

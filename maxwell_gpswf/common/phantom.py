@@ -65,9 +65,9 @@ def three_block_phantom(variant: str = "born") -> list[Block]:
     """
     if variant == "born":
         return [
-            Block(center=(-0.26, 0.25, 0.0), half_width=(0.16, 0.16, 0.16), amplitude=1.00 + 0.10j),
-            Block(center=(0.25, 0.25, 0.0), half_width=(0.15, 0.15, 0.16), amplitude=0.85 + 0.05j),
-            Block(center=(0.00, -0.25, 0.0), half_width=(0.18, 0.14, 0.16), amplitude=1.15 - 0.05j),
+            Block(center=(-0.26, 0.25, 0.0), half_width=(0.16, 0.16, 0.16), amplitude=0.2 * (1.00 + 0.10j)),
+            Block(center=(0.25, 0.25, 0.0), half_width=(0.15, 0.15, 0.16), amplitude=0.2 * (0.85 + 0.05j)),
+            Block(center=(0.00, -0.25, 0.0), half_width=(0.18, 0.14, 0.16), amplitude=0.2 * (1.15 - 0.05j)),
         ]
     if variant == "vie":
         return [

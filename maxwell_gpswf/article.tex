@@ -1,0 +1,1356 @@
+\documentclass[11pt]{article}
+
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage{bm}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{algorithm}
+\usepackage{float}
+\usepackage{algpseudocode}
+\usepackage{xcolor}
+\usepackage{microtype}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{todonotes}
+\usepackage[colorlinks=true,linkcolor=blue!55!black,citecolor=blue!55!black,urlcolor=blue!55!black]{hyperref}
+
+\allowdisplaybreaks
+\numberwithin{equation}{section}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\C}{\mathbb{C}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\Sph}{\mathbb{S}}
+\newcommand{\ii}{\mathrm{i}}
+\newcommand{\dd}{\,\mathrm d}
+\newcommand{\supp}{\operatorname{supp}}
+\newcommand{\rank}{\operatorname{rank}}
+\newcommand{\cond}{\operatorname{cond}}
+\newcommand{\curl}{\nabla\times}
+\newcommand{\diver}{\nabla\cdot}
+% vectors (bold italic)
+\newcommand{\vect}[1]{\bm{#1}}
+% 2nd-order tensors/matrices (bold sans-serif)
+\newcommand{\tens}[1]{\bm{\mathsf{#1}}}
+% 3rd-order arrays/tensors (bold calligraphic)
+\newcommand{\arr}[1]{\bm{\mathcal{#1}}}
+% 4th-order tensors (blackboard bold)
+\newcommand{\tensf}[1]{\mathbb{#1}}
+\newcommand{\vecop}{\ensuremath{\operatorname{vec}}}
+\newcommand{\Id}{\ensuremath{\tens{I}}}
+\newcommand{\B}{B_1}
+\newcommand{\F}{\mathcal{F}}
+\newcommand{\Dop}{\mathcal{D}}
+\newcommand{\G}{\ensuremath{\tens{G}}}
+\newcommand{\Ptx}{\ensuremath{\tens{P}_{\hat{\vect{x}}}}}
+\newcommand{\epsr}{\ensuremath{\bm{\varepsilon}_{\mathrm r}}}
+\newcommand{\Qt}{\ensuremath{\tens{Q}}}
+\newcommand{\Tt}{\ensuremath{\tens{T}}}
+\newcommand{\Mt}{\ensuremath{\tens{M}}}
+\newcommand{\Bt}{\ensuremath{\tens{B}}}
+\newcommand{\Et}{\ensuremath{\vect{E}}}
+\newcommand{\range}{\operatorname{range}}
+\newcommand{\diag}{\operatorname{diag}}
+\newcommand{\dist}{\operatorname{dist}}
+\newcommand{\abs}[1]{\left\lvert #1\right\rvert}
+\newcommand{\norm}[1]{\left\lVert #1\right\rVert}
+\newcommand{\inner}[2]{\left\langle #1,#2\right\rangle}
+\newcommand{\brac}[1]{\left( #1 \right)}
+\newcommand{\Frob}{\mathrm F}
+
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\theoremstyle{definition}
+\newtheorem{assumption}[theorem]{Assumption}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{remark}[theorem]{Remark}
+
+\title{Low-Rank Generalized Prolate Spheroidal Inversion for Anisotropic Maxwell Far-Field Scattering}
+\author{Jingzhi Li \and Ping Liu}
+\date{v01-\today}
+
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This paper develops a low-rank inversion framework for time-harmonic electromagnetic scattering by compactly supported anisotropic electric media.  The main observation is that the Born approximation converts full-aperture polarimetric Maxwell far-field measurements into tensor-valued Fourier data restricted to a ball.  A finite-dimensional polarimetric linear system first recovers the Fourier transform of the anisotropic electric tensor at each sampled frequency point, and the isotropic dielectric case follows as a rank-one specialization.  After scaling the support to the unit ball, every tensor component is inverted by the same compact restricted Fourier operator.  The singular structure of this operator is represented by three-dimensional generalized prolate spheroidal wave functions, computed through a commuting Sturm--Liouville eigenproblem and a symmetric tridiagonal Jacobi discretization.  Spectral cutoff estimates quantify the effects of measurement noise, polarimetric conditioning, quadrature error, and Born modeling error.  The resulting method gives a reproducible regularized reconstruction pipeline for anisotropic Maxwell inverse scattering and provides a mathematically controlled route from polarimetric far fields to low-rank tensor reconstructions.
+\end{abstract}
+
+\todo[inline]{Should we also consider the inverse source problem and emphasize the restrictive Fourier transform, see "Fourier method for recovering acoustic
+sources from multi-frequency far-field data". Compared to the Fourier basis, GPSWF is a better basis for the reconstruction. We can emphasize the restrictive Fourier transform and GPSWF in the paper. The title can be "Restrictive Fourier transform and Generalized Prolate Spheroidal Inversion for Anisotropic Maxwell Far-Field Scattering"}
+
+\noindent\textbf{Keywords.} Maxwell equations; anisotropic permittivity; electromagnetic inverse scattering; Born approximation; far-field data; generalized prolate spheroidal wave functions; restricted Fourier inversion; spectral cutoff; low-rank regularization.
+
+\tableofcontents
+
+
+\section{Introduction}
+
+Inverse electromagnetic scattering from far-field data is a central problem in computational wave imaging, radar, nondestructive testing, and photonic material characterization.  The scalar acoustic theory is already severely ill posed, but the Maxwell case adds two structural complications: the measured electric far field is transverse to the observation direction, and each incident plane wave has only two admissible polarization states.  For an anisotropic electric medium, the unknown is therefore not a scalar contrast but a matrix-valued permittivity contrast, and the data do not directly provide all entries of its Fourier transform.  Classical scattering theory and transmission-eigenvalue analysis provide the analytical background for this setting \cite{ColtonKress2019,CakoniColtonHaddar2016}.  The linear sampling method for electromagnetic scattering gives a complementary inverse-problem point of view \cite{CakoniColtonMonk2011}.  On the forward and discretization side, Maxwell finite-element and integral-equation theory supply the functional setting used below \cite{Monk2003,Nedelec2001,Hiptmair2002}.
+
+The anisotropic Maxwell inverse problem has a distinct theoretical literature.  Boundary inverse results for anisotropic Maxwell systems clarify the gauge and tensorial obstructions that arise beyond the scalar coefficients \cite{KenigSaloUhlmann2011}.  Orthotropic and polarization-sensitive optical models show how tensorial susceptibility can enter practical electromagnetic inverse problems under Born-type approximations \cite{ElbauMindrinosScherzer2018}.  Bianisotropic Maxwell scattering further illustrates the role of coupled electric and magnetic material tensors in both direct and inverse settings \cite{Nguyen2019}.  These works motivate treating the anisotropic electric tensor as the primary unknown rather than reducing the model to an isotropic scalar normalization.
+
+Qualitative and direct sampling methods form another major line of development.  The linear sampling and factorization viewpoints of Colton--Kirsch and Kirsch gave early operator-theoretic reconstruction principles for inverse scattering \cite{ColtonKirsch1996,Kirsch1998}, and the monograph of Kirsch and Grinberg systematized the factorization method \cite{KirschGrinberg2008}.  Point-source and orthogonality-sampling ideas provide related fast imaging functionals \cite{Potthast1996,Potthast2010}.  Direct sampling methods for medium scattering were developed in a computationally efficient form by Ito, Jin, and Zou \cite{ItoJinZou2012}; for electromagnetic scatterers, subsequent work has analyzed anisotropic Maxwell data, conducting cracks, limited-aperture measurements, and three-dimensional experimental configurations \cite{HarrisNguyen2020,Park2018,AhnChaePark2020,LeNguyenSchmidtTruong2022}.  These methods are attractive because they avoid fully nonlinear optimization, but they usually aim at support or shape indicators rather than at stable componentwise reconstruction of an anisotropic tensor field.
+
+Quantitative microwave and radar imaging emphasize a complementary set of computational issues: data calibration, model mismatch, limited aperture, and high-dimensional discretization.  The Fresnel experimental database and associated inversion studies have been extensively used to benchmark three-dimensional electromagnetic imaging algorithms \cite{GeffrinSabouroux2009,LitmanCrocco2009}.  Support reconstruction and coupled-dipole inversion were tested on these data by Catapano--Crocco-D'Urso-Isernia and Chaumet--Belkebir \cite{CatapanoCroccoDursoIsernia2009,ChaumetBelkebir2009}.  Contrast-source inversion and multiplicative regularization were examined in independent three-dimensional Fresnel studies \cite{LiAbubakarVanDenBerg2009,DeZaeytijdFranchois2009}.  Multifrequency inverse scattering results and radar-imaging formulations further show how frequency diversity and aperture geometry affect stability and resolution \cite{BaoLiLinTriki2015,CheneyBorden2009,AmmariEtAl2013}.  The present paper focuses on the Born-linearized far-field regime, but the numerical diagnostics are designed with these full-data computational concerns in mind.
+
+The second ingredient of this paper is prolate-spheroidal spectral regularization.  The classical time--frequency concentration theory of Slepian, Pollak, and Landau introduced prolate spheroidal wave functions as eigenfunctions of truncated Fourier operators \cite{SlepianPollak1961,LandauPollak1961,LandauPollak1962}.  Slepian's multidimensional extension and the Landau--Widom eigenvalue asymptotics explain the effective finite dimensionality, or numerical rank, of compact Fourier restrictions \cite{Slepian1964,LandauWidom1980}.  Numerical quadrature and interpolation for prolate bases were developed by Xiao, Rokhlin, and Yarvin \cite{XiaoRokhlinYarvin2001}, while spherical and ball concentration theory was advanced in geophysical and harmonic-analysis settings \cite{SimonsDahlenWieczorek2006,KhalidKennedyMcEwen2016}.  The monograph of Osipov, Rokhlin, and Xiao gives a detailed computational account of one-dimensional PSWF tools \cite{OsipovRokhlinXiao2013}.  Recent analyses of generalized prolate spheroidal functions and data-driven bases for inverse medium scattering make this spectral structure computationally explicit for Fourier-limited Born data \cite{Greengard2024,Meng2023}.  The associated cutoff regularization is naturally connected with classical ill-posed-problem theory and modern nonuniform Fourier projection algorithms \cite{TikhonovArsenin1977,Hansen2010,BarnettMaglandAfKlinteberg2019}.
+
+The present work combines these two threads.  The Maxwell Born approximation maps a compactly supported anisotropic electric tensor to polarimetric far-field data.  After subtracting the incident and observation directions, the accessible Fourier variable lies in a ball of radius twice the wavenumber.  At each Fourier point, however, the data are not the tensor Fourier value itself; they are polarization-projected scalar measurements.  We therefore first solve a finite-dimensional polarimetric linear system for the Fourier tensor value and only then invert the compact restricted Fourier operator componentwise.  Three-dimensional ball generalized prolate spheroidal wave functions provide the low-rank basis for the second stage.  In this terminology, ``low-rank'' refers to the effective spectral rank of the restricted Fourier operator, not to a Canonical Polyadic, Tucker, or nuclear-norm low-rank model for the anisotropic tensor.
+
+The main contributions are as follows.  First, we derive the anisotropic Maxwell Born-to-Fourier formula from the volume potential and far-field representation.  Second, we state and prove a rank-conditioned polarimetric recovery theorem for the tensor Fourier transform, with the isotropic dielectric case obtained as a rank-one specialization.  Third, we formulate the three-dimensional ball GPSWF inversion through a commuting Sturm--Liouville operator and a stable tridiagonal discretization.  Fourth, we prove tensor-valued spectral-cutoff estimates that separate measurement noise, polarimetric conditioning, quadrature or projection error, and Born modeling error.  Finally, we report deterministic numerical diagnostics showing where the Maxwell-specific polarimetric stage is well conditioned and where it becomes the dominant source of instability.
+
+The paper is organized as follows.  Section~\ref{sec:forward} states the anisotropic Maxwell scattering problem and derives the Lippmann--Schwinger and far-field formulae.  Section~\ref{sec:born} proves the Born tensor Fourier map, gives the coverage of the Fourier ball, states the polarimetric rank condition, and recovers the isotropic formula as a corollary.  Section~\ref{sec:gpswf} describes the ball GPSWF diagonalization and the corrected Sturm--Liouville computation.  Section~\ref{sec:regularization} proves the spectral cutoff estimates.  Section~\ref{sec:discretization} gives the projection and implementation details.  Section~\ref{sec:nonlinear} quantifies the Born modeling error for full Maxwell data.  Section~\ref{sec:numerics} reports deterministic polarimetric and modal numerical experiments and compares the resulting diagnostics with the scalar GPSWF-Born setting.
+
+\section{Anisotropic Maxwell scattering model}\label{sec:forward}
+
+We use the time dependence $\exp(-\ii\omega t)$.  Let $k>0$ be the free-space wavenumber.  The background medium is homogeneous and nonmagnetic, and the relative electric permittivity is
+\begin{equation*}
+  \epsr(\vect{x})=\Id+\Qt(\vect{x}),
+\end{equation*}
+where $\Qt$ is a compactly supported anisotropic electric contrast.  The isotropic case is the specialization $\Qt=q\Id$.
+
+\begin{assumption}[Electric tensor contrast]\label{ass:tensor}
+Let $D\subset\R^3$ be a bounded Lipschitz domain.  Assume that
+\begin{equation*}
+  \Qt\in L^\infty(\R^3;\C^{3\times3}),\qquad \supp \Qt\subset \overline D .
+\end{equation*}
+There is a constant $\gamma>0$ such that, for almost every $x\in D$ and every $\vect{\zeta}\in\C^3$,
+\begin{equation*}
+  \operatorname{Re}\big(\vect{\zeta}^{*}(\Id+\Qt(\vect{x}))\vect{\zeta}\big)\ge \gamma \abs{\vect{\zeta}}^2,
+  \qquad
+  \operatorname{Im}\big(\vect{\zeta}^{*}(\Id+\Qt(\vect{x}))\vect{\zeta}\big)\ge 0.
+\end{equation*}
+The second inequality is a passive-medium assumption.  It can be replaced by a nonresonance hypothesis, but passivity is convenient for uniqueness.
+\end{assumption}
+
+For an incident plane wave
+\begin{equation*}
+  \vect{E}^{\rm i}(\vect{x};\vect{d},\vect{e})=\vect{e}\exp(\ii k \vect{d}\cdot \vect{x}),
+  \qquad \vect{d}\in\Sph^2,
+  \qquad \vect{e}\in\C^3,
+  \qquad \vect{e}\cdot\vect{d}=0,
+\end{equation*}
+the electric field satisfies
+\begin{equation}\label{eq:maxwell_total}
+  \curl\curl \vect{E}-k^2(\Id+\Qt)\vect{E}=0 \qquad \hbox{in }\R^3.
+\end{equation}
+Writing $\vect{E}=\vect{E}^{\rm i}+\vect{E}^{\rm s}$ and using $\curl\curl \vect{E}^{\rm i}-k^2\vect{E}^{\rm i}=0$, the scattered field solves
+\begin{equation*}
+  \curl\curl \vect{E}^{\rm s}-k^2\vect{E}^{\rm s}=k^2\Qt\vect{E} \qquad \hbox{in }\R^3.
+\end{equation*}
+The radiation condition is the Silver--Mueller condition
+\begin{equation*}
+  \lim_{r\to\infty} r\left[(\curl \vect{E}^{\rm s})(\vect{x})\times \hat{\vect{x}}-\ii k \vect{E}^{\rm s}(\vect{x})\right]=0,
+  \qquad \hat{\vect{x}}=\frac{\vect{x}}{\abs{\vect{x}}},
+\end{equation*}
+uniformly in $\hat{\vect{x}}\in\Sph^2$.  The scattered field belongs to $H_{\mathrm{loc}}(\curl;\R^3)$.
+
+Let
+\begin{equation*}
+  \Phi_k(\vect{x})=\frac{\exp(\ii k\abs{\vect{x}})}{4\pi\abs{\vect{x}}},\qquad \vect{x}\ne0,
+\end{equation*}
+and define the outgoing dyadic Green tensor
+\begin{equation*}
+  \G_k(\vect{x})=\left(\Id+\frac{1}{k^2}\nabla\nabla^\top\right)\Phi_k(\vect{x}).
+\end{equation*}
+Then
+\begin{equation*}
+  (\curl\curl-k^2\Id)\G_k=\Id\delta_0
+\end{equation*}
+in the distributional sense.
+
+\begin{proposition}[Volume integral equation]\label{prop:LS}
+Under Assumption~\ref{ass:tensor}, the radiating solution of \eqref{eq:maxwell_total} satisfies
+\begin{equation*}
+  \vect{E}(\vect{x})=\vect{E}^{\rm i}(\vect{x})+k^2\int_D\G_k(\vect{x}-\vect{y})\Qt(\vect{y})\vect{E}(\vect{y})\dd \vect{y},
+  \qquad \vect{x}\in\R^3.
+\end{equation*}
+The scattered field is
+\begin{equation*}
+  \vect{E}^{\rm s}(\vect{x})=k^2\int_D\G_k(\vect{x}-\vect{y})\Qt(\vect{y})\vect{E}(\vect{y})\dd \vect{y}.
+\end{equation*}
+\end{proposition}
+
+\begin{proof}
+Let the source density be
+\[
+  \vect{F}=k^2\Qt\vect{E},
+  \qquad \supp \vect{F}\subset \overline D,
+\]
+where \(\vect{F}\) is extended by zero outside \(D\).  By the distributional identity for the dyadic Green tensor,
+\[
+  (\curl\curl-k^2\Id)\int_D \G_k(\vect{x}-\vect{y})\vect{F}(\vect{y})\dd\vect{y}
+  =\vect{F}(\vect{x})
+\]
+in \(\mathcal D'(\R^3)^3\).  Hence the potential
+\[
+  \vect{u}(\vect{x})=\int_D \G_k(\vect{x}-\vect{y})\vect{F}(\vect{y})\dd\vect{y}
+\]
+solves \((\curl\curl-k^2\Id)\vect{u}=k^2\Qt\vect{E}\) and is outgoing because each column of \(\G_k\) is outgoing.  Taking \(\vect{u}=\vect{E}^{\rm s}\) gives the representation for the scattered field, and adding \(\vect{E}^{\rm i}\) gives the total-field identity.
+
+It remains to justify solvability in the stated class.  Fix a ball \(B_R\) such that \(\overline D\subset B_R\), and define the restricted volume-potential operator
+\[
+  (\mathcal V_{\Qt}\vect{u})(\vect{x})
+  =\int_D\G_k(\vect{x}-\vect{y})\Qt(\vect{y})\vect{u}(\vect{y})\dd\vect{y},
+  \qquad \vect{x}\in B_R .
+\]
+The integral equation on \(B_R\) is
+\[
+  (\Id-k^2\mathcal V_{\Qt})\vect{E}=\vect{E}^{\rm i}.
+\]
+The Maxwell volume potential is bounded in the natural \(H(\operatorname{curl};B_R)\) volume-integral setting and is Fredholm after the standard regularizing decomposition of the dyadic kernel.  Thus existence follows once uniqueness is known.
+
+For uniqueness, let the incident field vanish.  The radiating solution then satisfies
+\[
+  \curl\curl\vect{E}-k^2(\Id+\Qt)\vect{E}=0 .
+\]
+Testing by \(\overline{\vect{E}}\) in \(B_R\), integrating by parts, using the exterior radiation condition, and then taking the imaginary part gives the standard passive-medium identity
+\[
+  k\norm{\vect{E}^{\infty}}_{L^2(\Sph^2)^3}^2
+  +k^2\int_D \operatorname{Im}\big(\overline{\vect{E}}\cdot \Qt\vect{E}\big)\dd\vect{x}=0,
+\]
+up to the conventional positive normalization of the far-field term.  The second term is nonnegative by passivity, hence \(\vect{E}^{\infty}=0\).  The Maxwell Rellich lemma gives \(\vect{E}=0\) in the exterior of \(D\), and unique continuation together with the coercivity assumption gives \(\vect{E}=0\) in \(D\).  Therefore the homogeneous integral equation has only the trivial solution.  Fredholm solvability yields the claimed radiating solution and the two integral formulae.
+\end{proof}
+
+The electric far field follows from the leading asymptotics of $\G_k$.  
+
+\begin{proposition}[Electric far-field pattern]\label{prop:farfield}
+The scattered electric field has the expansion
+\begin{equation*}
+  \vect{E}^{\rm s}(\vect{x};\vect{d},\vect{e};k)=\frac{\exp(\ii k\abs{\vect{x}})}{\abs{\vect{x}}}\vect{E}^\infty(\hat{\vect{x}};\vect{d},\vect{e};k)+O(\abs{\vect{x}}^{-2}),
+  \qquad \abs{\vect{x}}\to\infty,
+\end{equation*}
+where
+\begin{equation*}
+  \vect{E}^\infty(\hat{\vect{x}};\vect{d},\vect{e};k)=\frac{k^2}{4\pi}\tens{P}_{\hat{\vect{x}}}
+  \int_D\exp(-\ii k\hat{\vect{x}}\cdot \vect{y})\Qt(\vect{y})\vect{E}(\vect{y};\vect{d},\vect{e};k)\dd \vect{y} 
+\end{equation*}
+with $\tens{P}_{\hat{\vect{x}}}:=\Id-\hat{\vect{x}}\hat{\vect{x}}^\top$. Moreover $\hat{\vect{x}}\cdot \vect{E}^\infty(\hat{\vect{x}};\vect{d},\vect{e};k)=0$.
+\end{proposition}
+
+\begin{proof}
+Set \(r=\abs{\vect{x}}\) and \(\hat{\vect{x}}=\vect{x}/r\).  Since \(D\) is bounded, the scalar Green function has the uniform expansion
+\[
+  \Phi_k(\vect{x}-\vect{y})
+  =\frac{e^{\ii kr}}{4\pi r}e^{-\ii k\hat{\vect{x}}\cdot\vect{y}}+O(r^{-2}),
+  \qquad \vect{y}\in D .
+\]
+Differentiating the leading phase with respect to \(\vect{x}\) gives
+\[
+  \nabla_x\nabla_x^\top \Phi_k(\vect{x}-\vect{y})
+  =-k^2\hat{\vect{x}}\hat{\vect{x}}^\top
+  \frac{e^{\ii kr}}{4\pi r}e^{-\ii k\hat{\vect{x}}\cdot\vect{y}}+O(r^{-2}).
+\]
+Substitution into \(\G_k=(\Id+k^{-2}\nabla\nabla^\top)\Phi_k\) yields
+\[
+  \G_k(\vect{x}-\vect{y})
+  =\frac{e^{\ii kr}}{4\pi r}e^{-\ii k\hat{\vect{x}}\cdot\vect{y}}
+  (\Id-\hat{\vect{x}}\hat{\vect{x}}^\top)+O(r^{-2}) .
+\]
+Inserting this expansion into the volume potential for \(\vect{E}^{\rm s}\) gives
+\[
+  \vect{E}^{\rm s}(\vect{x})
+  =\frac{e^{\ii kr}}{r}\frac{k^2}{4\pi}\tens{P}_{\hat{\vect{x}}}
+  \int_D e^{-\ii k\hat{\vect{x}}\cdot\vect{y}}\Qt(\vect{y})\vect{E}(\vect{y})\dd\vect{y}
+  +O(r^{-2}),
+\]
+where the remainder is uniform in \(\hat{\vect{x}}\) because \(\Qt\vect{E}\) is supported in \(D\).  The coefficient of \(e^{\ii kr}/r\) is the stated far-field pattern.  Finally,
+\[
+  \hat{\vect{x}}\cdot \tens{P}_{\hat{\vect{x}}}\vect{v}
+  =\hat{\vect{x}}\cdot(\vect{v}-(\hat{\vect{x}}\cdot\vect{v})\hat{\vect{x}})=0
+\]
+for every \(\vect{v}\in\C^3\), so the electric far field is transverse.
+\end{proof}
+
+\section{Born approximation and polarimetric Fourier data}\label{sec:born}
+
+The Born approximation replaces the total field inside $D$ by the incident field:
+\begin{equation*}
+  \vect{E}(\vect{y};\vect{d},\vect{e};k)\approx \vect{E}^{\rm i}(\vect{y};\vect{d},\vect{e};k)=\vect{e}\exp(\ii k \vect{d}\cdot \vect{y}).
+\end{equation*}
+Using the Fourier convention
+\begin{equation*}
+  \widehat{\Qt}(\vect{\xi})=\int_D\exp(\ii\vect{\xi}\cdot \vect{y})\Qt(\vect{y})\dd \vect{y},
+\end{equation*}
+we obtain the following exact identity for the Born-linearized far field.
+
+\begin{theorem}[Anisotropic Maxwell Born-to-Fourier map]\label{thm:born_tensor}
+For the anisotropic electric contrast in Assumption~\ref{ass:tensor}, the Born far field is
+\begin{equation*}
+  \vect{E}_b^\infty(\hat{\vect{x}};\vect{d},\vect{e};k)=\frac{k^2}{4\pi}\tens{P}_{\hat{\vect{x}}}\widehat{\Qt}(k(\vect{d}-\hat{\vect{x}}))\vect{e},
+\end{equation*}
+where $\vect{d},\hat{\vect{x}}\in\Sph^2$ and $\vect{e}\cdot\vect{d}=0$.
+\end{theorem}
+
+\begin{proof}
+The Born approximation replaces the internal total field in the exact far-field formula by the incident plane wave.  Therefore
+\begin{align*}
+  \vect{E}_b^\infty(\hat{\vect{x}};\vect{d},\vect{e};k)
+  &=\frac{k^2}{4\pi}\tens{P}_{\hat{\vect{x}}}
+  \int_D e^{-\ii k\hat{\vect{x}}\cdot \vect{y}}
+  \Qt(\vect{y})\vect{e}e^{\ii k\vect{d}\cdot \vect{y}}\dd \vect{y} \\
+  &=\frac{k^2}{4\pi}\tens{P}_{\hat{\vect{x}}}
+  \int_D e^{\ii k(\vect{d}-\hat{\vect{x}})\cdot\vect{y}}\Qt(\vect{y})\dd\vect{y}\,\vect{e} .
+\end{align*}
+With the Fourier convention in this paper,
+\[
+  \widehat{\Qt}(\vect{\xi})=\int_D e^{\ii\vect{\xi}\cdot\vect{y}}\Qt(\vect{y})\dd\vect{y},
+  \qquad \vect{\xi}=k(\vect{d}-\hat{\vect{x}}),
+\]
+the last display is exactly the claimed identity.  The admissibility condition \(\vect{e}\cdot\vect{d}=0\) is inherited from the incident Maxwell plane wave, and the projection \(\tens{P}_{\hat{\vect{x}}}\) enforces transversality of the observed field.
+\end{proof}
+
+\begin{lemma}[Coverage of the Fourier ball]\label{lem:coverage}
+For every $\vect{p}\in B_1\subset\R^3$, there exist $\vect{d},\hat{\vect{x}}\in\Sph^2$ such that
+\begin{equation}\label{eq:p_definition}
+  \vect{p}=\frac{\vect{d}-\hat{\vect{x}}}{2}.
+\end{equation}
+If $0<\abs{\vect{p}}<1$, choose any $\vect{s}\in\Sph^2$ satisfying $\vect{s}\cdot \vect{p}=0$ and set
+\begin{equation*}
+  \vect{d}=\vect{p}+\sqrt{1-\abs{\vect{p}}^2}\,\vect{s},
+  \qquad
+  \hat{\vect{x}}=-\vect{p}+\sqrt{1-\abs{\vect{p}}^2}\,\vect{s} .
+\end{equation*}
+Then $\vect{d},\hat{\vect{x}}\in\Sph^2$ and \eqref{eq:p_definition} holds.  The endpoints $\vect{p}=0$ and $\abs{\vect{p}}=1$ are obtained by the obvious limiting choices.
+\end{lemma}
+
+\begin{proof}
+Assume first that \(0<\abs{\vect{p}}<1\) and choose \(\vect{s}\in\Sph^2\) with \(\vect{s}\cdot\vect{p}=0\).  Let \(\tau=(1-\abs{\vect{p}}^2)^{1/2}\).  Then
+\[
+  \abs{\vect{d}}^2
+  =\abs{\vect{p}}^2+2\tau\vect{p}\cdot\vect{s}+\tau^2\abs{\vect{s}}^2
+  =\abs{\vect{p}}^2+1-\abs{\vect{p}}^2=1,
+\]
+and the same computation gives \(\abs{\hat{\vect{x}}}^2=1\).  Moreover,
+\[
+  \vect{d}-\hat{\vect{x}}
+  =\vect{p}+\tau\vect{s}-(-\vect{p}+\tau\vect{s})=2\vect{p},
+\]
+which proves the required representation.  If \(\vect{p}=0\), one may take \(\vect{d}=\hat{\vect{x}}\) to be any unit vector.  If \(\abs{\vect{p}}=1\), take \(\vect{d}=\vect{p}\) and \(\hat{\vect{x}}=-\vect{p}\).  These endpoint choices are the limits of the preceding formula as \(\tau\to1\) and \(\tau\to0\), respectively.
+\end{proof}
+
+Consequently, fixed-frequency full-aperture Born data can access the Fourier ball
+\begin{equation*}
+  \vect{\xi}=k(\vect{d}-\hat{\vect{x}}), \qquad \abs{\xi}\le 2k .
+\end{equation*}
+For anisotropic media, however, the value $\widehat{\Qt}(\vect{\xi})$ is not observed directly.  It is observed through transverse input and output projections.  This finite-dimensional polarimetric inversion is the Maxwell-specific step of the method.
+
+Let $\mathcal T\subset\C^{3\times3}$ be the tensor class.  For a general anisotropic electric tensor, $\mathcal T=\C^{3\times3}$ and $\dim\mathcal T=9$.  For a reciprocal anisotropic dielectric, $\mathcal T=\{A\in\C^{3\times3}:A=A^\top\}$ and $\dim\mathcal T=6$.  Let $\Tt_1,\ldots,\Tt_m$ be a basis of $\mathcal T$ and write
+\begin{equation}\label{eq:tensor_basis}
+  \widehat{\Qt}(\vect{\xi})=\sum_{r=1}^m c_r(\vect{\xi})\Tt_r.
+\end{equation}
+For a fixed $\vect{\xi}$ choose admissible configurations
+\begin{equation*}
+  \mathcal C_{\vect{\xi}}=\{(\hat{\vect{x}}_j,\vect{d}_j,\tens{E}_j): \vect{d}_j-\hat{\vect{x}}_j=\vect{\xi}/k,
+  \ \tens{E}_j\in\C^{3\times2},\ \tens{E}_j^*\tens{E}_j=\tens{I}_2,\ \vect{d}_j^\top \tens{E}_j=0\}_{j=1}^{J(\vect{\xi})}.
+\end{equation*}
+The columns of $\tens{E}_j$ form an orthonormal basis of $\vect{d}_j^\perp$.  Define the measured Born block
+\begin{equation*}
+  \Bt_j(\vect{\xi})=\frac{4\pi}{k^2}\vect{E}_b^\infty(\hat{\vect{x}}_j;\vect{d}_j,\tens{E}_j;k)
+  =\tens{P}_{\hat{\vect{x}}_j}\widehat{\Qt}(\vect{\xi})\tens{E}_j\in\C^{3\times2}.
+\end{equation*}
+Using \eqref{eq:tensor_basis},
+\begin{equation*}
+  \vecop \Bt_j(\vect{\xi})=\sum_{r=1}^m c_r(\vect{\xi})\vecop(\tens{P}_{\hat{\vect{x}}_j}\Tt_r\tens{E}_j).
+\end{equation*}
+Stacking all configurations gives
+\begin{equation*}
+  g(\vect{\xi})=\Mt(\vect{\xi})c(\vect{\xi}),
+\end{equation*}
+where $c=(c_1,\ldots,c_m)^\top$ and the $r$th column of $\Mt(\vect{\xi})$ is the stacked vector with blocks $\vecop(\tens{P}_{\hat{\vect{x}}_j}\Tt_r\tens{E}_j)$.
+
+\begin{assumption}[Uniform polarimetric rank]\label{ass:rank}
+There is a measurable set $\Omega_k\subset B(0,2k)$ and a constant $\sigma_*>0$ such that
+\begin{equation*}
+  \rank \Mt(\vect{\xi})=m,
+  \qquad
+  \sigma_{\min}(\Mt(\vect{\xi}))\ge \sigma_*,
+  \qquad \hbox{for a.e. }\xi\in\Omega_k .
+\end{equation*}
+\end{assumption}
+
+\begin{remark}[Deterministic polarimetric design used in the experiments]\label{rem:deterministic_design}
+For $0<\abs{\vect{p}}<1$, let $\{\vect{u},\vect{v}\}$ be an orthonormal basis of $\vect{p}^{\perp}$ and set $\tau=(1-\abs{\vect{p}}^2)^{1/2}$.  For $J\ge3$ define
+\begin{equation*}
+  \vect{s}_j=\cos(2\pi j/J)\vect{u}+\sin(2\pi j/J)\vect{v},\qquad
+  \vect{d}_j=\vect{p}+\tau\vect{s}_j,\qquad
+  \hat{\vect{x}}_j=-\vect{p}+\tau\vect{s}_j .
+\end{equation*}
+The columns of $\tens{E}_j$ are then chosen as any orthonormal basis of $\vect{d}_j^{\perp}$.  This construction gives several independent transverse-transverse blocks of the same Fourier tensor value.  The rank condition remains a finite-dimensional condition on $\Mt(2k\vect{p})$ and is therefore checked explicitly in the algorithm; the numerical section reports the resulting singular values for the full and reciprocal tensor classes.
+\end{remark}
+
+
+\begin{remark}[Boundary degeneracy]\label{rem:boundary_degeneracy}
+For $\abs{\vect{\xi}}=2k$, the representation in Lemma~\ref{lem:coverage} gives the unique backscattering geometry $\vect{d}=\vect{\xi}/\abs{\vect{\xi}}$ and $\hat{\vect{x}}=-\vect{d}$.  A single geometry only probes a transverse-transverse block of $\widehat{\Qt}(\vect{\xi})$ and cannot recover a general tensor.  This does not affect $L^2$ inversion on the Fourier ball because the boundary has measure zero, but it matters for discrete data near the boundary.  In computation, one should monitor $\sigma_{\min}(\Mt(\vect{\xi}))$ and either regularize or discard poorly conditioned nodes.
+\end{remark}
+
+\begin{theorem}[Pointwise tensor recovery in the Born approximation]\label{thm:tensor_recovery}
+Under Assumption~\ref{ass:rank}, the Fourier coefficient vector $c(\vect{\xi})$ in \eqref{eq:tensor_basis} is recovered from noiseless Born data by
+\begin{equation*}
+  c(\vect{\xi})=\Mt(\vect{\xi})^\dagger g(\vect{\xi}),
+  \qquad \hbox{for a.e. } \vect \xi\in\Omega_k .
+\end{equation*}
+If $g^\delta(\vect \xi)=g(\vect{\xi})+\eta(\vect \xi)$, then the least-squares reconstruction satisfies
+\begin{equation}\label{eq:pointwise_noise}
+  \abs{c^\delta(\vect \xi)-c(\vect{\xi})}\le \frac{\abs{\eta(\vect \xi)}}{\sigma_{\min}(\Mt(\vect{\xi}))}.
+\end{equation}
+A Tikhonov-stabilized pointwise reconstruction is
+\begin{equation}\label{eq:pointwise_tikhonov}
+  c_\lambda^\delta(\vect \xi)=\big(\Mt(\vect{\xi})^*\Mt(\vect{\xi})+\lambda I\big)^{-1}\Mt(\vect{\xi})^*g^\delta(\vect \xi).
+\end{equation}
+\end{theorem}
+
+\begin{proof}
+For a fixed \(\vect{\xi}\), the tensor expansion gives $\Bt_j(\vect{\xi})
+  =\sum_{r=1}^m c_r(\vect{\xi})\tens{P}_{\hat{\vect{x}}_j}\Tt_r\tens{E}_j$. After vectorization and stacking over all admissible configurations, this is the linear system
+\[
+  g(\vect{\xi})=\Mt(\vect{\xi})c(\vect{\xi}) .
+\]
+Under the rank assumption, the singular value decomposition
+\[
+  \Mt=U\Sigma V^*,
+  \qquad
+  \Sigma=\operatorname{diag}(\sigma_1,\ldots,\sigma_m),
+  \qquad \sigma_m=\sigma_{\min}(\Mt)>0,
+\]
+gives
+\[
+  \Mt^\dagger=V\Sigma^{-1}U^*,
+  \qquad
+  \Mt^\dagger\Mt=I_m .
+\]
+Thus noiseless data satisfy \(c=\Mt^\dagger g\), which proves the recovery formula.
+
+For perturbed data \(g^\delta=g+\eta\), the least-squares solution is
+\[
+  c^\delta=\Mt^\dagger g^\delta
+  =c+\Mt^\dagger\eta .
+\]
+Consequently,
+\[
+  \abs{c^\delta-c}
+  \le \norm{\Mt^\dagger}_2\abs{\eta}
+  =\frac{\abs{\eta}}{\sigma_{\min}(\Mt)} .
+\]
+The Tikhonov formula is obtained by minimizing
+\[
+  \mathcal J_\lambda(c)=\norm{\Mt c-g^\delta}_2^2+\lambda\norm{c}_2^2,
+  \qquad \lambda>0 .
+\]
+The Euler equation \(\nabla\mathcal J_\lambda(c)=0\) is
+\[
+  (\Mt^*\Mt+\lambda I)c=\Mt^*g^\delta,
+\]
+which gives the stated expression.  In particular, relative to the exact coefficient vector,
+\[
+  c_\lambda^\delta-c
+  =-\lambda(\Mt^*\Mt+\lambda I)^{-1}c
+  +(\Mt^*\Mt+\lambda I)^{-1}\Mt^*\eta,
+\]
+showing explicitly the usual bias--variance decomposition of the stabilized polarimetric solve.
+\end{proof}
+
+\begin{corollary}[Isotropic dielectric contrast]\label{cor:isotropic}
+If $\Qt=q\Id$, then
+\begin{equation*}
+  \vect{E}_b^\infty(\hat{\vect{x}};\vect{d},\vect{e};k)=\frac{k^2}{4\pi}\tens{P}_{\hat{\vect{x}}}\vect{e}\,\widehat q(k(\vect{d}-\hat{\vect{x}})).
+\end{equation*}
+For any configuration with $\vect{a}=\tens{P}_{\hat{\vect{x}}}\vect{e}\ne0$,
+\begin{equation*}
+  \widehat q(k(\vect{d}-\hat{\vect{x}}))
+  =\frac{4\pi}{k^2}\frac{\vect{a}^*\cdot \vect{E}_b^\infty(\hat{\vect{x}};\vect{d},\vect{e};k)}{\abs{\vect{a}}^2}.
+\end{equation*}
+Thus the scalar restricted Fourier data are obtained by polarization normalization.
+\end{corollary}
+
+\begin{proof}
+If \(\Qt=q\Id\), then \(\widehat{\Qt}(\vect{\xi})=\widehat q(\vect{\xi})\Id\).  The anisotropic Born formula therefore reduces to
+\[
+  \vect{E}_b^\infty
+  =\frac{k^2}{4\pi}\widehat q(k(\vect{d}-\hat{\vect{x}}))\tens{P}_{\hat{\vect{x}}}\vect{e} .
+\]
+Let \(\vect{a}=\tens{P}_{\hat{\vect{x}}}\vect{e}\).  If \(\vect{a}\ne0\), then
+\[
+  \vect{a}^*\vect{E}_b^\infty
+  =\frac{k^2}{4\pi}\widehat q(k(\vect{d}-\hat{\vect{x}}))\vect{a}^*\vect{a}
+  =\frac{k^2}{4\pi}\abs{\vect{a}}^2\widehat q(k(\vect{d}-\hat{\vect{x}})).
+\]
+Solving this scalar identity for \(\widehat q\) proves the normalization formula.  The condition \(\vect{a}\ne0\) excludes precisely the geometries in which the chosen incident polarization is annihilated by the outgoing transverse projection.
+\end{proof}
+
+\section{Scaling and ball GPSWF diagonalization}\label{sec:gpswf}
+
+After the polarimetric inversion, the quantity available for spatial
+reconstruction is the Fourier transform of the electric contrast,
+\begin{equation}\label{eq:fourier_tensor_definition}
+  \widehat{\Qt}(\vect{\xi})
+  =
+  \int_D
+  \exp(\ii\vect{\xi}\cdot\vect{x})
+  \Qt(\vect{x})
+  \dd\vect{x}.
+\end{equation}
+The Fourier transform in \eqref{eq:fourier_tensor_definition} is understood
+entrywise.  In particular, for each pair of indices \(a,b\in\{1,2,3\}\),
+\begin{equation*}
+  \widehat{Q}_{ab}(\vect{\xi})
+  =
+  \int_D
+  \exp(\ii\vect{\xi}\cdot\vect{x})
+  Q_{ab}(\vect{x})
+  \dd\vect{x}.
+\end{equation*}
+Consequently, once the polarization variables have been eliminated, the same
+scalar spatial reconstruction problem is obtained for every entry of
+\(\Qt\).
+
+At a single frequency \(k\), the Born data determine
+\(\widehat{\Qt}(\vect{\xi})\) only for
+\begin{equation*}
+  \vect{\xi}\in B(0,2k).
+\end{equation*}
+Thus the remaining inverse problem is not an inversion of the full Fourier
+transform on \(\R^3\), but an inversion of the restricted Fourier transform
+\begin{equation}\label{eq:physical_restricted_fourier}
+  \mathcal F_{D,2k}f
+  :=
+  \left.
+  \left(
+    \int_D
+    \exp(\ii\vect{\xi}\cdot\vect{x})
+    f(\vect{x})
+    \dd\vect{x}
+  \right)
+  \right|_{\vect{\xi}\in B(0,2k)} .
+\end{equation}
+This operator is compact as a map from \(L^2(D)\) into
+\(L^2(B(0,2k))\).  Hence its inverse is ill-posed: spatial modes that produce
+very small restricted Fourier data cannot be stably reconstructed in the
+presence of measurement noise.  The relevant question is therefore not only
+how to represent the unknown, but how to choose a representation adapted to
+the observable and weakly observable modes of
+\eqref{eq:physical_restricted_fourier}.
+
+Prolate spheroidal wave functions provide precisely such an
+operator-adapted representation.  In the two-dimensional inverse scattering
+setting, restricted Fourier data on a disk have been reconstructed by
+projecting onto disk PSWFs and retaining the modes whose prolate eigenvalues
+remain above a prescribed spectral cutoff
+\cite{ZhouAudibertMengZhang2025,Meng2023}.  The essential reason for this
+choice is that the PSWFs are eigenfunctions of the restricted Fourier operator
+itself, rather than merely a generic approximation basis
+\cite{Slepian1964}.  The corresponding three-dimensional functions on the
+unit ball are the ball generalized prolate spheroidal wave functions, or ball
+GPSWFs \cite{ZhangLiWangZhang2020,IsaevNovikov2022}. We shall introduce the derivation of the basis in this section. 
+
+
+
+Assume $D\subset B_R=B(0,R)$.  For $z\in B_1$ define
+\begin{equation*}
+  \Qt_R(\vect{z})=\Qt(R\vect{z}).
+\end{equation*}
+With $\vect{p}=\vect{\xi}/(2k)$ and $C=2kR$,
+\begin{equation*}
+  R^{-3}\widehat{\Qt}(2k\vect{p})=\int_{B_1}\exp(\ii C\vect{p}\cdot \vect{z})\Qt_R(\vect{z})\dd \vect{z},
+  \qquad \vect{p}\in B_1 .
+\end{equation*}
+Thus the same restricted Fourier operator acts on every tensor component:
+\begin{equation*}
+  (\F_C f)(\vect{p})=\int_{B_1}\exp(\ii C\vect{p}\cdot \vect{z})f(\vect{z})\dd \vect{z},
+  \qquad \vect{p}\in B_1 .
+\end{equation*}
+We use the $L^2(B_1)$ inner product
+\begin{equation*}
+  \inner{f}{g}_{B_1}=\int_{B_1}f(x)\overline{g(x)}\dd x,
+\end{equation*}
+linear in the first argument.
+
+The three-dimensional ball GPSWFs are the functions
+\begin{equation*}
+  \psi_{\ell n m}(x;C),
+  \qquad \ell=0,1,2,\ldots,
+  \qquad n=0,1,2,\ldots,
+  \qquad -\ell\le m\le \ell,
+\end{equation*}
+satisfying
+\begin{equation*}
+  \F_C\psi_{\ell n m}=\alpha_{\ell n}(C)\psi_{\ell n m}.
+\end{equation*}
+The degeneracy in $m$ follows from rotational invariance.  The functions are chosen orthonormal in $L^2(B_1)$, and the eigenvalues $\alpha_{\ell n}(C)$ decay rapidly after the Shannon transition region.
+
+The separation of variables is
+\begin{equation*}
+  \psi_{\ell n m}(r,\omega;C)=R_{\ell n}(r;C)Y_\ell^m(\omega),
+  \qquad x=r\omega,
+\end{equation*}
+where $Y_\ell^m$ are orthonormal spherical harmonics.  The plane wave expansion
+\begin{equation*}
+  \exp(\ii Cx\cdot y)=4\pi\sum_{\ell=0}^\infty\sum_{m=-\ell}^{\ell}
+  \ii^\ell j_\ell(Crs)Y_\ell^m(\omega)\overline{Y_\ell^m(\eta)},
+  \qquad y=s\eta,
+\end{equation*}
+implies the radial integral equation
+\begin{equation}\label{eq:radial_integral}
+  4\pi\ii^\ell\int_0^1 j_\ell(Crs)R_{\ell n}(s;C)s^2\dd s
+  =\alpha_{\ell n}(C)R_{\ell n}(r;C).
+\end{equation}
+
+A stable way to compute these functions is through the commuting Sturm--Liouville operator
+\begin{equation}\label{eq:correct_D}
+  \Dop_C=-\nabla\cdot\big((1-\abs{\vect{x}}^2)\nabla\big)+C^2\abs{\vect{x}}^2 .
+\end{equation}
+In spherical coordinates,
+\begin{equation*}
+  \Dop_C=-(1-r^2)\partial_r^2-\bigg(\frac{2}{r}-4r\bigg)\partial_r
+  -\frac{1-r^2}{r^2}\Delta_{\Sph^2}+C^2r^2 .
+\end{equation*}
+Thus
+\begin{equation*}
+  \Dop_C\psi_{\ell n m}=\chi_{\ell n}(C)\psi_{\ell n m},
+\end{equation*}
+and the radial functions satisfy
+\begin{equation*}
+  \left[-(1-r^2)\frac{\dd^2}{\dd r^2}
+ -\left(\frac{2}{r}-4r\right)\frac{\dd}{\dd r}
+ +\frac{(1-r^2)\ell(\ell+1)}{r^2}+C^2r^2\right]R_{\ell n}(r)
+ =\chi_{\ell n}R_{\ell n}(r).
+\end{equation*}
+Regularity at the origin requires $R_{\ell n}(r)=O(r^\ell)$ as $r\to0$.  The endpoint $r=1$ is regular in the natural weighted domain of \eqref{eq:correct_D}.
+
+Set
+\begin{equation*}
+  \eta=2r^2-1,
+  \qquad
+  \nu=\ell+\frac12 .
+\end{equation*}
+Use the expansion
+\begin{equation*}
+  R_{\ell n}(r;C)=r^\ell\sum_{j=0}^{\infty}\beta_j^{\ell n}(C)P_j^{(0,\nu)}(\eta),
+\end{equation*}
+where the Jacobi polynomials are orthonormal for the weight $(1+\eta)^\nu$ on $(-1,1)$.  At $C=0$, the basis functions have eigenvalues
+\begin{equation*}
+  \gamma_{\ell+2j}=(\ell+2j)(\ell+2j+3).
+\end{equation*}
+The multiplication identity
+\begin{equation*}
+  \eta P_j^{(0,\nu)}=a_j^{(\nu)}P_{j+1}^{(0,\nu)}+b_j^{(\nu)}P_j^{(0,\nu)}+a_{j-1}^{(\nu)}P_{j-1}^{(0,\nu)}
+\end{equation*}
+has coefficients
+\begin{align*}
+  a_j^{(\nu)}&=\frac{2(j+1)(j+\nu+1)}{(2j+\nu+2)\sqrt{(2j+\nu+1)(2j+\nu+3)}},\\
+  b_j^{(\nu)}&=\frac{\nu^2}{(2j+\nu)(2j+\nu+2)}.
+\end{align*}
+Since $r^2=(1+\eta)/2$, truncation to $j=0,\ldots,K$ gives the symmetric tridiagonal eigenproblem
+\begin{equation}\label{eq:tridiag}
+  A_\ell(C)\beta^{\ell n}=\chi_{\ell n}(C)\beta^{\ell n},
+\end{equation}
+with
+\begin{align*}
+  (A_\ell)_{jj}
+  &=\gamma_{\ell+2j}+\frac{C^2}{2}\left(1+b_j^{(\nu)}\right),\\
+  (A_\ell)_{j,j+1}
+  &=(A_\ell)_{j+1,j}=\frac{C^2}{2}a_j^{(\nu)}.
+\end{align*}
+The eigenvectors are normalized so that $\norm{\psi_{\ell n m}}_{L^2(B_1)}=1$.
+
+\begin{remark}[Computation of Fourier eigenvalues]
+After computing $\psi_{\ell n m}$ from \eqref{eq:tridiag}, the Fourier eigenvalue $\alpha_{\ell n}$ can be obtained from the radial integral equation \eqref{eq:radial_integral} or from the Rayleigh quotient
+\begin{equation*}
+  \alpha_{\ell n}(C)=\inner{\F_C\psi_{\ell n m}}{\psi_{\ell n m}}_{B_1}.
+\end{equation*}
+The value is independent of $m$.  In practice, the radial Bessel representation is preferred because it avoids forming a dense three-dimensional Fourier matrix.
+\end{remark}
+
+\begin{remark}[Effective rank]
+A phase-space estimate for the number of well-concentrated modes is
+\begin{equation*}
+  N(C)\sim\frac{\abs{B_1}\abs{CB_1}}{(2\pi)^3}
+  =\frac{2}{9\pi}C^3.
+\end{equation*}
+This estimate is not a sharp cutoff rule, but it predicts the scale of the stable subspace before the prolate eigenvalue plunge.
+\end{remark}
+
+\section{Low-rank tensor reconstruction and stability}\label{sec:regularization}
+
+Let $\{\psi_j\}_{j\ge1}$ denote the GPSWF basis, where the single index $j$ represents $(\ell,n,m)$.  Let $\alpha_j$ denote the corresponding Fourier eigenvalue.  If the scaled tensor Fourier data are exact, then
+\begin{equation*}
+  W(\vect{p})=(\F_C\Qt_R)(\vect{p})=\int_{B_1}\exp(\ii C\vect{p}\cdot \vect{z})\Qt_R(\vect{z})\dd \vect{z}.
+\end{equation*}
+Expand
+\begin{equation*}
+  \Qt_R(\vect{z})=\sum_{j\ge1}\tens{Q}_j\psi_j(\vect{z}),
+  \qquad
+  \tens{Q}_j=\int_{B_1}\Qt_R(\vect{z})\overline{\psi_j(\vect{z})}\dd \vect{z}\in\C^{3\times3}.
+\end{equation*}
+Then
+\begin{equation*}
+  W(\vect{p})=\sum_{j\ge1}\alpha_j\tens{Q}_j\psi_j(\vect{p}),
+  \qquad
+  W_j=\alpha_j\tens{Q}_j.
+\end{equation*}
+For a reciprocal tensor, the same expansion is used on the independent symmetric components.
+
+Given perturbed scaled data $W^\delta$, define the spectral cutoff set
+\begin{equation*}
+  J_\epsilon(C)=\{j:\abs{\alpha_j(C)}>\epsilon\}.
+\end{equation*}
+The cutoff reconstruction is
+\begin{equation}\label{eq:Q_cutoff}
+  \Qt_{R,\epsilon}^\delta(\vect{z})=
+  \sum_{j\in J_\epsilon(C)}\frac{W_j^\delta}{\alpha_j(C)}\psi_j(\vect{z}),
+  \qquad
+  W_j^\delta=\int_{B_1}W^\delta(\vect{p})\overline{\psi_j(\vect{p})}\dd \vect{p}.
+\end{equation}
+The physical tensor is $\Qt_\epsilon^\delta(\vect{y})=\Qt_{R,\epsilon}^\delta(\vect{y}/R)$.
+
+\begin{theorem}[Tensor spectral cutoff stability]\label{thm:tensor_stability}
+Assume
+\begin{equation}\label{eq:data_noise_tensor}
+  \norm{W^\delta-\F_C\Qt_R}_{L^2(B_1;\C^{3\times3})}\le\delta,
+\end{equation}
+where the matrix norm is the Frobenius norm.  Then \eqref{eq:Q_cutoff} satisfies
+\begin{equation}\label{eq:tensor_cutoff_error}
+  \norm{\Qt_{R,\epsilon}^\delta-\Qt_R}_{L^2(B_1;\C^{3\times3})}
+  \le \frac{\delta}{\epsilon}
+  +\left(\sum_{j\notin J_\epsilon(C)}\norm{\tens{Q}_j}_{\Frob}^2\right)^{1/2}.
+\end{equation}
+\end{theorem}
+
+\begin{proof}
+Write \(W=\F_C\Qt_R\) and \(e=W^\delta-W\).  Since \(\{\psi_j\}\) is an orthonormal basis of \(L^2(B_1)\), Parseval's identity holds componentwise for matrix-valued functions with the Frobenius norm:
+\[
+  \norm{F}_{L^2(B_1;\C^{3\times3})}^2
+  =\sum_{j\ge1}\norm{F_j}_{\Frob}^2,
+  \qquad
+  F_j=\int_{B_1}F(\vect{p})\overline{\psi_j(\vect{p})}\dd\vect{p} .
+\]
+From \(W_j=\alpha_j\tens{Q}_j\), the cutoff reconstruction satisfies
+\[
+  \Qt_{R,\epsilon}^\delta-\Qt_R
+  =\sum_{j\in J_\epsilon}\frac{e_j}{\alpha_j}\psi_j
+  -\sum_{j\notin J_\epsilon}\tens{Q}_j\psi_j .
+\]
+The two sums are supported on disjoint modal index sets and are therefore orthogonal in \(L^2(B_1;\C^{3\times3})\).  Hence
+\[
+  \norm{\Qt_{R,\epsilon}^\delta-\Qt_R}_{L^2}^2
+  =\sum_{j\in J_\epsilon}\frac{\norm{e_j}_{\Frob}^2}{\abs{\alpha_j}^2}
+  +\sum_{j\notin J_\epsilon}\norm{\tens{Q}_j}_{\Frob}^2 .
+\]
+Because \(\abs{\alpha_j}>\epsilon\) for \(j\in J_\epsilon\),
+\[
+  \sum_{j\in J_\epsilon}\frac{\norm{e_j}_{\Frob}^2}{\abs{\alpha_j}^2}
+  \le \epsilon^{-2}\sum_{j\ge1}\norm{e_j}_{\Frob}^2
+  =\epsilon^{-2}\norm{W^\delta-W}_{L^2(B_1;\C^{3\times3})}^2
+  \le \epsilon^{-2}\delta^2 .
+\]
+Taking the square root and using \(\sqrt{a+b}\le\sqrt a+\sqrt b\) gives the asserted estimate.
+\end{proof}
+
+\begin{corollary}[Finite-rank Lipschitz stability]\label{cor:finite_rank}
+If $\Qt_R$ belongs to the span of GPSWF modes satisfying $\abs{\alpha_j(C)}>\eta$, then choosing $\epsilon=\eta$ gives
+\begin{equation*}
+  \norm{\Qt_{R,\eta}^\delta-\Qt_R}_{L^2(B_1;\C^{3\times3})}
+  \le \frac{\delta}{\eta}.
+\end{equation*}
+\end{corollary}
+
+To relate the truncation term to smoothness, define the graph norm
+\begin{equation*}
+  \norm{F}_{H_C^s(B_1;\C^{3\times3})}^2
+  =\sum_{j\ge1}(1+\chi_j(C))^s\norm{F_j}_{\Frob}^2,
+\end{equation*}
+where $F_j$ are the GPSWF coefficients and $\chi_j$ are the Sturm--Liouville eigenvalues.
+
+\begin{theorem}[Hilbert-scale truncation estimate]\label{thm:hilbert}
+Let $\Qt_R\in H_C^s(B_1;\C^{3\times3})$ with $s>0$.  For $A$ such that $J_A(C)$ is nonempty, set
+\begin{equation*}
+  J_A(C)=\{j:\chi_j(C)\le A\},
+  \qquad
+  \beta(A;C)=\min_{j\in J_A(C)}\abs{\alpha_j(C)},
+\end{equation*}
+define
+\begin{equation*}
+  \Qt_{R,A}^\delta=
+  \sum_{j\in J_A(C)}\frac{W_j^\delta}{\alpha_j(C)}\psi_j .
+\end{equation*}
+If \eqref{eq:data_noise_tensor} holds, then
+\begin{equation*}
+  \norm{\Qt_{R,A}^\delta-\Qt_R}_{L^2(B_1;\C^{3\times3})}
+  \le \frac{\delta}{\beta(A;C)}+(1+A)^{-s/2}\norm{\Qt_R}_{H_C^s(B_1;\C^{3\times3})}.
+\end{equation*}
+\end{theorem}
+
+\begin{proof}
+Let \(W=\F_C\Qt_R\) and \(e=W^\delta-W\).  For \(j\in J_A(C)\), the definition of \(\beta(A;C)\) gives \(\abs{\alpha_j}\ge \beta(A;C)\).  Therefore the retained-mode data error is bounded by
+\[
+  \left\|\sum_{j\in J_A}\frac{e_j}{\alpha_j}\psi_j\right\|_{L^2(B_1;\C^{3\times3})}^2
+  \le \beta(A;C)^{-2}\sum_{j\in J_A}\norm{e_j}_{\Frob}^2
+  \le \beta(A;C)^{-2}\delta^2 .
+\]
+The discarded part is
+\[
+  \sum_{j\notin J_A}\tens{Q}_j\psi_j
+  =\sum_{\chi_j>A}\tens{Q}_j\psi_j,
+\]
+and Parseval gives
+\[
+  \left\|\sum_{\chi_j>A}\tens{Q}_j\psi_j\right\|_{L^2}^2
+  =\sum_{\chi_j>A}\norm{\tens{Q}_j}_{\Frob}^2 .
+\]
+For every index with \(\chi_j>A\),
+\[
+  1\le (1+A)^{-s}(1+\chi_j)^s .
+\]
+Thus
+\[
+  \sum_{\chi_j>A}\norm{\tens{Q}_j}_{\Frob}^2
+  \le (1+A)^{-s}\sum_{j\ge1}(1+\chi_j)^s\norm{\tens{Q}_j}_{\Frob}^2
+  =(1+A)^{-s}\norm{\Qt_R}_{H_C^s(B_1;\C^{3\times3})}^2 .
+\]
+Combining the retained-mode and discarded-mode estimates and taking square roots proves the bound.
+\end{proof}
+
+The total data perturbation after polarimetric inversion may be written schematically as
+\begin{equation}\label{eq:total_data_perturbation}
+  W^\delta=\F_C\Qt_R+\mathcal{E}_{\mathrm{pol}}+\mathcal{E}_{\mathrm{quad}}+\mathcal{E}_{\mathrm{nl}}+\mathcal{E}_{\mathrm{meas}},
+\end{equation}
+where $\mathcal{E}_{\mathrm{pol}}$ is the algebraic polarimetric inversion error, $\mathcal{E}_{\mathrm{quad}}$ is the projection or interpolation error, $\mathcal{E}_{\mathrm{nl}}$ is the Born modeling error, and $\mathcal{E}_{\mathrm{meas}}$ is measurement noise.  Under Assumption~\ref{ass:rank}, the polarimetric contribution is amplified at most by $\sigma_*^{-1}$ before entering Theorem~\ref{thm:tensor_stability}.
+
+\section{Discretization and implementation}\label{sec:discretization}
+
+For a scalar or tensor-valued function $w$ on $B_1$, GPSWF coefficients are
+\begin{equation*}
+  w_j=\int_{B_1}w(x)\overline{\psi_j(x)}\dd x.
+\end{equation*}
+In spherical coordinates, with $x=r\omega$ and $\eta=2r^2-1$,
+\begin{equation*}
+  r^2\dd r=\frac{1}{4\sqrt2}(1+\eta)^{1/2}\dd\eta.
+\end{equation*}
+Therefore
+\begin{equation*}
+  w_j=\frac{1}{4\sqrt2}\int_{-1}^1\int_{\Sph^2}
+  w\left(\sqrt{\frac{1+\eta}{2}}\omega\right)
+  \overline{\psi_j\left(\sqrt{\frac{1+\eta}{2}},\omega\right)}
+  (1+\eta)^{1/2}\dd S(\omega)\dd\eta .
+\end{equation*}
+A tensor-product quadrature uses Gauss--Jacobi nodes $\eta_a$ with weight $(1+\eta)^{1/2}$ and spherical design or Lebedev nodes $\omega_b$:
+\begin{equation}\label{eq:projection_discrete}
+  w_j\approx\frac{1}{4\sqrt2}\sum_{a=1}^{N_r}\sum_{b=1}^{N_s}
+  \omega_a^{(r)}\omega_b^{(s)}w(r_a\omega_b)\overline{\psi_j(r_a\omega_b)},
+  \qquad
+  r_a=\sqrt{\frac{1+\eta_a}{2}}.
+\end{equation}
+
+Real far-field nodes are not generally arranged on this quadrature grid.  There are two practical choices.  The first is mock quadrature: assign each quadrature node to a nearby measured Fourier node.  If measured nodes are
+\begin{equation*}
+  \vect{p}_{\mu}=\frac{\vect{d}_{\mu}-\hat{\vect{x}}_{\mu}}{2},
+\end{equation*}
+then
+\begin{equation*}
+  \mu(a,b)=\operatorname*{argmin}_{\mu}\abs{r_a\omega_b-p_\mu},
+\end{equation*}
+and $w(r_a\omega_b)$ is replaced by $w(p_{\mu(a,b)})$.  The second is a nonuniform least-squares projection.  Let $\mathcal J$ be the retained GPSWF index set and suppose tensor Fourier values $W(p_\mu)$ have been recovered by the polarimetric inversion.  For each tensor component, solve
+\begin{equation}\label{eq:nonuniform_LS}
+  \min_{\{c_j\}_{j\in\mathcal J}}
+  \sum_{\mu} \omega_\mu\left|\sum_{j\in\mathcal J}\alpha_jc_j\psi_j(p_\mu)-W(p_\mu)\right|^2
+  +\lambda\sum_{j\in\mathcal J}\abs{c_j}^2 .
+\end{equation}
+This avoids nearest-neighbor error and is preferable when the sampling pattern is irregular or aperture-limited.
+
+\begin{algorithm}[t]
+\caption{Anisotropic Maxwell-GPSWF low-rank inversion}
+\label{alg:main}
+\begin{algorithmic}[1]
+\Require Far-field data $\vect{E}^\infty(\hat{\vect{x}}_j;\vect{d}_j,\tens{E}_j;k)$, support radius $R$, tensor class basis $\Tt_1,\ldots,\Tt_m$, cutoff $\epsilon$ or index set $\mathcal J$.
+\State Set $C=2kR$ and $\vect{p}_{j}=(\vect{d}_{j}-\hat{\vect{x}}_{j})/2$.
+\State For each Fourier node, form the polarimetric matrix $\Mt(2k\vect{p}_{j})$ and the stacked data vector $g(2k\vect{p}_{j})$.
+\State Recover $\widehat{\Qt}(2k\vect{p}_{j})$ by least squares or Tikhonov regularization, and scale $W(\vect{p}_{j})=R^{-3}\widehat{\Qt}(2k\vect{p}_{j})$.
+\State For $\ell=0,\ldots,\ell_{\max}$, solve the tridiagonal eigenproblem \eqref{eq:tridiag} and compute $\alpha_{\ell n}$.
+\State Retain modes with $\abs{\alpha_{\ell n}}>\epsilon$ or with $\chi_{\ell n}\le A$.
+\State Compute GPSWF coefficients by quadrature projection \eqref{eq:projection_discrete} with mock nodes or by nonuniform least squares \eqref{eq:nonuniform_LS}.
+\State Form $\Qt_{R,\epsilon}$ from \eqref{eq:Q_cutoff} and output $\Qt_\epsilon(\vect{y})=\Qt_{R,\epsilon}(\vect{y}/R)$.
+\end{algorithmic}
+\end{algorithm}
+
+The offline cost is dominated by the tridiagonal eigensolves for each angular index $\ell$ and by the evaluation of radial basis functions.  The online cost is dominated by polarimetric least squares at the Fourier nodes and by the projection step.  Nearest-neighbor mock quadrature can be accelerated by a k-d tree in $B_1$.  The least-squares system \eqref{eq:nonuniform_LS} is typically small because $\mathcal J$ contains only stable low-rank modes.
+
+
+\section{Comparing it with the Fourier basis}
+
+
+
+
+
+
+
+
+
+
+
+
+\section{Numerical experiments}
+\label{sec:numerics}
+\label{sec:maxwell-gpswf-numerics}
+
+The numerical study examines low-rank truncation, noise stability, resolution
+at different wavenumbers, and comparisons with alternative reconstruction
+methods. In every test, a prescribed tensor contrast is used only to generate
+far-field measurements; the inverse stage starts from these measurements and
+does not use the exact Fourier transform of the target. Unless otherwise
+stated, the displayed quantity is the real part of $Q_{11}$ on the plane
+$x_3=0$.
+
+\subsection{Common numerical setting}
+\label{subsec:maxwell-gpswf-setup}
+
+The support of the unknown tensor contrast is assumed to be contained in the
+unit ball
+\[
+    B=\{\mathbf{x}\in\mathbb{R}^3:|\mathbf{x}|<1\}.
+\]
+We use the general nonsymmetric complex reference tensor
+\[
+\mathbf{Q}_0=
+\begin{pmatrix}
+1+0.15\mathrm{i} & 0.35-0.20\mathrm{i} & -0.10+0.08\mathrm{i}\\
+-0.28+0.12\mathrm{i} & -0.65+0.30\mathrm{i} & 0.22-0.18\mathrm{i}\\
+0.16+0.04\mathrm{i} & -0.34+0.10\mathrm{i} & 0.75-0.35\mathrm{i}
+\end{pmatrix}.
+\]
+Within each block, the tensor contrast is a complex scalar amplitude times
+$\mathbf{Q}_0$. The finite-direction acquisition, polarimetric recovery, and
+GPSWF projection follow Sections~\ref{sec:born}--\ref{sec:discretization}; they
+are not repeated here. Thus, every experiment uses the data path
+\[
+    \text{far-field data}
+    \longrightarrow \widehat{\mathbf{Q}}(\mathbf{p})
+    \longrightarrow Q_{11}(\mathbf{x}).
+\]
+
+The three-block target used in Experiments~2--4 consists of axis-aligned
+rectangular blocks
+\[
+    D_r=\left\{\mathbf x:\ |x_i-c_{r,i}|<h_{r,i},\quad i=1,2,3\right\},
+\]
+with centers $\mathbf c_r$ and half-widths $\mathbf h_r$ given by
+\[
+\begin{array}{c|c|c}
+ r & \mathbf c_r & \mathbf h_r \\ \hline
+ 1 & (-0.26,\ 0.25,\ 0) & (0.16,\ 0.16,\ 0.16) \\
+ 2 & ( \phantom{-}0.25,\ 0.25,\ 0) & (0.15,\ 0.15,\ 0.16) \\
+ 3 & ( \phantom{-}0,\ -0.25,\ 0) & (0.18,\ 0.14,\ 0.16).
+\end{array}
+\]
+The minimum boundary separation between any two blocks is $0.20$.
+
+Let $\mathbf g$ denote a noise-free far-field data vector. Relative complex
+Gaussian noise is added before polarimetric recovery according to
+\begin{equation}
+    \mathbf{g}^{\delta}=\mathbf{g}+\boldsymbol{\eta},
+    \qquad
+    \|\boldsymbol{\eta}\|_2=\delta\|\mathbf{g}\|_2,
+    \label{eq:maxwell-noise}
+\end{equation}
+with independent standard Gaussian real and imaginary parts before
+normalization. All panels use individual color scales, so colors are compared
+within a panel rather than as absolute amplitudes across different panels.
+
+\subsection{Effect of the low-rank dimension}
+\label{subsec:maxwell-exp1}
+
+The low-rank experiment uses finite-direction far-field data generated by the
+full VIE solver for a cube centered at the origin with half-side length $0.4$ and contrast
+$\mathbf Q=0.2\mathbf Q_0$. We fix $k=15$ and $\delta=0.2$, and vary only the
+retained GPSWF dimension:
+\[
+\begin{array}{ccc}
+1&21&57\\
+71&237&496.
+\end{array}
+\]
+Each value ends at a complete angular multiplet. Small reconstruction spaces
+retain only coarse spatial structure, whereas larger spaces admit finer
+angular and radial information. Since the higher modes are less stable, this
+experiment also illustrates why increasing the nominal dimension does not
+necessarily improve a noisy reconstruction.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.96\textwidth]
+    {outputs/exp1/exp1_dimension_individual_scale.png}
+    \caption{Reconstruction of the $Q_{11}$ cross-section for increasing ball
+    GPSWF dimensions. Here $k=15$ and $\delta=0.2$. Each panel uses its own
+    color scale.}
+    \label{fig:maxwell-exp1-dimension}
+\end{figure}
+
+\subsection{Robustness with respect to far-field noise}
+\label{subsec:maxwell-exp2}
+
+The noise experiment uses finite-direction full-VIE data for the three-block
+target with different complex amplitudes. We fix $k=15$ and use $\delta=0$,
+$0.2$, and $0.4$. The same noise-free data,
+measurement geometry, quadrature nodes, and GPSWF truncation are used in all
+three cases; a single complex Gaussian realization is merely rescaled to each
+prescribed noise level. The comparison therefore isolates the influence of
+far-field noise.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.96\textwidth]
+    {outputs/exp2/exp2_noise_individual_scale.png}
+    \caption{Reconstruction of the three-block phantom for relative far-field
+    noise levels $\delta=0,0.2,0.4$. Here $k=15$. Each panel uses its own color
+    scale.}
+    \label{fig:maxwell-exp2-noise}
+\end{figure}
+
+\subsection{Wavenumber and resolution}
+\label{subsec:maxwell-exp3}
+
+The resolution experiment uses finite-direction full-VIE data for the
+three-block target. We consider $k=5,6,7,8,10,15$ at the fixed noise level
+$\delta=0.2$. The number of
+measurement directions and the reconstruction quadrature are increased with
+$k$ to represent the expanding Fourier band, while the target, six
+polarimetric configurations, and noise model remain unchanged.
+
+For a wavenumber $k$, the half wavelength is $\pi/k$. If objects separated by
+less than $\pi/k$ remain distinguishable, the result is super-resolved relative
+to that single frequency. Increasing $k$ enlarges the accessible Fourier band
+and the effective rank of the continuous operator. However, the number of
+modes that can be carried stably by the discrete system is also limited by the
+measurement density, polarimetric conditioning, and noise. The comparison is
+therefore interpreted through both bandwidth and stable spectral content,
+rather than by assuming that every additional high-frequency mode is useful.
+In particular, at $k=8$ the half wavelength is $\pi/8\approx0.393$, which is
+larger than the minimum separation $0.20$, whereas the three blocks are already
+distinguishable in Figure~\ref{fig:maxwell-exp3-frequency}. The reconstruction
+therefore exhibits super-resolution relative to this single-frequency
+criterion.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.96\textwidth]
+    {outputs/exp3/exp3_frequency_individual_scale.png}
+    \caption{Reconstruction of three closely spaced blocks for different
+    wavenumbers. The minimum boundary separation is $0.20$ and
+    $\delta=0.2$. Each panel uses its own color scale.}
+    \label{fig:maxwell-exp3-frequency}
+\end{figure}
+
+
+\subsection{In comparison with Fourier basis and Bessel basis}
+\label{subsec:maxwell-basis-comparison}
+
+We next compare GPSWF reconstruction with a cube Fourier basis and a
+spherical-harmonic Bessel basis. The comparison uses the same three-block
+target, finite-direction full-VIE far-field data, recovered Fourier samples, and
+quadrature nodes for all methods. We take $k=8,12,15$ and $\delta=0.2$; hence
+the only change is the representation used to map the recovered Fourier data
+to physical space.
+
+The cube Fourier basis is natural on an enclosing Cartesian box but is not
+adapted to the spherical support. The Bessel basis respects the ball geometry,
+although it is not diagonal for the restricted Fourier operator. In contrast,
+the GPSWF basis is adapted simultaneously to the ball and to the observable
+Fourier band. The three methods are compared with comparable retained
+dimensions and the same weighted data fit. Figure~\ref{fig:maxwell-exp4-bases}
+provides this basis comparison.
+
+The reconstructions show that GPSWF provides visibly higher spatial resolution
+than the two alternative bases. At $k=8$, the cube Fourier reconstruction
+merges the three blocks into an essentially unresolved response, while GPSWF
+already separates their supports. At $k=15$, the GPSWF reconstruction also
+produces boundaries closer to the square geometry than the spherical Bessel
+reconstruction. Its background is cleaner, with weaker diffuse and oscillatory
+artifacts away from the target.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]
+    {outputs/exp4/exp4_basis_individual_scale.png}
+    \caption{Comparison of GPSWF, cube Fourier, and spherical Bessel
+    reconstructions for $k=8,12,15$ at the relative far-field noise level
+    $\delta=0.2$. Every panel has an independent color scale.}
+    \label{fig:maxwell-exp4-bases}
+\end{figure}
+
+
+\subsection{In comparison with DSM method}
+\label{subsec:maxwell-dsm-comparison}
+
+Direct sampling methods form images by correlating the data with the phase
+pattern associated with a sampling point. We consider two variants, according
+to whether the correlation is applied before or after polarimetric recovery.
+For a nonnegative function $f$ on $B$, write
+\[
+    \mathcal N[f](\mathbf z)
+    =\frac{f(\mathbf z)}{\max_{\boldsymbol\zeta\in B}f(\boldsymbol\zeta)}
+\]
+for spatial normalization.
+
+\subsubsection{DSM from far field data}
+\label{subsubsec:maxwell-farfield-dsm}
+
+Let $\mathbf g^\delta(2k\mathbf p_s)$ be the stacked noisy far-field channels
+at the Fourier node $\mathbf p_s$, and let $\mathbf M(2k\mathbf p_s)$ be the
+corresponding polarimetric matrix. A far-field DSM is defined by
+\begin{equation}
+    I_{\mathrm{DSM}}^{\mathrm{FF}}(\mathbf z)
+    =\mathcal N\!\left[
+      \left\|
+      \sum_s w_s\mathbf M(2k\mathbf p_s)^*
+      \mathbf g^\delta(2k\mathbf p_s)
+      \exp\!\left(-\mathrm i C\mathbf p_s\cdot\mathbf z\right)
+      \right\|_2
+    \right],
+    \label{eq:maxwell-farfield-dsm}
+\end{equation}
+where $w_s$ are the Fourier-quadrature weights. The adjoint matrix maps the
+measured polarization channels back to the tensor coefficient space. The
+phase factors compensate the propagation phase, so contributions from
+different nodes add coherently near a target point. This construction avoids
+an explicit Moore--Penrose inversion of the polarimetric system.
+
+\subsubsection{DSM from \texorpdfstring{$\widehat Q$}{Q-hat}}
+\label{subsubsec:maxwell-qhat-dsm}
+
+After polarimetric recovery, the same idea can be applied to a Fourier tensor
+component. For the displayed component, we use
+\begin{equation}
+    I_{\mathrm{DSM}}^{\widehat Q}(\mathbf z)
+    =\mathcal N\!\left[
+      \left|
+      \sum_s w_s\widehat Q_{11}^{\delta}(2k\mathbf p_s)
+      \exp\!\left(-\mathrm i C\mathbf p_s\cdot\mathbf z\right)
+      \right|
+    \right].
+    \label{eq:maxwell-qhat-dsm}
+\end{equation}
+For a tensor-valued indicator, the absolute value may be replaced by the
+Frobenius norm after summing all recovered components. Unlike
+\eqref{eq:maxwell-farfield-dsm}, this indicator contains the conditioning and
+regularization effects of the preceding polarimetric inversion.
+
+The distinction between DSM and GPSWF is especially transparent when both are
+written for the same perturbed Fourier data. For one component of the
+contrast, let
+\begin{equation}
+    Q=\sum_j q_j\psi_j,
+    \qquad
+    q_j=\langle Q,\psi_j\rangle_B,
+    \qquad
+    W=\mathcal F_CQ.
+    \label{eq:maxwell-dsm-gpswf-expansion}
+\end{equation}
+Since $\mathcal F_C\psi_j=\alpha_j\psi_j$, the exact Fourier data have the
+expansion
+\[
+    W=\sum_j\alpha_jq_j\psi_j.
+\]
+Let $e$ denote the total perturbation in the recovered Fourier data and set
+$e_j=\langle e,\psi_j\rangle_B$. Then
+\begin{equation}
+    W^\delta=W+e
+    =\sum_j\bigl(\alpha_jq_j+e_j\bigr)\psi_j.
+    \label{eq:maxwell-dsm-noisy-data}
+\end{equation}
+
+The ball Fourier operator is normal on the GPSWF basis, so that
+$\mathcal F_C^*\psi_j=\overline{\alpha_j}\psi_j$. The unnormalized
+backprojection underlying the $\widehat Q$-based DSM is therefore
+\begin{equation}
+\begin{aligned}
+    B_{\mathrm{DSM}}^\delta
+    :=\mathcal F_C^*W^\delta
+    &=\sum_j\overline{\alpha_j}
+      \bigl(\alpha_jq_j+e_j\bigr)\psi_j \\
+    &=\boxed{\sum_j
+      \left(|\alpha_j|^2q_j+\overline{\alpha_j}e_j\right)\psi_j}.
+\end{aligned}
+\label{eq:maxwell-dsm-normal-expansion}
+\end{equation}
+Thus DSM attenuates the $j$th signal mode by $|\alpha_j|^2$ and the
+corresponding data perturbation by $\overline{\alpha_j}$. Spatial normalization
+turns this stable backprojection into a support indicator, but it does not undo
+the attenuation of weakly observable modes.
+
+GPSWF reconstruction instead divides by the Fourier eigenvalues on the
+retained index set $J_\epsilon(C)$. For the same $W^\delta$, it gives
+\begin{equation}
+\begin{aligned}
+    Q_\epsilon^\delta
+    &=\sum_{j\in J_\epsilon(C)}
+      \frac{\langle W^\delta,\psi_j\rangle_B}{\alpha_j}\psi_j \\
+    &=\sum_{j\in J_\epsilon(C)}
+      \left(q_j+\frac{e_j}{\alpha_j}\right)\psi_j.
+\end{aligned}
+\label{eq:maxwell-gpswf-inverse-expansion}
+\end{equation}
+Hence GPSWF compensates for the forward attenuation on the retained modes, but
+it amplifies the perturbation by $1/\alpha_j$. The cutoff
+in~\eqref{eq:Q_cutoff} prevents division by small eigenvalues. This gives the
+essential spectral difference: DSM applies a stable normal-operator filter,
+whereas GPSWF applies a regularized inverse filter. For the far-field DSM, the
+same viewpoint holds with the additional polarimetric normal factor
+$\mathbf M(2k\mathbf p)^*\mathbf M(2k\mathbf p)$ before the spatial
+backprojection.
+
+The numerical comparison uses the same full-VIE data and three-block target as
+the resolution experiment in Section~\ref{subsec:maxwell-exp3}. Thus, the
+GPSWF reconstructions in Figure~\ref{fig:maxwell-exp3-frequency} and the two
+DSM results below use $k=5,6,7,8,10,15$, $\delta=0.2$, and the same acquisition
+and quadrature at each wavenumber. Comparing the two DSM variants separately
+shows the additional effect of polarimetric recovery without conflating it
+with the final imaging operator.
+
+Once the wavenumber is sufficiently large to resolve all three components, the
+normalized DSM indicators can follow the rectangular support more closely.
+However, both DSM variants retain appreciable background and sidelobe
+artifacts. In particular, an elevated response remains in the central region
+between the three blocks. The GPSWF reconstructions have a cleaner background
+and preserve darker valleys in the inter-block gaps, so the separation of the
+three supports is more explicit.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.96\textwidth]
+    {outputs/exp3/exp3_frequency_dsm.png}
+    \caption{Normalized DSM indicators formed from the recovered
+    $\widehat Q_{11}^{\delta}$ for different wavenumbers. The minimum boundary
+    separation is $0.20$ and $\delta=0.2$.}
+    \label{fig:maxwell-exp3-qhat-dsm}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.96\textwidth]
+    {outputs/exp3/exp3_frequency_farfield_dsm.png}
+    \caption{Normalized electromagnetic DSM indicators formed directly from
+    the far-field data for different wavenumbers. The minimum boundary
+    separation is $0.20$ and $\delta=0.2$.}
+    \label{fig:maxwell-exp3-farfield-dsm}
+\end{figure}
+
+\clearpage
+
+\section{Conclusion}
+
+The anisotropic electric Maxwell inverse problem separates naturally into two stages under the Born approximation.  The first stage is a finite-dimensional polarimetric inversion that recovers the tensor Fourier transform at each accessible Fourier point, provided the measurement design has sufficient rank.  The second stage is a compact restricted Fourier inversion on the unit ball, shared by every tensor component and regularized by GPSWF spectral cutoff.  The isotropic dielectric formula is obtained by setting the tensor contrast equal to a scalar multiple of the identity and applying a single polarization normalization.
+
+The corrected Sturm--Liouville formulation yields a reproducible computation of the three-dimensional ball GPSWFs and their Fourier eigenvalues.  The stability estimates show that the cutoff parameter controls the amplification of measurement, quadrature, polarimetric, and modeling errors, while the truncation term is governed by the GPSWF tail of the unknown tensor.  Together with the polarimetric and modal numerical tests, these results provide a mathematically explicit and reproducible foundation for low-rank anisotropic Maxwell far-field inversion.  The remaining computational extension is to couple the same inversion module to large-scale nonlinear Maxwell forward solvers for application-specific benchmarks.
+
+
+\appendix 
+
+\section{Full Maxwell data and Born modeling error}\label{sec:nonlinear}
+
+For full data, the exact far field is
+\begin{equation*}
+  \vect{E}^\infty(\hat{\vect{x}};\vect{d},\vect{e};k)=\frac{k^2}{4\pi}\tens{P}_{\hat{\vect{x}}}
+  \int_D\exp(-\ii k\hat{\vect{x}}\cdot \vect{y})\Qt(\vect{y})\vect{E}(\vect{y};\vect{d},\vect{e};k)\dd \vect{y} .
+\end{equation*}
+Writing $\vect{E}=\vect{E}^{\rm i}+\vect{E}^{\rm s}$ gives
+\begin{equation*}
+  \vect{E}^\infty=\vect{E}_b^\infty+\mathcal{E}_{\mathrm{nl}}^\infty,
+\end{equation*}
+where
+\begin{equation}\label{eq:nonlinear_farfield}
+  \mathcal{E}_{\mathrm{nl}}^\infty(\hat{\vect{x}};\vect{d},\vect{e};k)=\frac{k^2}{4\pi}\tens{P}_{\hat{\vect{x}}}
+  \int_D\exp(-\ii k\hat{\vect{x}}\cdot \vect{y})\Qt(\vect{y})\vect{E}^{\rm s}(\vect{y};\vect{d},\vect{e};k)\dd \vect{y} .
+\end{equation}
+Thus the proposed inversion applied to full Maxwell data should be interpreted as a Born-regularized reconstruction with a modeling-error term.
+
+Let
+\begin{equation*}
+  (\mathcal V_k\vect{F})(\vect{x})=\int_D\G_k(\vect{x}-\vect{y})\vect{F}(\vect{y})\dd \vect{y},
+  \qquad \vect{x}\in D .
+\end{equation*}
+The operator $\mathcal V_k\Qt$ maps $\vect{F}$ to $\mathcal V_k(\Qt\vect{F})$.
+
+\begin{proposition}[Small-contrast Born modeling error]\label{prop:born_error}
+Assume
+\begin{equation*}
+  \rho=k^2\norm{\mathcal V_k\Qt}_{L^2(D)^3\to L^2(D)^3}<1.
+\end{equation*}
+Then
+\begin{equation*}
+  \norm{\vect{E}^{\rm s}}_{L^2(D)^3}\le \frac{\rho}{1-\rho}\norm{\vect{E}^{\rm i}}_{L^2(D)^3}.
+\end{equation*}
+Consequently,
+\begin{equation*}
+  \norm{\mathcal{E}_{\mathrm{nl}}^\infty}_{L^2(\Sph^2)^3}
+  \le C(k,D)\norm{\Qt}_{L^\infty(D)}\frac{\rho}{1-\rho}\norm{\vect{E}^{\rm i}}_{L^2(D)^3},
+\end{equation*}
+where $C(k,D)$ is the operator norm of the far-field source map $\mathcal A_k:L^2(D)^3\to L^2(\Sph^2)^3$ defined in the proof.
+\end{proposition}
+
+\begin{proof}
+Restrict the volume integral equation to \(D\) and set
+\[
+  K=k^2\mathcal V_k\Qt .
+\]
+Then
+\[
+  (I-K)\vect{E}=\vect{E}^{\rm i},
+  \qquad \norm{K}_{L^2(D)^3\to L^2(D)^3}=\rho<1 .
+\]
+The inverse exists by the Neumann series,
+\[
+  (I-K)^{-1}=\sum_{n=0}^{\infty}K^n,
+  \qquad
+  \norm{(I-K)^{-1}}\le \frac{1}{1-\rho},
+\]
+and hence
+\[
+  \norm{\vect{E}}_{L^2(D)^3}
+  \le \frac{1}{1-\rho}\norm{\vect{E}^{\rm i}}_{L^2(D)^3} .
+\]
+Since \(\vect{E}^{\rm s}=K\vect{E}\) on \(D\),
+\[
+  \norm{\vect{E}^{\rm s}}_{L^2(D)^3}
+  \le \rho\norm{\vect{E}}_{L^2(D)^3}
+  \le \frac{\rho}{1-\rho}\norm{\vect{E}^{\rm i}}_{L^2(D)^3},
+\]
+which proves the scattered-field estimate.
+
+Define the far-field source operator
+\[
+  (\mathcal A_k\vect{F})(\hat{\vect{x}})
+  =\frac{k^2}{4\pi}\tens{P}_{\hat{\vect{x}}}
+  \int_D e^{-\ii k\hat{\vect{x}}\cdot\vect{y}}\vect{F}(\vect{y})\dd\vect{y} .
+\]
+Then the nonlinear Born remainder can be written as
+\[
+  \mathcal E_{\mathrm{nl}}^\infty=\mathcal A_k(\Qt\vect{E}^{\rm s}) .
+\]
+The kernel of \(\mathcal A_k\) is smooth and bounded on \(\Sph^2\times D\), so \(\mathcal A_k:L^2(D)^3\to L^2(\Sph^2)^3\) is bounded.  Therefore
+\[
+  \norm{\mathcal E_{\mathrm{nl}}^\infty}_{L^2(\Sph^2)^3}
+  \le \norm{\mathcal A_k}\norm{\Qt\vect{E}^{\rm s}}_{L^2(D)^3}
+  \le C(k,D)\norm{\Qt}_{L^\infty(D)}\norm{\vect{E}^{\rm s}}_{L^2(D)^3} .
+\]
+Substitution of the preceding scattered-field bound gives the claimed far-field modeling-error estimate.
+\end{proof}
+
+Combining Proposition~\ref{prop:born_error} with Theorem~\ref{thm:tensor_stability} yields the operational error estimate
+\begin{equation}\label{eq:combined_error}
+  \norm{\Qt_{R,\epsilon}^\delta-\Qt_R}_{L^2(B_1;\C^{3\times3})}
+  \le \frac{\delta_{\mathrm{meas}}+\delta_{\mathrm{pol}}+\delta_{\mathrm{quad}}+
+\norm{\mathcal{E}_{\mathrm{nl}}}_{L^2(B_1)}}{\epsilon}
+  +\left(\sum_{j\notin J_\epsilon}\norm{\tens{Q}_j}_{\Frob}^2\right)^{1/2}.
+\end{equation}
+Here $\delta_{\mathrm{pol}}$ includes the condition-number amplification from $\Mt(\vect{\xi})$, and $\mathcal{E}_{\mathrm{nl}}$ denotes the scaled tensor Fourier error induced by \eqref{eq:nonlinear_farfield} after polarimetric inversion.
+
+
+\bibliographystyle{plain}
+\bibliography{ref}
+
+\end{document}

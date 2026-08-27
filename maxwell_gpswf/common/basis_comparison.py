@@ -615,6 +615,7 @@ def run_basis_comparison(
     figure_title: str,
     noise_level: float = 0.2,
     shared_noise_for_equal_k: bool = False,
+    include_dsm: bool = True,
 ) -> Any:
     """Run one basis comparison with explicit forward-source rows."""
     if not row_specs:
@@ -641,7 +642,7 @@ def run_basis_comparison(
 
     context_cache: dict[float, _BasisContext] = {}
     n_rows = len(forward_rows)
-    n_cols = 4
+    n_cols = 4 if include_dsm else 3
     fig, axes = plt.subplots(
         n_rows,
         n_cols,
@@ -838,51 +839,52 @@ def run_basis_comparison(
             valid_mask=context.disk_mask,
         ))
 
-        dsm_values, dsm_meta = direct_sampling_component_indicator(
-            component_data,
-            setup.target_nodes,
-            setup.target_weights,
-            context.grid_points,
-            C,
-            normalize=True,
-        )
-        dsm_rec = dsm_values.reshape(grid_size, grid_size)
-        dsm_rec[~context.disk_mask] = 0.0
-        truth_scale = max(float(np.nanmax(np.abs(context.truth))), 1e-14)
-        dsm_display = dsm_rec * truth_scale
-        dsm_image = np.real(dsm_display)
-        dsm_title = f"DSM\nnodes={dsm_meta.get('dsm_nodes', '?')}"
-        reconstruction_panels.append((dsm_image, dsm_title, context.disk_mask))
-        _imshow(
-            axes[row_index, 3],
-            dsm_image,
-            dsm_title,
-            context.vmin,
-            context.vmax,
-        )
-        dsm_case = _case_common(
-            forward_row,
-            experiment_number=experiment_number,
-            row_index=row_index,
-            column_index=3,
-            method="dsm",
-            noise_level=noise_level,
-            polarimetric_J=polarimetric_J,
-        )
-        dsm_case.update({
-            "case_id": _case_id(experiment_number, spec, "dsm"),
-            "support": "unit_ball",
-            "basis_modes": int(dsm_meta.get("dsm_nodes", 0)),
-            "target_nodes": int(setup.target_nodes.shape[0]),
-            "p_nodes": int(setup.target_nodes.shape[0]),
-            **dsm_meta,
-        })
-        diagnostic_rows.append(_baseline_diagnostics(
-            case=dsm_case,
-            image=dsm_display,
-            truth=context.truth,
-            valid_mask=context.disk_mask,
-        ))
+        if include_dsm:
+            dsm_values, dsm_meta = direct_sampling_component_indicator(
+                component_data,
+                setup.target_nodes,
+                setup.target_weights,
+                context.grid_points,
+                C,
+                normalize=True,
+            )
+            dsm_rec = dsm_values.reshape(grid_size, grid_size)
+            dsm_rec[~context.disk_mask] = 0.0
+            truth_scale = max(float(np.nanmax(np.abs(context.truth))), 1e-14)
+            dsm_display = dsm_rec * truth_scale
+            dsm_image = np.real(dsm_display)
+            dsm_title = f"DSM\nnodes={dsm_meta.get('dsm_nodes', '?')}"
+            reconstruction_panels.append((dsm_image, dsm_title, context.disk_mask))
+            _imshow(
+                axes[row_index, 3],
+                dsm_image,
+                dsm_title,
+                context.vmin,
+                context.vmax,
+            )
+            dsm_case = _case_common(
+                forward_row,
+                experiment_number=experiment_number,
+                row_index=row_index,
+                column_index=3,
+                method="dsm",
+                noise_level=noise_level,
+                polarimetric_J=polarimetric_J,
+            )
+            dsm_case.update({
+                "case_id": _case_id(experiment_number, spec, "dsm"),
+                "support": "unit_ball",
+                "basis_modes": int(dsm_meta.get("dsm_nodes", 0)),
+                "target_nodes": int(setup.target_nodes.shape[0]),
+                "p_nodes": int(setup.target_nodes.shape[0]),
+                **dsm_meta,
+            })
+            diagnostic_rows.append(_baseline_diagnostics(
+                case=dsm_case,
+                image=dsm_display,
+                truth=context.truth,
+                valid_mask=context.disk_mask,
+            ))
 
         axes[row_index, 0].set_ylabel(
             spec.label,

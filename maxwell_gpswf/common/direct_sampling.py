@@ -190,3 +190,79 @@ def direct_sampling_farfield_indicator(
         "farfield_weighted_max_abs": float(meta["coeff_max_abs"]),
     }
     return image, meta
+
+
+def direct_sampling_explicit_farfield_indicator(
+    farfield_data: np.ndarray,
+    p_nodes: np.ndarray,
+    weights: np.ndarray,
+    points: np.ndarray,
+    C: float,
+    incident_dirs: np.ndarray,
+    obs_dirs: np.ndarray,
+    *,
+    kind: str = "full",
+    block_size: int = 2048,
+    normalize: bool = True,
+) -> tuple[np.ndarray, dict[str, Any]]:
+    """Electromagnetic DSM using the dataset's actual direction pairs.
+
+    For node ``p_i`` and its measured channel vector ``g_i``, this computes
+
+        I(z) = ||sum_i w_i M_i^* g_i exp(i C p_i.z)||_2,
+
+    where ``M_i`` is assembled from the explicit incident and observation
+    directions.  This is required for finite-direction mock data, whose
+    direction pairs generally differ from the ideal pairs generated from
+    ``p_i``.
+    """
+    from common.polarimetric import build_polarimetric_matrix_from_directions
+
+    data = np.asarray(farfield_data, dtype=np.complex128)
+    nodes = np.asarray(p_nodes, dtype=float)
+    incident_dirs = np.asarray(incident_dirs, dtype=float)
+    obs_dirs = np.asarray(obs_dirs, dtype=float)
+    if data.ndim != 2 or data.shape[1] != 6:
+        raise ValueError("farfield_data must have shape (n_measurements, 6)")
+    if nodes.ndim != 2 or nodes.shape[1] != 3:
+        raise ValueError("p_nodes must have shape (n_nodes, 3)")
+    if incident_dirs.shape != obs_dirs.shape or incident_dirs.shape != (data.shape[0], 3):
+        raise ValueError("direction arrays must have shape (n_measurements, 3)")
+    n_nodes = nodes.shape[0]
+    if n_nodes <= 0 or data.shape[0] % n_nodes != 0:
+        raise ValueError("farfield_data rows must be a multiple of p_nodes")
+
+    configurations = data.shape[0] // n_nodes
+    adjoint_data = []
+    for idx in range(n_nodes):
+        rows = idx + np.arange(configurations) * n_nodes
+        matrix = build_polarimetric_matrix_from_directions(
+            incident_dirs[rows], obs_dirs[rows], kind
+        )
+        adjoint_data.append(matrix.conj().T @ data[rows].reshape(-1))
+    adjoint_data_array = np.asarray(adjoint_data, dtype=np.complex128)
+
+    image, tensor_meta = direct_sampling_tensor_indicator(
+        adjoint_data_array,
+        nodes,
+        weights,
+        points,
+        C,
+        block_size=block_size,
+        normalize=normalize,
+    )
+    return image, {
+        "em_dsm_nodes": int(n_nodes),
+        "em_dsm_configurations": int(configurations),
+        "em_dsm_channels": int(6 * configurations),
+        "em_dsm_adjoint_components": int(adjoint_data_array.shape[1]),
+        "em_dsm_normalized": int(bool(normalize)),
+        "em_dsm_raw_max": float(tensor_meta["dsm_raw_max"]),
+        "em_dsm_raw_l2": float(tensor_meta["dsm_raw_l2"]),
+        "farfield_data_norm": vector_norm(data),
+        "farfield_data_max_abs": float(np.max(np.abs(data))) if data.size else float("nan"),
+        "farfield_adjoint_data_norm": float(tensor_meta["data_norm"]),
+        "farfield_adjoint_data_max_abs": float(tensor_meta["data_max_abs"]),
+        "farfield_weighted_norm": float(tensor_meta["coeff_norm"]),
+        "farfield_weighted_max_abs": float(tensor_meta["coeff_max_abs"]),
+    }

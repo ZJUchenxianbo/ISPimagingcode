@@ -2,8 +2,7 @@
 # -*- coding: utf-8 -*-
 """Experiment 2: Noise effects with three-block phantom.
 
-Layout: 1 row x 3 cols = 3 reconstructions (no truth column).
-  Noise = 0, 0.2, 0.4
+Layout: 1 row x 4 cols = truth followed by noise = 0, 0.2, 0.4.
 
 Data: Full VIE far-field, mock measurement mode, k=15.
 Truncation: three-layer (GPSWF params -> epsilon=0.2 -> N_cap=C^2/2).
@@ -121,15 +120,17 @@ def run_experiment(config: ExperimentConfig) -> Any:
     target_basis = modal_matrix(target_nodes, modes, fourier_side=True)
     image_matrix = modal_matrix(grid_points, modes, fourier_side=False)
 
-    # -- Plot: 1 row x 3 cols --
-    N_rows = 1; N_cols = 3
+    # -- Plot: truth followed by the three noise levels --
+    N_rows = 1; N_cols = 4
     fig, axes = plt.subplots(N_rows, N_cols,
                              figsize=(3.1 * N_cols, 3.1 * N_rows),
                              constrained_layout=True)
     if N_rows == 1:
         axes = axes[None, :] if axes.ndim == 1 else axes
     diagnostic_rows: list[dict[str, Any]] = []
-    reconstruction_panels: list[tuple[np.ndarray, str]] = []
+    truth_real = np.real(truth)
+    reconstruction_panels: list[tuple[np.ndarray, str]] = [(truth_real, "Truth")]
+    _imshow(axes[0, 0], truth_real, "Truth", vmin, vmax)
 
     standard_noise = (
         rng.normal(size=ds.farfield_data.shape)
@@ -156,7 +157,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
                 "experiment": 2,
                 "case_id": f"noise{noise_level:g}",
                 "row": 0,
-                "column": int(col_idx),
+                "column": int(col_idx + 1),
                 "k": float(k),
                 "C": float(C),
                 "K": int(K_val),
@@ -195,7 +196,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
         title = f"noise={noise_level:g}"
         real_rec = np.real(rec)
         reconstruction_panels.append((real_rec, title))
-        _imshow(axes[0, col_idx], real_rec, title, vmin, vmax)
+        _imshow(axes[0, col_idx + 1], real_rec, title, vmin, vmax)
 
     retained_N = int(np.sum(retained))
     fig.supylabel(f"k = {k:g}, N = {retained_N}", fontsize=10)

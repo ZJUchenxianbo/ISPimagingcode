@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Experiment 4: compare four reconstruction methods across wavenumbers.
+"""Experiment 4: compare three reconstruction methods across wavenumbers.
 
 Rows use ``k = 8, 12, 15``.  Every row is generated from finite-direction
 Full VIE far-field data with relative far-field noise 0.2.  Columns are GPSWF,
-cube Fourier, ball Bessel, and DSM.
+cube Fourier, and ball Bessel.
 """
 from __future__ import annotations
 
@@ -32,6 +32,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
         figure_title="noise = 0.2",
         noise_level=0.2,
         shared_noise_for_equal_k=False,
+        include_dsm=False,
     )
 
 

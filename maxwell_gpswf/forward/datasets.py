@@ -489,6 +489,7 @@ def farfield_dataset_to_qhat(
     noise_level: float = 0.0,
     rng: np.random.Generator | None = None,
     standard_noise: np.ndarray | None = None,
+    prepared_farfield_data: np.ndarray | None = None,
 ) -> np.ndarray:
     """Polarimetric recovery: g(p) → pinv(M(p)) → c(p).
 
@@ -498,10 +499,25 @@ def farfield_dataset_to_qhat(
 
     Returns coefficients of shape ``(n_p, n_coeffs)``.
     """
-    from common.utils import complex_relative_noise
-
     p_nodes = dataset.p_nodes
-    inc = dataset.incident_dirs; obs = dataset.obs_dirs; g_raw = dataset.farfield_data
+    inc = dataset.incident_dirs; obs = dataset.obs_dirs
+    if prepared_farfield_data is None:
+        g_raw = farfield_data_with_relative_noise(
+            dataset,
+            noise_level,
+            rng=rng,
+            standard_noise=standard_noise,
+        )
+    else:
+        if rng is not None or standard_noise is not None:
+            raise ValueError(
+                "rng and standard_noise cannot be used with prepared_farfield_data"
+            )
+        g_raw = np.asarray(prepared_farfield_data, dtype=np.complex128)
+        if g_raw.shape != dataset.farfield_data.shape:
+            raise ValueError(
+                "prepared_farfield_data must have the same shape as farfield_data"
+            )
     n_p = p_nodes.shape[0]
     n_meas = g_raw.shape[0]
     if n_p <= 0:
@@ -515,15 +531,6 @@ def farfield_dataset_to_qhat(
     ranks = np.empty(n_p, dtype=float)
     sigma_min = np.empty(n_p, dtype=float)
     condition_numbers = np.empty(n_p, dtype=float)
-
-    if standard_noise is not None:
-        standard_noise = np.asarray(standard_noise, dtype=np.complex128)
-        if standard_noise.shape != g_raw.shape:
-            raise ValueError("standard_noise must have the same shape as farfield_data")
-    if noise_level > 0.0 and rng is None and standard_noise is None:
-        raise ValueError(
-            "rng or standard_noise is required when noise_level is positive"
-        )
 
     for idx in range(n_p):
         rows = idx + np.arange(polarimetric_J) * n_p
@@ -544,19 +551,6 @@ def farfield_dataset_to_qhat(
                 f"required={n_coeffs}, polarimetric_J={polarimetric_J}"
             )
 
-        if noise_level > 0.0:
-            if standard_noise is None:
-                assert rng is not None
-                noise = complex_relative_noise(g_vec, noise_level, rng)
-            else:
-                eta = standard_noise[rows].reshape(-1)
-                eta_norm = max(float(np.linalg.norm(eta)), 1e-14)
-                noise = (
-                    eta / eta_norm
-                    * float(noise_level)
-                    * float(np.linalg.norm(g_vec))
-                )
-            g_vec = g_vec + noise
         recovered[idx] = np.linalg.pinv(M) @ g_vec
 
     dataset.metadata.update({
@@ -573,3 +567,53 @@ def farfield_dataset_to_qhat(
     })
 
     return recovered
+
+
+def farfield_data_with_relative_noise(
+    dataset: FarfieldDataset,
+    noise_level: float,
+    *,
+    rng: np.random.Generator | None = None,
+    standard_noise: np.ndarray | None = None,
+) -> np.ndarray:
+    """Return raw far-field data with node-wise relative complex noise.
+
+    Each target Fourier node and all its polarimetric configurations form one
+    channel vector.  Its noise norm is ``noise_level * ||g_i||``.  Keeping this
+    operation separate lets multiple inversion/imaging methods consume exactly
+    the same noisy measurement realization.
+    """
+    from common.utils import complex_relative_noise
+
+    clean = np.asarray(dataset.farfield_data, dtype=np.complex128)
+    noisy = clean.copy()
+    n_p = int(dataset.p_nodes.shape[0])
+    if n_p <= 0:
+        return noisy
+    if clean.shape[0] % n_p != 0:
+        raise ValueError("farfield_data rows must be a multiple of p_nodes")
+    if standard_noise is not None:
+        standard_noise = np.asarray(standard_noise, dtype=np.complex128)
+        if standard_noise.shape != clean.shape:
+            raise ValueError("standard_noise must have the same shape as farfield_data")
+    if noise_level > 0.0 and rng is None and standard_noise is None:
+        raise ValueError("rng or standard_noise is required when noise_level is positive")
+
+    polarimetric_J = clean.shape[0] // n_p
+    for idx in range(n_p):
+        rows = idx + np.arange(polarimetric_J) * n_p
+        clean_vector = clean[rows].reshape(-1)
+        if noise_level <= 0.0:
+            continue
+        if standard_noise is None:
+            assert rng is not None
+            noise = complex_relative_noise(clean_vector, noise_level, rng)
+        else:
+            eta = standard_noise[rows].reshape(-1)
+            noise = (
+                eta / max(float(np.linalg.norm(eta)), 1e-14)
+                * float(noise_level)
+                * float(np.linalg.norm(clean_vector))
+            )
+        noisy[rows] = (clean_vector + noise).reshape(polarimetric_J, 6)
+    return noisy

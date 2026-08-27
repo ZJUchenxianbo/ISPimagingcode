@@ -2,10 +2,9 @@
 # -*- coding: utf-8 -*-
 """Experiment 1: Truncation dimension effects with a single cube block.
 
-Layout: 3 rows x 3 cols = 9 reconstructions (no truth column).
-  Row 1: N = 1, 5, 21
-  Row 2: N = 35, 57, 71
-  Row 3: N = 135, 237, 496
+Layout: 2 rows x 3 cols.
+  Row 1: N = 1, 21, 57
+  Row 2: N = 71, 237, 496
 
 Data: Full VIE far-field, finite-direction mock measurement mode, k=15,
 far-field noise=0.2, and tensor contrast Q(x)=0.2 Q0 inside the cube.
@@ -56,9 +55,8 @@ from forward.datasets import (
 def _settings(quick: bool):
     """Return (n_measure, n_radial, n_angular, grid_size, n_per_axis, N_values, quad_order, r_eval)."""
     if quick:
-        # Smaller N set, lighter quadrature
-        return 110, 10, 170, 51, 7, [1, 5, 21, 35, 57, 71, 135, 135, 135], 100, 80
-    return 974, 12, 230, 161, 23, [1, 5, 21, 35, 57, 71, 135, 237, 496], 160, 120
+        return 110, 10, 170, 51, 7, [1, 21, 57, 71, 237, 496], 100, 80
+    return 974, 12, 230, 161, 23, [1, 21, 57, 71, 237, 496], 160, 120
 
 
 def _relative_error(values: np.ndarray, reference: np.ndarray) -> float:
@@ -294,11 +292,12 @@ def run_experiment(config: ExperimentConfig) -> Any:
     target_basis = modal_matrix(target_nodes, modes, fourier_side=True)
     image_matrix = modal_matrix(grid_points, modes, fourier_side=False)
 
-    # -- Plot: 3 rows x 3 cols --
-    N_rows = 3; N_cols = 3
+    # -- Plot: six truncation dimensions in two rows and three columns --
+    N_rows = 2; N_cols = 3
     fig, axes = plt.subplots(N_rows, N_cols,
                              figsize=(3.1 * N_cols, 3.1 * N_rows),
                              constrained_layout=True)
+    axes = np.asarray(axes).reshape(N_rows, N_cols)
     diagnostic_rows: list[dict[str, Any]] = []
     reconstruction_panels: list[tuple[np.ndarray, str]] = []
 
@@ -400,6 +399,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
         figsize=(3.8 * N_cols, 3.1 * N_rows),
         constrained_layout=True,
     )
+    adaptive_axes = np.asarray(adaptive_axes).reshape(N_rows, N_cols)
     for flat_idx, (image, title) in enumerate(reconstruction_panels):
         ax = adaptive_axes[flat_idx // N_cols, flat_idx % N_cols]
         valid_values = image[disk_mask]

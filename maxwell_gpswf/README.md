@@ -69,8 +69,10 @@ p = (d - xhat) / 2
 | `exp1` | 比较 GPSWF 保留维数 `N` | 单立方体，`Q=0.2 Q0` | Full VIE | `0.2` |
 | `exp2` | 比较噪声影响 | 最小间距 `0.20` 的三方块 | Full VIE | `0, 0.2, 0.4` |
 | `exp3` | 比较波数、分辨率及 GPSWF/DSM | 最小间距 `0.20` 的三方块 | Full VIE | `0.2` |
-| `exp4` | 比较 GPSWF/Fourier/Bessel/DSM | 最小间距 `0.20` 的三方块 | Full VIE | `0.2` |
+| `exp4` | 比较 GPSWF/Fourier/Bessel | 最小间距 `0.20` 的三方块 | Full VIE | `0.2` |
 | `exp5` | 比较正向数据源及其反演结果 | 最小间距 `0.20` 的三方块 | Analytic Born / Discrete VIE-Born / Full VIE | `0.2` |
+
+实验 1 的六个截断维数按 `2×3` 排列：第一行为 `N=1, 21, 57`，第二行为 `N=71, 237, 496`。实验 3 的六个波数也按 `2×3` 排列：第一行为 `5, 6, 7`，第二行为 `8, 10, 15`；GPSWF、individual-scale 和两种 DSM 图均使用这一布局。
 
 五个实验的完整公式、参数表和 individual-scale 图像见 [output_guide.tex](output_guide.tex)。
 实验 2--5 共用同一组三方块几何，其最小边界间距为 `0.20`。
@@ -88,12 +90,12 @@ Full VIE 远场、噪声和极化恢复后的 `Qhat_11`。
 
 | `k` | `n_per_axis` | `requested_measure_dirs` |
 |---:|---:|---:|
-| 4 | 11 | 170 |
+| 5 | 11 | 230 |
 | 6 | 11 | 302 |
+| 7 | 12 | 350 |
 | 8 | 13 | 434 |
 | 10 | 16 | 590 |
 | 15 | 23 | 974 |
-| 20 | 31 | 1730 |
 
 其中 Full VIE 网格以实验 1 的 `k=15, n_per_axis=23` 保持近似相同的
 每波长网格密度；方向数以 `k=15, 974` 为锚点近似按 `k^(3/2)` 增长，
@@ -103,7 +105,7 @@ Full VIE 远场、噪声和极化恢复后的 `Qhat_11`。
 
 实验 4 在 `k=8,12,15` 时分别使用 `n_per_axis=13,19,23` 和
 `requested_measure_dirs=434,770,974`；`k=15` 的 GPSWF 设置与实验 1
-一致。每一行的 GPSWF、Fourier、Bessel 和 DSM 仍共享同一份 Full VIE
+一致。每一行的 GPSWF、Fourier 和 Bessel 仍共享同一份 Full VIE
 数据。
 实验 5 固定 `k=12`，三类数据共用方向配置、极化矩阵、标准复高斯噪声样本、
 目标求积节点和四种重构参数。正式 Full VIE 使用 `n_per_axis=14`，形成
@@ -123,19 +125,25 @@ outputs/exp*/exp*_diagnostics_detail.npz # 详细压缩诊断
 outputs/exp*/exp*_diagnostic_curves.png  # 稳定性与泄漏曲线
 outputs/exp3/exp3_frequency_dsm.png       # 实验 3 DSM 波数对照图
 outputs/exp3/exp3_dsm_diagnostics.csv    # 实验 3 DSM 诊断
+outputs/exp3/exp3_frequency_farfield_dsm.png # 实验 3 原始远场 EM-DSM 对照图
+outputs/exp3/exp3_farfield_dsm_diagnostics.csv # 原始远场 EM-DSM 诊断
 outputs/exp1/exp1_full_vs_born_diagnostics.png
 outputs/exp1/exp1_forward_model_diagnostics.csv
 outputs/exp1/exp1_forward_model_diagnostics_detail.npz
 ```
+
+实验 2 的成像图按 `Truth | noise=0 | noise=0.2 | noise=0.4` 单行排列。
+实验 2--5 的三方块 phantom 统一使用实验 1 的弱对比度标准，即在原有三块相对复振幅不变的前提下整体乘以 `0.2`。
+实验 3 同时输出两种 DSM：`exp3_frequency_dsm.png` 使用极化伪逆恢复后的 `Qhat_11`；`exp3_frequency_farfield_dsm.png` 直接计算 `M_i^* g_i`。两者使用同一份 Full VIE 远场数据和完全相同的噪声实现。
 
 主要诊断包括 `retained_modes`、`target_nodes_per_retained_modes`、`mock_distance_mean/max/p95`、极化矩阵秩与条件数、GPSWF Gram 矩阵条件数、系数范数、目标区域幅值和背景 95% 分位幅值。实验 5 还记录相对 Analytic Born 的远场与极化恢复后 `Qhat` 误差，以及 Full VIE 的体素数、未知量数、唯一入射方向数、右端项数和抽样线性残差。
 
 正式 Full VIE 的开销随体素数快速增长。实验 1、2 以及实验 3、4 的
 `k=15` 行使用 `n_per_axis=23`，约有 6403 个体素和 19209 个复电场未知量，
 单个稠密复矩阵约占 `5.50 GiB`；LU 分解还需要额外内存。实验 3 的
-`k=20` 行使用 `n_per_axis=31`，约有 15515 个体素和 46545 个未知量，
-单个稠密复矩阵约占 `32.28 GiB`，LU 分解及 1730 个候选方向带来的计算
-还需要更多资源。因此正式 `all` 只适合在高内存服务器运行。`--quick`
+波数序列为 `5, 6, 7, 8, 10, 15`，不再包含原先内存压力最大的 `k=20`；
+因此当前实验 3 的最大 VIE 网格也是 `k=15, n_per_axis=23`。正式运行仍需
+为稠密 LU 分解预留额外内存。`--quick`
 中的粗 VIE 网格和固定 110 个方向只验证代码链路，不用于评价正式 Full VIE
 精度或成像效果。
 

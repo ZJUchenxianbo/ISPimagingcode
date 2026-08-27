@@ -99,6 +99,7 @@ from common.spherical_bessel import (
 
 from common.direct_sampling import (
     direct_sampling_component_indicator,
+    direct_sampling_explicit_farfield_indicator,
     direct_sampling_farfield_indicator,
     direct_sampling_tensor_indicator,
 )

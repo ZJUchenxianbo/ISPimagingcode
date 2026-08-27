@@ -23,6 +23,8 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
+# 数据缓存文件 #
+*cache
 
 # 其它文件
 *.txt
