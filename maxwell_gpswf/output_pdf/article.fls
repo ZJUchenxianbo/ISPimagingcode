@@ -431,8 +431,6 @@ INPUT d:/texlive/2026/texmf-dist/fonts/tfm/public/lm/rm-lmssbx10.tfm
 INPUT d:/texlive/2026/texmf-dist/fonts/tfm/public/lm/ec-lmri10.tfm
 INPUT d:/texlive/2026/texmf-dist/fonts/tfm/public/lm/ec-lmr9.tfm
 INPUT d:/texlive/2026/texmf-dist/fonts/tfm/public/lm/ec-lmbx12.tfm
-INPUT d:/texlive/2026/texmf-dist/fonts/tfm/public/lm/ec-lmr8.tfm
-INPUT d:/texlive/2026/texmf-dist/fonts/tfm/public/lm/ec-lmr6.tfm
 INPUT ./outputs/exp1/exp1_dimension_individual_scale.png
 INPUT ./outputs/exp1/exp1_dimension_individual_scale.png
 INPUT ./outputs/exp1/exp1_dimension_individual_scale.png
@@ -445,12 +443,12 @@ INPUT ./outputs/exp3/exp3_frequency_individual_scale.png
 INPUT ./outputs/exp4/exp4_basis_individual_scale.png
 INPUT ./outputs/exp4/exp4_basis_individual_scale.png
 INPUT ./outputs/exp4/exp4_basis_individual_scale.png
-INPUT ./outputs/exp3/exp3_frequency_dsm.png
-INPUT ./outputs/exp3/exp3_frequency_dsm.png
-INPUT ./outputs/exp3/exp3_frequency_dsm.png
 INPUT ./outputs/exp3/exp3_frequency_farfield_dsm.png
 INPUT ./outputs/exp3/exp3_frequency_farfield_dsm.png
 INPUT ./outputs/exp3/exp3_frequency_farfield_dsm.png
+INPUT ./outputs/exp3/exp3_frequency_dsm.png
+INPUT ./outputs/exp3/exp3_frequency_dsm.png
+INPUT ./outputs/exp3/exp3_frequency_dsm.png
 INPUT maxwell_gpswf/output_pdf/article.aux
 INPUT maxwell_gpswf/output_pdf/article.out
 INPUT maxwell_gpswf/output_pdf/article.out

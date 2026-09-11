@@ -120,6 +120,70 @@ def three_tensor_block_phantom() -> list[TensorBlock]:
     ]
 
 
+def three_admissible_full_tensor_blocks() -> list[TensorBlock]:
+    """Three non-reciprocal passive tensor blocks for Experiment 6.
+
+    Each contrast is written as ``Q = H + i G`` with Hermitian ``H`` and
+    positive-definite Hermitian ``G``.  Hence ``I + H`` is coercive and
+    ``Im(Q) = (Q-Q*)/(2i) = G`` is positive semidefinite, while the nonzero
+    skew-Hermitian entries of ``H`` make ``Q.T != Q``.  The three matrices are
+    deliberately not scalar multiples, so all nine full-tensor coefficient
+    fields have genuinely different spatial patterns.
+    """
+    tensors = [
+        np.asarray(
+            [
+                [0.20 + 0.040j, 0.048j, -0.026j],
+                [-0.032j, 0.12 + 0.030j, 0.026j],
+                [0.034j, -0.014j, 0.08 + 0.025j],
+            ],
+            dtype=np.complex128,
+        ),
+        np.asarray(
+            [
+                [0.09 + 0.030j, -0.020j, 0.025j],
+                [0.030j, 0.22 + 0.045j, 0.041j],
+                [-0.011j, -0.029j, 0.14 + 0.035j],
+            ],
+            dtype=np.complex128,
+        ),
+        np.asarray(
+            [
+                [0.14 + 0.035j, 0.021j, 0.033j],
+                [-0.009j, 0.07 + 0.025j, -0.018j],
+                [-0.023j, 0.026j, 0.19 + 0.050j],
+            ],
+            dtype=np.complex128,
+        ),
+    ]
+    blocks = [
+        TensorBlock(
+            center=(-0.26, 0.25, 0.0),
+            half_width=(0.16, 0.16, 0.16),
+            tensor=tensors[0],
+        ),
+        TensorBlock(
+            center=(0.25, 0.25, 0.0),
+            half_width=(0.15, 0.15, 0.16),
+            tensor=tensors[1],
+        ),
+        TensorBlock(
+            center=(0.00, -0.25, 0.0),
+            half_width=(0.18, 0.14, 0.16),
+            tensor=tensors[2],
+        ),
+    ]
+    for index, block in enumerate(blocks, start=1):
+        diagnostics = tensor_material_diagnostics(block.tensor)
+        if diagnostics["coercivity_min_eigenvalue"] <= 0.0:
+            raise ValueError(f"tensor block {index} violates coercivity")
+        if diagnostics["passivity_min_eigenvalue"] < -1e-12:
+            raise ValueError(f"tensor block {index} violates passivity")
+        if diagnostics["transpose_asymmetry"] <= 1e-12:
+            raise ValueError(f"tensor block {index} is reciprocal/symmetric")
+    return blocks
+
+
 def ball_phantom(
     center: tuple[float, float, float] = (0.0, 0.0, 0.0),
     radius: float = 0.35,
@@ -213,6 +277,25 @@ def tensor_truth_image_2d(
     display: Literal["frobenius", "component"] = "frobenius",
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Generate a z=0 truth image for tensor-block phantoms."""
+    matrix_field, grid_points, disk_mask = tensor_truth_matrix_2d(grid_size, blocks)
+    if display == "frobenius":
+        truth = np.linalg.norm(matrix_field.reshape(grid_size, grid_size, 9), axis=2)
+        truth = truth.astype(np.complex128)
+    elif display == "component":
+        if component_index is None:
+            raise ValueError("component_index is required for component display")
+        coeff_field = tensor_coefficients_from_field(matrix_field, kind)
+        truth = coeff_field[:, :, int(component_index)]
+    else:
+        raise ValueError("display must be 'frobenius' or 'component'")
+    return truth, grid_points, disk_mask
+
+
+def tensor_truth_matrix_2d(
+    grid_size: int,
+    blocks: list[TensorBlock],
+) -> tuple[CArray, Array, NDArray[np.bool_]]:
+    """Return the complete ``3 x 3`` tensor truth on the ``z=0`` plane."""
     centers = np.linspace(-1.0, 1.0, grid_size)
     X, Y = np.meshgrid(centers, centers)
     matrix_field = np.zeros((grid_size, grid_size, 3, 3), dtype=np.complex128)
@@ -222,25 +305,10 @@ def tensor_truth_image_2d(
         if abs(cz) <= hz:
             mask = (np.abs(X - cx) <= hx) & (np.abs(Y - cy) <= hy)
             matrix_field[mask] += np.asarray(block.tensor, dtype=np.complex128)
-
-    if display == "frobenius":
-        truth = np.linalg.norm(matrix_field.reshape(grid_size, grid_size, 9), axis=2)
-        truth = truth.astype(np.complex128)
-    elif display == "component":
-        if component_index is None:
-            raise ValueError("component_index is required for component display")
-        coeff_field = np.zeros((grid_size, grid_size, len(tensor_basis(kind))), dtype=np.complex128)
-        for i in range(grid_size):
-            for j in range(grid_size):
-                coeff_field[i, j] = tensor_coefficients_from_matrix(matrix_field[i, j], kind)
-        truth = coeff_field[:, :, int(component_index)]
-    else:
-        raise ValueError("display must be 'frobenius' or 'component'")
-
     disk_mask = X**2 + Y**2 <= 1.0
-    truth[~disk_mask] = 0.0
+    matrix_field[~disk_mask] = 0.0
     grid_points = np.column_stack([X.reshape(-1), Y.reshape(-1), np.zeros(grid_size * grid_size)])
-    return truth, grid_points, disk_mask
+    return matrix_field, grid_points, disk_mask
 
 
 # ---------------------------------------------------------------------------
@@ -294,6 +362,70 @@ def tensor_coefficients_from_matrix(T: CArray, kind: TensorKind) -> CArray:
     if kind == "isotropic":
         return np.asarray([np.trace(T) / 3.0], dtype=np.complex128)
     raise ValueError("kind must be 'full', 'reciprocal', or 'isotropic'")
+
+
+def tensor_matrix_from_coefficients(coefficients: CArray, kind: TensorKind) -> CArray:
+    """Convert coefficient vectors in ``tensor_basis(kind)`` back to matrices.
+
+    The last input axis is the tensor-coefficient axis; arbitrary leading
+    axes are retained in the returned ``(..., 3, 3)`` array.
+    """
+    coefficients = np.asarray(coefficients, dtype=np.complex128)
+    basis = np.asarray(tensor_basis(kind), dtype=np.complex128)
+    if coefficients.ndim < 1 or coefficients.shape[-1] != basis.shape[0]:
+        raise ValueError(
+            f"last coefficient axis must have length {basis.shape[0]} for {kind!r}"
+        )
+    return np.einsum("...r,rab->...ab", coefficients, basis)
+
+
+def tensor_coefficients_from_field(field: CArray, kind: TensorKind) -> CArray:
+    """Convert a ``(..., 3, 3)`` tensor field to basis coefficients."""
+    field = np.asarray(field, dtype=np.complex128)
+    if field.ndim < 2 or field.shape[-2:] != (3, 3):
+        raise ValueError("field must have shape (..., 3, 3)")
+    if kind == "full":
+        return field.reshape(*field.shape[:-2], 9)
+    if kind == "reciprocal":
+        return np.stack(
+            [
+                field[..., 0, 0],
+                field[..., 1, 1],
+                field[..., 2, 2],
+                math.sqrt(2.0) * field[..., 0, 1],
+                math.sqrt(2.0) * field[..., 0, 2],
+                math.sqrt(2.0) * field[..., 1, 2],
+            ],
+            axis=-1,
+        )
+    if kind == "isotropic":
+        return (np.trace(field, axis1=-2, axis2=-1) / 3.0)[..., None]
+    raise ValueError("kind must be 'full', 'reciprocal', or 'isotropic'")
+
+
+def tensor_material_diagnostics(T: CArray) -> dict[str, float]:
+    """Return coercivity, passivity, and non-reciprocity diagnostics for ``Q``.
+
+    The manuscript assumptions are checked through the Hermitian parts of
+    ``epsilon_r = I + Q`` and of ``Q`` itself:
+
+    ``lambda_min(Hermitian(I+Q)) > 0`` and
+    ``lambda_min((Q-Q*)/(2i)) >= 0``.
+    """
+    T = np.asarray(T, dtype=np.complex128)
+    if T.shape != (3, 3):
+        raise ValueError("T must have shape (3, 3)")
+    epsilon_r = np.eye(3, dtype=np.complex128) + T
+    coercive_part = 0.5 * (epsilon_r + np.conj(epsilon_r).T)
+    dissipative_part = (T - np.conj(T).T) / (2.0j)
+    coercive_eigenvalues = np.linalg.eigvalsh(coercive_part)
+    passive_eigenvalues = np.linalg.eigvalsh(dissipative_part)
+    return {
+        "coercivity_min_eigenvalue": float(np.min(coercive_eigenvalues)),
+        "passivity_min_eigenvalue": float(np.min(passive_eigenvalues)),
+        "transpose_asymmetry": float(np.linalg.norm(T - T.T)),
+        "hermitian_asymmetry": float(np.linalg.norm(T - np.conj(T).T)),
+    }
 
 
 def reference_tensor(kind: TensorKind) -> CArray:

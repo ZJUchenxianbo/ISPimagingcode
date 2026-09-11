@@ -1,4 +1,4 @@
-This is XeTeX, Version 3.141592653-2.6-0.999998 (TeX Live 2026) (preloaded format=xelatex 2026.8.26)  27 AUG 2026 14:14
+This is XeTeX, Version 3.141592653-2.6-0.999998 (TeX Live 2026) (preloaded format=xelatex 2026.8.26)  28 AUG 2026 13:41
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -1118,32 +1118,25 @@ LaTeX Warning: Citation `IsaevNovikov2022' on page 9 undefined on input line 55
 [9] [10] [11] [12] [13] [14]
 Package hyperref Info: bookmark level for unknown algorithm defaults to 0 on in
 put line 867.
-
-Overfull \hbox (10.82169pt too wide) in paragraph at lines 901--908
-\T1/lmr/m/n/10.95 The nu-mer-i-cal study ex-am-ines low-rank trun-ca-tion, nois
-e sta-bil-ity, res-o-lu-tion at dif-fer-ent wavenum-
- []
-
-[15]
+ [15]
 File: outputs/exp1/exp1_dimension_individual_scale.png Graphic file (type bmp)
 <outputs/exp1/exp1_dimension_individual_scale.png>
+ [16]
 File: outputs/exp2/exp2_noise_individual_scale.png Graphic file (type bmp)
 <outputs/exp2/exp2_noise_individual_scale.png>
- [16] [17]
 File: outputs/exp3/exp3_frequency_individual_scale.png Graphic file (type bmp)
 <outputs/exp3/exp3_frequency_individual_scale.png>
+ [17]
 File: outputs/exp4/exp4_basis_individual_scale.png Graphic file (type bmp)
 <outputs/exp4/exp4_basis_individual_scale.png>
- [18] [19] [20]
-File: outputs/exp3/exp3_frequency_dsm.png Graphic file (type bmp)
-<outputs/exp3/exp3_frequency_dsm.png>
+ [18]
 File: outputs/exp3/exp3_frequency_farfield_dsm.png Graphic file (type bmp)
 <outputs/exp3/exp3_frequency_farfield_dsm.png>
- [21] [22] [23
-
-]
+File: outputs/exp3/exp3_frequency_dsm.png Graphic file (type bmp)
+<outputs/exp3/exp3_frequency_dsm.png>
+ [19] [20] [21] [22]
 No file article.bbl.
-[24] (maxwell_gpswf/output_pdf/article.aux)
+[23] (maxwell_gpswf/output_pdf/article.aux)
  ***********
 LaTeX2e <2026-06-01>
 L3 programming layer <2026-08-10>
@@ -1156,13 +1149,13 @@ Package rerunfilecheck Info: File `article.out' has not changed.
 (rerunfilecheck)             Checksum: 99D88030242D92911D528BCC7E2A0E3C;3876.
  ) 
 Here is how much of TeX's memory you used:
- 25290 strings out of 467745
- 467803 string characters out of 5425966
- 900713 words of memory out of 5000000
- 53986 multiletter control sequences out of 15000+600000
- 702281 words of font info for 92 fonts, out of 8000000 for 9000
+ 25285 strings out of 467745
+ 467733 string characters out of 5425966
+ 900741 words of memory out of 5000000
+ 53983 multiletter control sequences out of 15000+600000
+ 696301 words of font info for 90 fonts, out of 8000000 for 9000
  1348 hyphenation exceptions out of 8191
  117i,13n,121p,1484b,861s stack positions out of 10000i,1000n,20000p,200000b,200000s
 
-Output written on maxwell_gpswf/output_pdf/article.xdv (24 pages, 125696 bytes)
+Output written on maxwell_gpswf/output_pdf/article.xdv (23 pages, 124892 bytes)
 .

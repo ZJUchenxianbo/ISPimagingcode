@@ -116,6 +116,37 @@ def tensor_blocks_contrast(
     return Q
 
 
+def piecewise_tensor_blocks_contrast(
+    nodes: Array,
+    blocks: list[tuple[Array, Array, CArray]],
+) -> CArray:
+    """Write an independent ``3 x 3`` tensor into each axis-aligned block.
+
+    Each block is ``(center, half_width, tensor)``.  Overlapping blocks add,
+    matching :func:`tensor_blocks_contrast`; the Experiment 6 geometry is
+    disjoint, so every occupied voxel receives exactly one material tensor.
+    """
+    nodes = np.asarray(nodes, dtype=float)
+    if nodes.ndim != 2 or nodes.shape[1] != 3:
+        raise ValueError("nodes must have shape (n_nodes, 3)")
+
+    Q = np.zeros((nodes.shape[0], 3, 3), dtype=np.complex128)
+    for center, half_width, tensor in blocks:
+        center_vec = np.asarray(center, dtype=float)
+        half_width_vec = np.asarray(half_width, dtype=float)
+        block_tensor = np.asarray(tensor, dtype=np.complex128)
+        if center_vec.shape != (3,) or half_width_vec.shape != (3,):
+            raise ValueError("block center and half_width must have shape (3,)")
+        if block_tensor.shape != (3, 3):
+            raise ValueError("each block tensor must have shape (3, 3)")
+        mask = np.all(
+            np.abs(nodes - center_vec[None, :]) <= half_width_vec[None, :],
+            axis=1,
+        )
+        Q[mask] += block_tensor
+    return Q
+
+
 # ---------------------------------------------------------------------------
 # Incident field and dyadic Green tensor
 # ---------------------------------------------------------------------------

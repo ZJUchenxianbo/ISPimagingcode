@@ -29,6 +29,28 @@ def build_gpswf_modes(
     Returns ``modes`` of length ``n_modes_per_ell * (ell_max+1)²``, each
     with populated ``alpha`` and ``beta``.
     """
+    modes, _ = build_gpswf_modes_with_chi(
+        C,
+        K,
+        ell_max,
+        n_modes_per_ell,
+        quad_order,
+        r_eval_count,
+        cache_dir,
+    )
+    return modes
+
+
+def build_gpswf_modes_with_chi(
+    C: float,
+    K: int,
+    ell_max: int,
+    n_modes_per_ell: int,
+    quad_order: int,
+    r_eval_count: int,
+    cache_dir: Path,
+) -> tuple[list[Mode], dict[tuple[int, int], float]]:
+    """Build GPSWF modes together with their Sturm--Liouville eigenvalues."""
     alpha_df = collect_alpha_pairs_cached(
         C, K, ell_max, n_modes_per_ell, quad_order=quad_order,
         r_eval_count=r_eval_count, cache_dir=cache_dir,
@@ -38,13 +60,15 @@ def build_gpswf_modes(
         for _, row in alpha_df.iterrows()
     }
     modes: list[Mode] = []
+    chi_by_pair: dict[tuple[int, int], float] = {}
     for ell in range(ell_max + 1):
-        _, beta = solve_ball_gpswf(C, ell, K, n_modes=n_modes_per_ell)
+        chi, beta = solve_ball_gpswf(C, ell, K, n_modes=n_modes_per_ell)
         for n in range(beta.shape[1]):
             a = alpha_lookup[(ell, n)]
+            chi_by_pair[(ell, n)] = float(chi[n])
             for m in range(-ell, ell + 1):
                 modes.append(Mode(ell=ell, n=n, m=m, alpha=a, beta=beta[:, n]))
-    return modes
+    return modes, chi_by_pair
 
 
 def truncate_modes(
@@ -209,3 +233,73 @@ def gpswf_reconstruct_image(
     if disk_mask is not None:
         rec[~disk_mask] = 0.0
     return rec
+
+
+def gpswf_reconstruct_tensor(
+    tensor_data: np.ndarray,
+    target_basis: np.ndarray,
+    target_weights: np.ndarray,
+    modes: list[Mode],
+    retained: np.ndarray,
+    image_matrix: np.ndarray,
+    grid_size: int,
+    disk_mask: np.ndarray | None = None,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Project and reconstruct all tensor coefficients in one linear solve.
+
+    Parameters
+    ----------
+    tensor_data:
+        Complex Fourier coefficients with shape ``(n_nodes, n_components)``.
+
+    Returns
+    -------
+    reconstruction:
+        Complex coefficient images with shape
+        ``(grid_size, grid_size, n_components)``.
+    modal_coefficients:
+        Complex GPSWF coefficients with shape ``(n_modes, n_components)``.
+    """
+    data = np.asarray(tensor_data, dtype=np.complex128)
+    basis_matrix = np.asarray(target_basis, dtype=np.complex128)
+    weights = np.asarray(target_weights, dtype=float)
+    retained = np.asarray(retained, dtype=bool)
+    if data.ndim != 2:
+        raise ValueError("tensor_data must have shape (n_nodes, n_components)")
+    if basis_matrix.shape[0] != data.shape[0] or weights.shape != (data.shape[0],):
+        raise ValueError("tensor data, basis rows, and quadrature weights must agree")
+    if retained.shape != (len(modes),):
+        raise ValueError("retained must have shape (len(modes),)")
+    n_retained = int(np.sum(retained))
+    if n_retained == 0:
+        raise ValueError("at least one GPSWF mode must be retained")
+
+    A = basis_matrix[:, retained]
+    AWA = np.conj(A).T @ (weights[:, None] * A)
+    AWd = np.conj(A).T @ (weights[:, None] * data)
+    diagonal = np.diag(np.diag(AWA))
+    offdiag_ratio = np.linalg.norm(AWA - diagonal) / max(
+        np.linalg.norm(diagonal), 1e-14
+    )
+    if offdiag_ratio < 0.01:
+        alpha = np.asarray([mode.alpha for mode in modes], dtype=np.complex128)
+        retained_coefficients = AWd / (np.abs(alpha[retained]) ** 2)[:, None]
+    else:
+        regularization = 1e-10 * abs(complex(np.trace(AWA))) / n_retained
+        retained_coefficients = np.linalg.solve(
+            AWA
+            + regularization
+            * np.eye(n_retained, dtype=np.complex128),
+            AWd,
+        )
+
+    coefficients = np.zeros((len(modes), data.shape[1]), dtype=np.complex128)
+    coefficients[retained] = retained_coefficients
+    reconstruction = (np.asarray(image_matrix) @ coefficients).reshape(
+        grid_size,
+        grid_size,
+        data.shape[1],
+    )
+    if disk_mask is not None:
+        reconstruction[~np.asarray(disk_mask, dtype=bool)] = 0.0
+    return reconstruction, coefficients

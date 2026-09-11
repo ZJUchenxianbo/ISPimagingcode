@@ -9,9 +9,9 @@ maxwell_gpswf/
 ├── common/          # 配置、phantom、求积、极化恢复、GPSWF 与其他重构方法
 ├── forward/         # Analytic Born、Discrete VIE-Born 和 Full VIE 数据生成
 ├── nonlinear/       # 可复用的 BIM-GPSWF 非线性模块
-├── experiments/     # exp1-exp5 正式实验
+├── experiments/     # exp1-exp6 正式实验
 ├── main.py          # 统一入口
-├── output_guide.tex # 数值实验 LaTeX section
+├── article.tex      # 理论推导与数值实验稿件
 └── README.md
 ```
 
@@ -33,12 +33,13 @@ maxwell_gpswf/
 .venv/bin/python maxwell_gpswf/main.py --mode exp1 --out-dir outputs
 .venv/bin/python maxwell_gpswf/main.py --mode exp3 --out-dir outputs
 .venv/bin/python maxwell_gpswf/main.py --mode exp5 --out-dir outputs
+.venv/bin/python maxwell_gpswf/main.py --mode exp6 --out-dir outputs
 .venv/bin/python maxwell_gpswf/main.py --mode all --quick --out-dir outputs_smoke
 ```
 
-`--mode` 可取 `exp1`、`exp2`、`exp3`、`exp4`、`exp5` 或 `all`。由于
+`--mode` 可取 `exp1`、`exp2`、`exp3`、`exp4`、`exp5`、`exp6` 或 `all`。由于
 `exp1`--`exp4` 均包含稠密 Full VIE 求解，正式 `all` 计算量很大。
-`all` 仍只运行 `exp1`--`exp4`；实验 5 必须用 `--mode exp5` 显式运行。
+`all` 仍只运行 `exp1`--`exp4`；实验 5、6 必须显式运行。
 
 ## 统一数据流程
 
@@ -71,10 +72,11 @@ p = (d - xhat) / 2
 | `exp3` | 比较波数、分辨率及 GPSWF/DSM | 最小间距 `0.20` 的三方块 | Full VIE | `0.2` |
 | `exp4` | 比较 GPSWF/Fourier/Bessel | 最小间距 `0.20` 的三方块 | Full VIE | `0.2` |
 | `exp5` | 比较正向数据源及其反演结果 | 最小间距 `0.20` 的三方块 | Analytic Born / Discrete VIE-Born / Full VIE | `0.2` |
+| `exp6` | 联合恢复一般复张量的 9 个分量 | 三个区域分别使用不同的非对称 `3×3` 张量 | Full VIE | `0.2` |
 
 实验 1 的六个截断维数按 `2×3` 排列：第一行为 `N=1, 21, 57`，第二行为 `N=71, 237, 496`。实验 3 的六个波数也按 `2×3` 排列：第一行为 `5, 6, 7`，第二行为 `8, 10, 15`；GPSWF、individual-scale 和两种 DSM 图均使用这一布局。
 
-五个实验的完整公式、参数表和 individual-scale 图像见 [output_guide.tex](output_guide.tex)。
+完整理论公式和数值实验说明见 [article.tex](article.tex)。
 实验 2--5 共用同一组三方块几何，其最小边界间距为 `0.20`。
 实验 3 额外输出 `exp3_frequency_dsm.png`，它与 GPSWF 主图共用同一份
 Full VIE 远场、噪声和极化恢复后的 `Qhat_11`。
@@ -112,6 +114,17 @@ Full VIE 远场、噪声和极化恢复后的 `Qhat_11`。
 1472 个体素和 4416 个电场未知量；代码按唯一入射方向复用两个极化总场，
 但正式运行仍需要较多内存和时间。
 
+实验 6 沿用实验 4 的 `k=12` 离散参数（正式 Full VIE 使用
+`n_per_axis=19`、`requested_measure_dirs=770`），但不再使用
+`Q(x)=q(x)Q0` 的固定
+张量模板。三个方块分别使用不同、彼此不成比例且满足稿件 coercivity / passivity
+条件的非对称复张量。反演基底按行优先排列为
+`Q11,Q12,Q13,Q21,Q22,Q23,Q31,Q32,Q33`；每个 Fourier 节点必须通过秩为 9
+的极化系统，然后九个分量共用同一 GPSWF 截断集和 Gram 矩阵。正式 Full VIE
+计算量较高，`--quick` 只用于检查链路和输出，不用于评价重建精度。
+主图分别选取实部 `Q11,Q22,Q33` 和虚部 `Q12,Q21,Q23`；每个分量的真值与
+GPSWF 重建共享该分量自己的色标。完整九分量仍保存在详细 NPZ 和 CSV 诊断中。
+
 ## 极化恢复
 
 每个 target Fourier 节点从 24 个近邻候选方向配置中选取 `polarimetric_J=6` 组。每组方向对使用两个正交入射极化并保留远场向量的三个分量，因此一般 full tensor 对应 `36 x 9` 联合极化矩阵。代码要求列秩为 9，并记录最小奇异值和条件数。
@@ -130,13 +143,19 @@ outputs/exp3/exp3_farfield_dsm_diagnostics.csv # 原始远场 EM-DSM 诊断
 outputs/exp1/exp1_full_vs_born_diagnostics.png
 outputs/exp1/exp1_forward_model_diagnostics.csv
 outputs/exp1/exp1_forward_model_diagnostics_detail.npz
+outputs/exp6/exp6_tensor_components_real.png
+outputs/exp6/exp6_tensor_components_imag.png
+outputs/exp6/exp6_tensor_norm.png
+outputs/exp6/exp6_tensor_diagnostics.csv
+outputs/exp6/exp6_tensor_diagnostics_detail.npz
+outputs/exp6/metadata.json
 ```
 
 实验 2 的成像图按 `Truth | noise=0 | noise=0.2 | noise=0.4` 单行排列。
 实验 2--5 的三方块 phantom 统一使用实验 1 的弱对比度标准，即在原有三块相对复振幅不变的前提下整体乘以 `0.2`。
 实验 3 同时输出两种 DSM：`exp3_frequency_dsm.png` 使用极化伪逆恢复后的 `Qhat_11`；`exp3_frequency_farfield_dsm.png` 直接计算 `M_i^* g_i`。两者使用同一份 Full VIE 远场数据和完全相同的噪声实现。
 
-主要诊断包括 `retained_modes`、`target_nodes_per_retained_modes`、`mock_distance_mean/max/p95`、极化矩阵秩与条件数、GPSWF Gram 矩阵条件数、系数范数、目标区域幅值和背景 95% 分位幅值。实验 5 还记录相对 Analytic Born 的远场与极化恢复后 `Qhat` 误差，以及 Full VIE 的体素数、未知量数、唯一入射方向数、右端项数和抽样线性残差。
+主要诊断包括 `retained_modes`、`target_nodes_per_retained_modes`、`mock_distance_mean/max/p95`、极化矩阵秩与条件数、GPSWF Gram 矩阵条件数、系数范数、目标区域幅值和背景 95% 分位幅值。实验 5 还记录相对 Analytic Born 的远场与极化恢复后 `Qhat` 误差，以及 Full VIE 的体素数、未知量数、唯一入射方向数、右端项数和抽样线性残差。实验 6 另外记录九个分量的相对误差、逐区域平均张量误差、非对称分量差和张量 Frobenius 范数背景泄漏。
 
 正式 Full VIE 的开销随体素数快速增长。实验 1、2 以及实验 3、4 的
 `k=15` 行使用 `n_per_axis=23`，约有 6403 个体素和 19209 个复电场未知量，

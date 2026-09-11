@@ -161,9 +161,17 @@ def _build_vie_contrast(shape_name: str, volume_nodes, tensor, **kwargs):
     shape constructors (for example, ``cube_half_side``).
     """
     from common.phantom import (
-        Block, cube_phantom, two_spheres_cube_phantom, dispersed_blocks_phantom,
+        Block,
+        cube_phantom,
+        dispersed_blocks_phantom,
+        three_admissible_full_tensor_blocks,
+        two_spheres_cube_phantom,
     )
-    from forward.vie import tensor_ball_contrast, tensor_blocks_contrast
+    from forward.vie import (
+        piecewise_tensor_blocks_contrast,
+        tensor_ball_contrast,
+        tensor_blocks_contrast,
+    )
 
     name = shape_name
     contrast_scale = complex(kwargs.pop("contrast_scale", 1.0))
@@ -194,6 +202,25 @@ def _build_vie_contrast(shape_name: str, volume_nodes, tensor, **kwargs):
     elif name == "three_blocks":
         from common.phantom import three_block_phantom
         blocks = three_block_phantom("born")
+    elif name == "piecewise_full_tensor_blocks":
+        if kwargs:
+            unexpected = ", ".join(sorted(kwargs))
+            raise ValueError(
+                "piecewise_full_tensor_blocks does not accept shape options: "
+                f"{unexpected}"
+            )
+        tensor_blocks = three_admissible_full_tensor_blocks()
+        return piecewise_tensor_blocks_contrast(
+            volume_nodes,
+            [
+                (
+                    np.asarray(block.center, dtype=float),
+                    np.asarray(block.half_width, dtype=float),
+                    contrast_scale * np.asarray(block.tensor, dtype=np.complex128),
+                )
+                for block in tensor_blocks
+            ],
+        )
     else:
         raise ValueError(f"Unknown shape: {name!r}")
     return tensor_blocks_contrast(

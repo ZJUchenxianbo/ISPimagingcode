@@ -17,6 +17,7 @@ from forward.vie import (
     incident_plane_wave,
     maxwell_born_far_field,
     maxwell_far_field,
+    piecewise_tensor_blocks_contrast,
     solve_total_field_vie,
     tensor_ball_contrast,
     tensor_blocks_contrast,

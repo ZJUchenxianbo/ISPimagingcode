@@ -7,14 +7,14 @@
   "maxwell_gpswf/output_pdf/article.bbl"
   "maxwell_gpswf/output_pdf/article.blg"
   (rewritten before read)
-["xdvipdfmx"] 1787811267.84923 "maxwell_gpswf/output_pdf/article.xdv" "maxwell_gpswf/output_pdf/article.pdf" "maxwell_gpswf/output_pdf/article" 1787811273.77068 0
-  "maxwell_gpswf/output_pdf/article.xdv" 1787811267 125696 c3ca187cc22402cc99532ad740791d87 "xelatex"
+["xdvipdfmx"] 1787895702.86321 "maxwell_gpswf/output_pdf/article.xdv" "maxwell_gpswf/output_pdf/article.pdf" "maxwell_gpswf/output_pdf/article" 1787895708.805 0
+  "maxwell_gpswf/output_pdf/article.xdv" 1787895702 124892 02676cd271006834e532f2d50d0cd18a "xelatex"
   "output_pdf/article.xdv" 0 -1 0 ""
   (generated)
   "maxwell_gpswf/output_pdf/article.pdf"
   "output_pdf/article.pdf"
   (rewritten before read)
-["xelatex"] 1787811266.07452 "maxwell_gpswf/article.tex" "maxwell_gpswf/output_pdf/article.xdv" "article" 1787811273.76752 0
+["xelatex"] 1787895701.11921 "maxwell_gpswf/article.tex" "maxwell_gpswf/output_pdf/article.xdv" "article" 1787895708.8019 0
   "d:/texlive/2026/texmf-dist/fonts/map/fontname/texfonts.map" 1787731800 3524 cb3e574dea2d1052e39280babc910dc8 ""
   "d:/texlive/2026/texmf-dist/fonts/tfm/adobe/zapfding/pzdr.tfm" 1787734456 1528 7e12f4c0fcf5a072cebdcfbfc610f54c ""
   "d:/texlive/2026/texmf-dist/fonts/tfm/public/amsfonts/cmextra/cmbsy6.tfm" 1787730604 1124 14ccf5552bc7f77ca02a8a402bea8bfb ""
@@ -35,8 +35,6 @@
   "d:/texlive/2026/texmf-dist/fonts/tfm/public/lm/ec-lmr10.tfm" 1787732457 12056 7e13df7fe4cbce21b072ba7c4f4deb6e ""
   "d:/texlive/2026/texmf-dist/fonts/tfm/public/lm/ec-lmr12.tfm" 1787732457 12092 7b1546e2d096cfd5dcbd4049b0b1ec2e ""
   "d:/texlive/2026/texmf-dist/fonts/tfm/public/lm/ec-lmr17.tfm" 1787732457 12156 ca1ae6a3c8564e89597f1f993fba1608 ""
-  "d:/texlive/2026/texmf-dist/fonts/tfm/public/lm/ec-lmr6.tfm" 1787732457 12048 c1068d0f4772be9b0ec447692e1d6d82 ""
-  "d:/texlive/2026/texmf-dist/fonts/tfm/public/lm/ec-lmr8.tfm" 1787732457 12064 9b9ade9f64cb32ce1d9a88d21fbd5c2d ""
   "d:/texlive/2026/texmf-dist/fonts/tfm/public/lm/ec-lmr9.tfm" 1787732457 12084 b7f5e4c003de6f57f07c7e9fee73a37c ""
   "d:/texlive/2026/texmf-dist/fonts/tfm/public/lm/ec-lmri10.tfm" 1787732457 17148 9556e1b5f936b77a796f68d2d559ba99 ""
   "d:/texlive/2026/texmf-dist/fonts/tfm/public/lm/lmbsy10.tfm" 1787732457 1300 2df9da0fc09d4a8c772b3dd386a47c6a ""
@@ -203,11 +201,11 @@
   "d:/texlive/2026/texmf-dist/web2c/texmf.cnf" 1787730525 43815 bcd8835056a2dfac260166a1c9541261 ""
   "d:/texlive/2026/texmf-var/web2c/xetex/xelatex.fmt" 1787734579 5965544 90a452b9a81bf667828f0dc11997a261 ""
   "d:/texlive/2026/texmf.cnf" 1787734476 713 e69b156964470283e0530f5060668171 ""
-  "maxwell_gpswf/article.tex" 1787811254 69588 a6b5fb580cf2e22ecc4ddac3608840c6 ""
-  "maxwell_gpswf/output_pdf/article.aux" 1787811267 13164 7328ff13406c861eb073c1bede74094d "xelatex"
+  "maxwell_gpswf/article.tex" 1787895690 69054 b88a842f7af4bf63f75ef2bc85929535 ""
+  "maxwell_gpswf/output_pdf/article.aux" 1787895702 13329 f72279038d50c5ce7592ea04d167490b "xelatex"
   "maxwell_gpswf/output_pdf/article.bbl" 0 -1 0 "bibtex maxwell_gpswf/output_pdf/article"
-  "maxwell_gpswf/output_pdf/article.out" 1787811267 3876 99d88030242d92911d528bcc7e2a0e3c "xelatex"
-  "maxwell_gpswf/output_pdf/article.toc" 1787811267 1748 679c0895e5475cca86c5ecd85276b007 "xelatex"
+  "maxwell_gpswf/output_pdf/article.out" 1787895702 3876 99d88030242d92911d528bcc7e2a0e3c "xelatex"
+  "maxwell_gpswf/output_pdf/article.toc" 1787895702 1895 a614fc3e93d20eb25af82faf23a318c3 "xelatex"
   "outputs/exp1/exp1_dimension_individual_scale.png" 1787808175 551002 2249cf4a681965fca42aeaafc977fae5 ""
   "outputs/exp2/exp2_noise_individual_scale.png" 1787796825 230508 3580e436ceadd0c85f6a7038e47f6d55 ""
   "outputs/exp3/exp3_frequency_dsm.png" 1787806947 643231 4d403930226b9d9fb45dcfca45d4fd34 ""

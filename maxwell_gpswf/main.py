@@ -12,6 +12,7 @@ from experiments.exp2_noise import run_experiment as run_exp2
 from experiments.exp3_frequency import run_experiment as run_exp3
 from experiments.exp4_basis import run_experiment as run_exp4
 from experiments.exp5_forward_comparison import run_experiment as run_exp5
+from experiments.exp6_piecewise_tensor import run_experiment as run_exp6
 
 
 def parse_args():
@@ -21,11 +22,11 @@ def parse_args():
     p.add_argument("--quick", action="store_true")
     p.add_argument(
         "--mode",
-        choices=["exp1", "exp2", "exp3", "exp4", "exp5", "all"],
+        choices=["exp1", "exp2", "exp3", "exp4", "exp5", "exp6", "all"],
         default="all",
         help=(
             "'all' runs the Full VIE experiments exp1-exp4; "
-            "run exp5 explicitly"
+            "run exp5 or exp6 explicitly"
         ),
     )
     return p.parse_args()
@@ -62,6 +63,10 @@ def main():
     if args.mode == "exp5":
         print("\n== Experiment 5: Forward-data comparison at k=12 ==")
         run_exp5(cfg("exp5"))
+
+    if args.mode == "exp6":
+        print("\n== Experiment 6: Piecewise full-tensor reconstruction ==")
+        run_exp6(cfg("exp6"))
 
     print(f"\nDone. Output: {base}")
 
