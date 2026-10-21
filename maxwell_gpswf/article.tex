@@ -383,6 +383,10 @@ For $0<\abs{\vect{p}}<1$, let $\{\vect{u},\vect{v}\}$ be an orthonormal basis of
   \hat{\vect{x}}_j=-\vect{p}+\tau\vect{s}_j .
 \end{equation*}
 The columns of $\tens{E}_j$ are then chosen as any orthonormal basis of $\vect{d}_j^{\perp}$.  This construction gives several independent transverse-transverse blocks of the same Fourier tensor value.  The rank condition remains a finite-dimensional condition on $\Mt(2k\vect{p})$ and is therefore checked explicitly in the algorithm; the numerical section reports the resulting singular values for the full and reciprocal tensor classes.
+At $\vect{p}=0$, we use the separate three-axis design
+$\vect{d}_j=\hat{\vect{x}}_j=\vect{e}_j$, $j=1,2,3$, with both transverse incident polarizations.
+For the full tensor class its Gram matrix has eigenvalues $2$ (multiplicity three) and $1$ (multiplicity six), hence rank nine, determinant $8$, and $\sigma_{\min}=1$.
+When $J=6$, each axis is repeated twice.  The implementation uses $\abs{\vect{p}}\le10^{-14}$ as the numerical-origin criterion; the equiangular construction is retained above this tolerance.
 \end{remark}
 
 
@@ -907,22 +911,9 @@ quantity is the real part of $Q_{11}$ on $x_3=0$.
 \subsection{Common numerical setting}
 \label{subsec:maxwell-gpswf-setup}
 
-In Experiments~1--5, all contrasts are supported in the unit ball
-$B=\{\mathbf{x}\in\mathbb{R}^3:|\mathbf{x}|<1\}$ and are constructed from the
-nonsymmetric complex reference tensor
-\[
-\mathbf{Q}_0=
-\begin{pmatrix}
-1+0.15\mathrm{i} & 0.35-0.20\mathrm{i} & -0.10+0.08\mathrm{i}\\
--0.28+0.12\mathrm{i} & -0.65+0.30\mathrm{i} & 0.22-0.18\mathrm{i}\\
-0.16+0.04\mathrm{i} & -0.34+0.10\mathrm{i} & 0.75-0.35\mathrm{i}
-\end{pmatrix}.
-\]
-Each block has a complex scalar amplitude multiplying $\mathbf Q_0$.
-Finite-direction acquisition, polarimetric recovery, and GPSWF projection are
-implemented as in Sections~\ref{sec:born}--\ref{sec:discretization}.
-
-The three-block target in Experiments~2--4 consists of
+All contrasts are supported in the unit ball
+$B=\{\mathbf{x}\in\mathbb{R}^3:|\mathbf{x}|<1\}$.  The three-block target used
+in Experiments~2--6 consists of
 $D_r=\{\mathbf x:|x_i-c_{r,i}|<h_{r,i},\ i=1,2,3\}$, with centers
 $\mathbf c_r$ and half-widths $\mathbf h_r$ given by
 \[
@@ -933,6 +924,40 @@ $\mathbf c_r$ and half-widths $\mathbf h_r$ given by
  3 & ( \phantom{-}0,\ -0.25,\ 0) & (0.18,\ 0.14,\ 0.16).
 \end{array}
 \]
+and carries the piecewise constant contrast
+\[
+  \Qt(\vect{x})=\Qt_r,\qquad \vect{x}\in D_r,\quad r=1,2,3,
+\]
+where
+\[
+\Qt_1=\begin{pmatrix}
+0.20+0.040\mathrm{i}&0.048\mathrm{i}&-0.026\mathrm{i}\\
+-0.032\mathrm{i}&0.12+0.030\mathrm{i}&0.026\mathrm{i}\\
+0.034\mathrm{i}&-0.014\mathrm{i}&0.08+0.025\mathrm{i}
+\end{pmatrix},
+\]
+\[
+\Qt_2=\begin{pmatrix}
+0.09+0.030\mathrm{i}&-0.020\mathrm{i}&0.025\mathrm{i}\\
+0.030\mathrm{i}&0.22+0.045\mathrm{i}&0.041\mathrm{i}\\
+-0.011\mathrm{i}&-0.029\mathrm{i}&0.14+0.035\mathrm{i}
+\end{pmatrix},
+\]
+\[
+\Qt_3=\begin{pmatrix}
+0.14+0.035\mathrm{i}&0.021\mathrm{i}&0.033\mathrm{i}\\
+-0.009\mathrm{i}&0.07+0.025\mathrm{i}&-0.018\mathrm{i}\\
+-0.023\mathrm{i}&0.026\mathrm{i}&0.19+0.050\mathrm{i}
+\end{pmatrix}.
+\]
+These three nonsymmetric complex tensors satisfy
+Assumption~\ref{ass:tensor}; in particular, their coercive Hermitian parts are
+positive definite and their dissipative Hermitian parts are positive
+semidefinite.  They are not scalar multiples of a common matrix. Experiment~1,
+which has only one centered cube, uses the contrast $\Qt_1$.
+Finite-direction acquisition, polarimetric recovery, and GPSWF projection are
+implemented as in Sections~\ref{sec:born}--\ref{sec:discretization}.
+
 The minimum boundary separation is $0.20$. For a noise-free far-field vector
 $\mathbf g$, relative complex Gaussian noise is added before polarimetric
 recovery according to
@@ -951,7 +976,7 @@ colors are compared within a panel rather than across panels.
 
 For the low-rank experiment, the full VIE solver generates finite-direction
 far-field data for a centered cube of half-side length $0.4$ and contrast
-$\mathbf Q=0.2\mathbf Q_0$. We fix $k=15$ and $\delta=0.2$ and vary the retained
+$\Qt=\Qt_1$. We fix $k=15$ and $\delta=0.2$ and vary the retained
 GPSWF dimension:
 \[
 \begin{array}{ccc}
@@ -977,7 +1002,7 @@ so a larger reconstruction space need not improve noisy data.
 \label{subsec:maxwell-exp2}
 
 The noise experiment uses finite-direction full-VIE data for the three-block
-target with different complex amplitudes. We fix $k=15$ and use $\delta=0$,
+piecewise tensor target defined above. We fix $k=15$ and use $\delta=0$,
 $0.2$, and $0.4$. The same noise-free data,
 measurement geometry, quadrature nodes, and GPSWF truncation are used in all
 three cases; a single complex Gaussian realization is merely rescaled to each
@@ -1060,237 +1085,55 @@ artifacts away from the target.
 \subsection{Piecewise reconstruction of all nine tensor components}
 \label{subsec:maxwell-exp6}
 
-The preceding experiments use scalar spatial profiles multiplying a fixed
-tensor. To test the general tensor class $\mathcal T=\C^{3\times3}$ without
-that restriction, Experiment~6 retains the three supports in
-Section~\ref{subsec:maxwell-gpswf-setup} but assigns an independent tensor to
-each block:
-\[
-\Qt(\vect{x})=\Qt_r,\qquad \vect{x}\in D_r,\quad r=1,2,3,
-\]
-where
-\[
-\Qt_1=\begin{pmatrix}
-0.20+0.040\mathrm{i}&0.048\mathrm{i}&-0.026\mathrm{i}\\
--0.032\mathrm{i}&0.12+0.030\mathrm{i}&0.026\mathrm{i}\\
-0.034\mathrm{i}&-0.014\mathrm{i}&0.08+0.025\mathrm{i}
-\end{pmatrix},
-\]
-\[
-\Qt_2=\begin{pmatrix}
-0.09+0.030\mathrm{i}&-0.020\mathrm{i}&0.025\mathrm{i}\\
-0.030\mathrm{i}&0.22+0.045\mathrm{i}&0.041\mathrm{i}\\
--0.011\mathrm{i}&-0.029\mathrm{i}&0.14+0.035\mathrm{i}
-\end{pmatrix},
-\]
-\[
-\Qt_3=\begin{pmatrix}
-0.14+0.035\mathrm{i}&0.021\mathrm{i}&0.033\mathrm{i}\\
--0.009\mathrm{i}&0.07+0.025\mathrm{i}&-0.018\mathrm{i}\\
--0.023\mathrm{i}&0.026\mathrm{i}&0.19+0.050\mathrm{i}
-\end{pmatrix}.
-\]
-The matrices are not scalar multiples and satisfy $\Qt_r^\top\ne\Qt_r$.
-They are constructed as $\Qt_r=\tens{H}_r+\mathrm{i}\tens{G}_r$, with Hermitian
-$\tens{H}_r$ and positive-definite Hermitian $\tens{G}_r$. Direct eigenvalue checks give
-\[
-\lambda_{\min}\!\left(\frac{\Id+\Qt_r+(\Id+\Qt_r)^*}{2}\right)
- =1.063,1.079,1.063,
-\]
-and
-\[
-\lambda_{\min}\!\left(\frac{\Qt_r-\Qt_r^*}{2\mathrm{i}}\right)
- =0.0209,0.0250,0.0221,
-\]
-respectively. Thus the example obeys the material assumptions while retaining
-nine independent complex entries.
+The preceding experiments display only $Q_{11}$ of the common piecewise tensor
+target.  We now use the same target to test simultaneous recovery of all nine
+fields in the general tensor class $\mathcal T=\C^{3\times3}$. We take $k=12$ and
+$\delta=0.2$, and use the same finite-direction acquisition and GPSWF
+parameters as in the $k=12$ basis comparison, retaining 283 modes. Full-VIE
+far fields are generated first; a rank-nine polarimetric recovery then
+supplies all nine component fields to the GPSWF inversion.
 
-We take $k=12$ and $\delta=0.2$ and use the same discretization parameters as
-the $k=12$ GPSWF--Fourier--Bessel comparison. Full-VIE far fields are generated first;
-the inverse code then recovers the row-major coefficients
-$(Q_{11},Q_{12},Q_{13},Q_{21},\ldots,Q_{33})$ from a rank-nine polarimetric
-system at every Fourier node. All nine recovered coefficient fields use the
-same GPSWF modes, cutoff, quadrature weights, and discrete Gram matrix. The
-reported outputs separate real and imaginary component images, the Frobenius
-norm of the full tensor, inclusion-wise mean-tensor errors, the three
-off-diagonal skew fields $Q_{ab}-Q_{ba}$, background leakage, and the complete
-polarimetric and modal diagnostics. This experiment therefore tests spatially
-varying general anisotropy rather than inferring a scalar profile from
-$Q_{11}$ alone.
-
-
-\subsection{In comparison with DSM method}
-\label{subsec:maxwell-dsm-comparison}
-
-Direct sampling methods form images by correlating the measured data with the
-Green-tensor or point-source pattern associated with a sampling point. We
-consider two variants, according to whether this correlation is applied before
-or after polarimetric recovery.
-Since the experiments use $R=1$, we have $C=2k$. For a nonnegative function
-$f$ on $B_1$, write
-\[
-    \mathcal N[f](\mathbf z)
-    =\frac{f(\mathbf z)}{\max_{\boldsymbol\zeta\in B_1}f(\boldsymbol\zeta)}
-\]
-for spatial normalization. The indicators are written in continuous form, and
-overall constants are omitted because they cancel under $\mathcal N$.
-
-\subsubsection{DSM from far field data}
-\label{subsubsec:maxwell-farfield-dsm}
-
-Let $\vect{E}^{\infty,\delta}$ denote the noisy measured electric far-field
-pattern. The far-field pattern of the dyadic Green tensor with source at
-$\mathbf z$ is
-\[
-    \G_k^\infty(\hat{\mathbf x},\mathbf z)
-    =\frac{1}{4\pi}\tens{P}_{\hat{\mathbf x}}
-      e^{-\mathrm ik\hat{\mathbf x}\cdot\mathbf z}.
-\]
-Since $\G_k^\infty$ is dyadic, it must first act on a probing polarization.
-For the tensor basis $\{\mathbf T_r\}_{r=1}^m$, we use
-$\mathbf T_r\mathbf E^{\rm i}(\mathbf z)$, where the incident field corresponds
-to each acquisition. Writing $\langle\cdot,\cdot\rangle_{\mathcal A}$ for the
-inner product over the acquisition variables, the far-field DSM is
-\begin{equation}
-    I_{\mathrm{DSM}}^{\mathrm{FF}}(\mathbf z)
-    =\mathcal N\!\left[
-      \left(
-      \sum_{r=1}^{m}
-      \left|\left\langle \vect{E}^{\infty,\delta},
-      \G_k^\infty(\cdot,\mathbf z)\mathbf T_r
-      \mathbf E^{\rm i}(\mathbf z)
-      \right\rangle_{\mathcal A}\right|^2
-      \right)^{1/2}
-      \right].
-    \label{eq:maxwell-farfield-dsm}
-\end{equation}
-The vector $\mathbf T_r\mathbf E^{\rm i}(\mathbf z)$ is the dipole polarization
-of the $r$th probing field. Summing the correlations over $r$ avoids selecting
-a single tensor-polarization direction while retaining the essential imaging
-operation: correlating the measured far field with a polarized Green-tensor
-far-field pattern.
+Figure~\ref{fig:maxwell-exp6-real} shows representative diagonal real parts.
+The reconstruction identifies all three supports and preserves the different
+component amplitudes assigned to the blocks. The interfaces are smoothed, as
+expected from the finite Fourier bandwidth and spectral truncation, but the
+block locations and component-wise contrast ordering remain visible.
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.96\textwidth]
-    {outputs/exp3/exp3_frequency_farfield_dsm.png}
-    \caption{Normalized electromagnetic DSM indicators formed directly from
-    the far-field data for different wavenumbers. The minimum boundary
-    separation is $0.20$ and $\delta=0.2$.}
-    \label{fig:maxwell-exp3-farfield-dsm}
+    \includegraphics[width=\textwidth]
+    {outputs/exp6/exp6_tensor_components_real.png}
+    \caption{Exact and GPSWF-reconstructed real parts of the diagonal tensor
+    components $Q_{11}$, $Q_{22}$, and $Q_{33}$. Here $k=12$ and
+    $\delta=0.2$. Each component uses one color scale shared by its exact and
+    reconstructed panels.}
+    \label{fig:maxwell-exp6-real}
 \end{figure}
 
-\subsubsection{DSM from \texorpdfstring{$\widehat Q$}{Q-hat}}
-\label{subsubsec:maxwell-qhat-dsm}
-
-After polarimetric recovery, the sampling pattern for $\mathbf z$ is simply
-$e^{\mathrm iC\mathbf p\cdot\mathbf z}$.
-Figure~\ref{fig:maxwell-exp3-qhat-dsm} shows the resulting indicator.
+The imaginary off-diagonal components in
+Figure~\ref{fig:maxwell-exp6-imag} provide a more demanding test because their
+magnitudes are smaller. Their signs, spatial locations, and principal block
+patterns are nevertheless recovered, while the weakest entries exhibit more
+visible smoothing and amplitude loss.
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.96\textwidth]
-    {outputs/exp3/exp3_frequency_dsm.png}
-    \caption{Normalized DSM indicators formed from the recovered
-    $\widehat Q_{11}^{\delta}$ for different wavenumbers. The minimum boundary
-    separation is $0.20$ and $\delta=0.2$.}
-    \label{fig:maxwell-exp3-qhat-dsm}
+    \includegraphics[width=\textwidth]
+    {outputs/exp6/exp6_tensor_components_imag.png}
+    \caption{Exact and GPSWF-reconstructed imaginary parts of the selected
+    off-diagonal components $Q_{12}$, $Q_{21}$, and $Q_{23}$. Here $k=12$ and
+    $\delta=0.2$. Each component uses one color scale shared by its exact and
+    reconstructed panels.}
+    \label{fig:maxwell-exp6-imag}
 \end{figure}
 
-The DSM is the Fourier-data correlation
-\begin{equation}
-    I_{\mathrm{DSM}}^{\widehat Q}(\mathbf z)
-    =\mathcal N\!\left[
-      \left|\left\langle \widehat Q_{11}^\delta(2k\mathbf p),
-      e^{\mathrm iC\mathbf p\cdot\mathbf z}\right\rangle_{B_1}\right|
-      \right].
-    \label{eq:maxwell-qhat-dsm}
-\end{equation}
-With the inner product taken to be linear in its first argument, this
-correlation is precisely the adjoint Fourier backprojection of the recovered
-data. Unlike~\eqref{eq:maxwell-farfield-dsm}, this indicator contains
-the conditioning and regularization effects of the preceding polarimetric
-inversion.
+All nine tensor components are reconstructed; six representative fields are
+displayed for legibility. The relative errors of the mean reconstructed
+tensor over the three blocks are $0.244$, $0.226$, and $0.327$, respectively.
+The experiment therefore confirms that the polarimetric--GPSWF procedure can
+recover a spatially varying full complex tensor, while also showing the
+resolution and amplitude limitations near discontinuous interfaces.
 
-\paragraph{Spectral comparison with GPSWF.}
-The distinction between DSM and GPSWF is especially transparent when both are
-written for the same perturbed Fourier data. For one component of the
-contrast, let
-\begin{equation}
-    Q=\sum_j q_j\psi_j,
-    \qquad
-    q_j=\langle Q,\psi_j\rangle_B,
-    \qquad
-    W=\mathcal F_CQ.
-    \label{eq:maxwell-dsm-gpswf-expansion}
-\end{equation}
-Since $\mathcal F_C\psi_j=\alpha_j\psi_j$, the exact Fourier data have the
-expansion
-\[
-    W=\sum_j\alpha_jq_j\psi_j.
-\]
-Let $e$ denote the total perturbation in the recovered Fourier data and set
-$e_j=\langle e,\psi_j\rangle_B$. Then
-\begin{equation}
-    W^\delta=W+e
-    =\sum_j\bigl(\alpha_jq_j+e_j\bigr)\psi_j.
-    \label{eq:maxwell-dsm-noisy-data}
-\end{equation}
-
-The ball Fourier operator is normal on the GPSWF basis, so that
-$\mathcal F_C^*\psi_j=\overline{\alpha_j}\psi_j$. The unnormalized
-backprojection underlying the $\widehat Q$-based DSM is therefore
-\begin{equation}
-\begin{aligned}
-    B_{\mathrm{DSM}}^\delta
-    :=\mathcal F_C^*W^\delta
-    &=\sum_j\overline{\alpha_j}
-      \bigl(\alpha_jq_j+e_j\bigr)\psi_j \\
-    &=\sum_j
-      \left(|\alpha_j|^2q_j+\overline{\alpha_j}e_j\right)\psi_j.
-\end{aligned}
-\label{eq:maxwell-dsm-normal-expansion}
-\end{equation}
-Thus DSM attenuates the $j$th signal mode by $|\alpha_j|^2$ and the
-corresponding data perturbation by $\overline{\alpha_j}$. Spatial normalization
-turns this stable backprojection into a support indicator, but it does not undo
-the attenuation of weakly observable modes.
-
-GPSWF reconstruction instead divides by the Fourier eigenvalues on the
-retained index set $J_\epsilon(C)$. For the same $W^\delta$, it gives
-\begin{equation}
-\begin{aligned}
-    Q_\epsilon^\delta
-    &=\sum_{j\in J_\epsilon(C)}
-      \frac{\langle W^\delta,\psi_j\rangle_B}{\alpha_j}\psi_j \\
-    &=\sum_{j\in J_\epsilon(C)}
-      \left(q_j+\frac{e_j}{\alpha_j}\right)\psi_j.
-\end{aligned}
-\label{eq:maxwell-gpswf-inverse-expansion}
-\end{equation}
-Hence GPSWF compensates for the forward attenuation on the retained modes, but
-it amplifies the perturbation by $1/\alpha_j$. The cutoff
-in~\eqref{eq:Q_cutoff} prevents division by small eigenvalues. This gives the
-essential spectral difference: DSM applies a stable normal-operator filter,
-whereas GPSWF applies a regularized inverse filter. For the far-field DSM, the
-same viewpoint holds with the adjoint of the far-field measurement operator in
-place of the Fourier adjoint.
-
-\paragraph{Common numerical behavior.}
-The numerical comparison uses the same full-VIE data and three-block target as
-the resolution experiment in Section~\ref{subsec:maxwell-exp3}. Thus, the
-GPSWF reconstructions in Figure~\ref{fig:maxwell-exp3-frequency}, the
-far-field indicators in Figure~\ref{fig:maxwell-exp3-farfield-dsm}, and the
-recovered-data indicators in Figure~\ref{fig:maxwell-exp3-qhat-dsm} use
-$k=5,6,7,8,10,15$, $\delta=0.2$, and the same acquisition at each wavenumber.
-
-Once the wavenumber is sufficiently large to resolve all three components, the
-normalized DSM indicators can follow the rectangular support more closely.
-However, both DSM variants retain appreciable background and sidelobe
-artifacts. In particular, an elevated response remains in the central region
-between the three blocks. The GPSWF reconstructions have a cleaner background
-and preserve darker valleys in the inter-block gaps, so the separation of the
-three supports is more explicit.
 
 \section{Conclusion}
 

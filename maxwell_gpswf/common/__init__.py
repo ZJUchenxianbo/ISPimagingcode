@@ -29,8 +29,6 @@ from common.phantom import (
     tensor_truth_image_2d,
     tensor_truth_matrix_2d,
     three_admissible_full_tensor_blocks,
-    three_block_phantom,
-    three_tensor_block_phantom,
     truth_image_2d,
     two_spheres_cube_phantom,
     _shape_truth_and_fourier,

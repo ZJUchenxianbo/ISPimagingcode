@@ -1,4 +1,4 @@
-This is XeTeX, Version 3.141592653-2.6-0.999998 (TeX Live 2026) (preloaded format=xelatex 2026.8.26)  28 AUG 2026 13:41
+This is XeTeX, Version 3.141592653-2.6-0.999998 (TeX Live 2026) (preloaded format=xelatex 2026.8.26)  11 SEP 2026 10:44
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -1130,13 +1130,13 @@ File: outputs/exp3/exp3_frequency_individual_scale.png Graphic file (type bmp)
 File: outputs/exp4/exp4_basis_individual_scale.png Graphic file (type bmp)
 <outputs/exp4/exp4_basis_individual_scale.png>
  [18]
-File: outputs/exp3/exp3_frequency_farfield_dsm.png Graphic file (type bmp)
-<outputs/exp3/exp3_frequency_farfield_dsm.png>
-File: outputs/exp3/exp3_frequency_dsm.png Graphic file (type bmp)
-<outputs/exp3/exp3_frequency_dsm.png>
- [19] [20] [21] [22]
+File: outputs/exp6/exp6_tensor_components_real.png Graphic file (type bmp)
+<outputs/exp6/exp6_tensor_components_real.png>
+File: outputs/exp6/exp6_tensor_components_imag.png Graphic file (type bmp)
+<outputs/exp6/exp6_tensor_components_imag.png>
+ [19] [20] [21]
 No file article.bbl.
-[23] (maxwell_gpswf/output_pdf/article.aux)
+[22] (maxwell_gpswf/output_pdf/article.aux)
  ***********
 LaTeX2e <2026-06-01>
 L3 programming layer <2026-08-10>
@@ -1146,16 +1146,16 @@ L3 programming layer <2026-08-10>
 LaTeX Warning: There were undefined references.
 
 Package rerunfilecheck Info: File `article.out' has not changed.
-(rerunfilecheck)             Checksum: 99D88030242D92911D528BCC7E2A0E3C;3876.
+(rerunfilecheck)             Checksum: 50A44B0439E3438F653C6E39ED0C84E3;3668.
  ) 
 Here is how much of TeX's memory you used:
- 25285 strings out of 467745
- 467733 string characters out of 5425966
- 900741 words of memory out of 5000000
- 53983 multiletter control sequences out of 15000+600000
+ 25275 strings out of 467745
+ 467497 string characters out of 5425966
+ 900212 words of memory out of 5000000
+ 53972 multiletter control sequences out of 15000+600000
  696301 words of font info for 90 fonts, out of 8000000 for 9000
  1348 hyphenation exceptions out of 8191
  117i,13n,121p,1484b,861s stack positions out of 10000i,1000n,20000p,200000b,200000s
 
-Output written on maxwell_gpswf/output_pdf/article.xdv (23 pages, 124892 bytes)
+Output written on maxwell_gpswf/output_pdf/article.xdv (22 pages, 117264 bytes)
 .

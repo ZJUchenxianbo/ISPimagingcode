@@ -54,74 +54,8 @@ class Mode:
 # ---------------------------------------------------------------------------
 
 
-def three_block_phantom(variant: str = "born") -> list[Block]:
-    """Three-block phantom with minimum boundary separation 0.20.
-
-    Parameters
-    ----------
-    variant : str
-        ``"born"`` — amplitudes matching the main Born reconstruction experiment.
-        ``"vie"``  — larger contrast amplitudes used in the VIE comparison.
-    """
-    if variant == "born":
-        return [
-            Block(center=(-0.26, 0.25, 0.0), half_width=(0.16, 0.16, 0.16), amplitude=0.2 * (1.00 + 0.10j)),
-            Block(center=(0.25, 0.25, 0.0), half_width=(0.15, 0.15, 0.16), amplitude=0.2 * (0.85 + 0.05j)),
-            Block(center=(0.00, -0.25, 0.0), half_width=(0.18, 0.14, 0.16), amplitude=0.2 * (1.15 - 0.05j)),
-        ]
-    if variant == "vie":
-        return [
-            Block(center=(-0.26, 0.25, 0.0), half_width=(0.16, 0.16, 0.16), amplitude=0.60 + 0.05j),
-            Block(center=(0.25, 0.25, 0.0), half_width=(0.15, 0.15, 0.16), amplitude=1.15 + 0.10j),
-            Block(center=(0.00, -0.25, 0.0), half_width=(0.18, 0.14, 0.16), amplitude=1.80 - 0.10j),
-        ]
-    raise ValueError(f"Unknown three_block_phantom variant: {variant!r}")
-
-
-def three_tensor_block_phantom() -> list[TensorBlock]:
-    """Three gap-0.20 blocks with different anisotropic tensor contrasts."""
-    return [
-        TensorBlock(
-            center=(-0.26, 0.25, 0.0),
-            half_width=(0.16, 0.16, 0.16),
-            tensor=np.asarray(
-                [
-                    [1.00 + 0.15j, 0.32 - 0.18j, -0.08 + 0.06j],
-                    [-0.22 + 0.10j, -0.50 + 0.24j, 0.18 - 0.12j],
-                    [0.12 + 0.03j, -0.26 + 0.08j, 0.65 - 0.25j],
-                ],
-                dtype=np.complex128,
-            ),
-        ),
-        TensorBlock(
-            center=(0.25, 0.25, 0.0),
-            half_width=(0.15, 0.15, 0.16),
-            tensor=np.asarray(
-                [
-                    [0.25 + 0.05j, -0.18 + 0.08j, 0.42 - 0.10j],
-                    [0.30 - 0.16j, 1.05 + 0.12j, -0.20 + 0.18j],
-                    [-0.15 + 0.04j, 0.36 - 0.07j, -0.45 + 0.22j],
-                ],
-                dtype=np.complex128,
-            ),
-        ),
-        TensorBlock(
-            center=(0.00, -0.25, 0.0),
-            half_width=(0.18, 0.14, 0.16),
-            tensor=np.asarray(
-                [
-                    [-0.55 + 0.28j, 0.16 + 0.12j, 0.12 - 0.20j],
-                    [-0.08 + 0.05j, 0.35 - 0.18j, 0.48 + 0.06j],
-                    [0.24 - 0.10j, -0.30 + 0.16j, 1.25 - 0.30j],
-                ],
-                dtype=np.complex128,
-            ),
-        ),
-    ]
-
-
 def three_admissible_full_tensor_blocks() -> list[TensorBlock]:
-    """Three non-reciprocal passive tensor blocks for Experiment 6.
+    """Three admissible full tensors shared by all three-block experiments.
 
     Each contrast is written as ``Q = H + i G`` with Hermitian ``H`` and
     positive-definite Hermitian ``G``.  Hence ``I + H`` is coercive and
@@ -442,14 +376,9 @@ def reference_tensor(kind: TensorKind) -> CArray:
             dtype=np.complex128,
         )
     if kind == "full":
-        return np.asarray(
-            [
-                [1.00 + 0.15j, 0.35 - 0.20j, -0.10 + 0.08j],
-                [-0.28 + 0.12j, -0.65 + 0.30j, 0.22 - 0.18j],
-                [0.16 + 0.04j, -0.34 + 0.10j, 0.75 - 0.35j],
-            ],
-            dtype=np.complex128,
-        )
+        # Single-target experiments use the first member of the same
+        # admissible tensor family as the three-block experiments.
+        return np.array(three_admissible_full_tensor_blocks()[0].tensor, copy=True)
     raise ValueError("kind must be 'full', 'reciprocal', or 'isotropic'")
 
 

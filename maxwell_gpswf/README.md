@@ -67,11 +67,11 @@ p = (d - xhat) / 2
 
 | 实验 | 目的 | 散射体 | 数据源 | 远场噪声 |
 |------|------|--------|--------|----------|
-| `exp1` | 比较 GPSWF 保留维数 `N` | 单立方体，`Q=0.2 Q0` | Full VIE | `0.2` |
-| `exp2` | 比较噪声影响 | 最小间距 `0.20` 的三方块 | Full VIE | `0, 0.2, 0.4` |
-| `exp3` | 比较波数、分辨率及 GPSWF/DSM | 最小间距 `0.20` 的三方块 | Full VIE | `0.2` |
-| `exp4` | 比较 GPSWF/Fourier/Bessel | 最小间距 `0.20` 的三方块 | Full VIE | `0.2` |
-| `exp5` | 比较正向数据源及其反演结果 | 最小间距 `0.20` 的三方块 | Analytic Born / Discrete VIE-Born / Full VIE | `0.2` |
+| `exp1` | 比较 GPSWF 保留维数 `N` | 单立方体，`Q=Q1` | Full VIE | `0.2` |
+| `exp2` | 比较噪声影响 | 三方块分别使用 `Q1,Q2,Q3` | Full VIE | `0, 0.2, 0.4` |
+| `exp3` | 比较波数、分辨率及 GPSWF/DSM | 三方块分别使用 `Q1,Q2,Q3` | Full VIE | `0.2` |
+| `exp4` | 比较 GPSWF/Fourier/Bessel | 三方块分别使用 `Q1,Q2,Q3` | Full VIE | `0.2` |
+| `exp5` | 比较正向数据源及其反演结果 | 三方块分别使用 `Q1,Q2,Q3` | Analytic Born / Discrete VIE-Born / Full VIE | `0.2` |
 | `exp6` | 联合恢复一般复张量的 9 个分量 | 三个区域分别使用不同的非对称 `3×3` 张量 | Full VIE | `0.2` |
 
 实验 1 的六个截断维数按 `2×3` 排列：第一行为 `N=1, 21, 57`，第二行为 `N=71, 237, 496`。实验 3 的六个波数也按 `2×3` 排列：第一行为 `5, 6, 7`，第二行为 `8, 10, 15`；GPSWF、individual-scale 和两种 DSM 图均使用这一布局。
@@ -80,7 +80,7 @@ p = (d - xhat) / 2
 实验 2--5 共用同一组三方块几何，其最小边界间距为 `0.20`。
 实验 3 额外输出 `exp3_frequency_dsm.png`，它与 GPSWF 主图共用同一份
 Full VIE 远场、噪声和极化恢复后的 `Qhat_11`。
-实验 1 使用较弱但仍保持非对称各向异性结构的介质对比度 `Q=0.2 Q0`，
+实验 1 直接使用满足假设 2.1 的非对称各向异性介质对比度 `Q=Q1`，
 正式 Full VIE 网格为 `n_per_axis=23`。实验同时用相同方向配置生成无噪声
 解析 Born 数据，并输出 Full VIE/Born 的远场、`Qhat`、径向幅值和相位差
 诊断；这些诊断不包含主成像使用的 `0.2` 随机噪声。
@@ -115,10 +115,9 @@ Full VIE 远场、噪声和极化恢复后的 `Qhat_11`。
 但正式运行仍需要较多内存和时间。
 
 实验 6 沿用实验 4 的 `k=12` 离散参数（正式 Full VIE 使用
-`n_per_axis=19`、`requested_measure_dirs=770`），但不再使用
-`Q(x)=q(x)Q0` 的固定
-张量模板。三个方块分别使用不同、彼此不成比例且满足稿件 coercivity / passivity
-条件的非对称复张量。反演基底按行优先排列为
+`n_per_axis=19`、`requested_measure_dirs=770`），并与实验 2--5 使用完全相同的
+分片全张量目标。三个方块分别使用不同、彼此不成比例且满足稿件 coercivity /
+passivity 条件的非对称复张量。反演基底按行优先排列为
 `Q11,Q12,Q13,Q21,Q22,Q23,Q31,Q32,Q33`；每个 Fourier 节点必须通过秩为 9
 的极化系统，然后九个分量共用同一 GPSWF 截断集和 Gram 矩阵。正式 Full VIE
 计算量较高，`--quick` 只用于检查链路和输出，不用于评价重建精度。
@@ -128,6 +127,8 @@ GPSWF 重建共享该分量自己的色标。完整九分量仍保存在详细 N
 ## 极化恢复
 
 每个 target Fourier 节点从 24 个近邻候选方向配置中选取 `polarimetric_J=6` 组。每组方向对使用两个正交入射极化并保留远场向量的三个分量，因此一般 full tensor 对应 `36 x 9` 联合极化矩阵。代码要求列秩为 9，并记录最小奇异值和条件数。
+
+底层精确方向构造在原点（数值判断 `|p|<=1e-14`）采用论文 Proposition 3.4 的三轴配置 `d_j=xhat_j=e_j`，`J=6` 时每轴重复两次。`J=3` 时满张量 Gram 行列式为 8、最小奇异值为 1。非零节点继续使用等角配置；正式实验的 Gauss–Jacobi 径向求积不含原点，有限方向 mock 流程保持不变。
 
 ## 输出
 
@@ -140,6 +141,8 @@ outputs/exp3/exp3_frequency_dsm.png       # 实验 3 DSM 波数对照图
 outputs/exp3/exp3_dsm_diagnostics.csv    # 实验 3 DSM 诊断
 outputs/exp3/exp3_frequency_farfield_dsm.png # 实验 3 原始远场 EM-DSM 对照图
 outputs/exp3/exp3_farfield_dsm_diagnostics.csv # 原始远场 EM-DSM 诊断
+outputs/exp4/exp4_gpswf_spatial_concentration.png # GPSWF 在 B_R 内的空间能量集中
+outputs/exp4/exp4_gpswf_representative_modes.png # 代表性 GPSWF 的径向最大值包络
 outputs/exp1/exp1_full_vs_born_diagnostics.png
 outputs/exp1/exp1_forward_model_diagnostics.csv
 outputs/exp1/exp1_forward_model_diagnostics_detail.npz
@@ -152,8 +155,10 @@ outputs/exp6/metadata.json
 ```
 
 实验 2 的成像图按 `Truth | noise=0 | noise=0.2 | noise=0.4` 单行排列。
-实验 2--5 的三方块 phantom 统一使用实验 1 的弱对比度标准，即在原有三块相对复振幅不变的前提下整体乘以 `0.2`。
+实验 2--6 共用同一个分片全张量 phantom：三个方块分别使用满足强制性与被动性条件的非对称复张量 `Q1`、`Q2`、`Q3`，三者不是同一矩阵的标量倍数。
 实验 3 同时输出两种 DSM：`exp3_frequency_dsm.png` 使用极化伪逆恢复后的 `Qhat_11`；`exp3_frequency_farfield_dsm.png` 直接计算 `M_i^* g_i`。两者使用同一份 Full VIE 远场数据和完全相同的噪声实现。
+实验 4 额外输出 GPSWF 空间能量集中图。左列是所有保留模态在全空间带限延拓后的聚合能量密度，青色圆表示物理支撑球 `B_R`；右列使用 `E_{ell,n}(B_R)=C^3|alpha_{ell,n}|^2/(2*pi)^3` 定量比较保留与舍弃 multiplet 的球内能量比例。
+实验 4 还在 `k=12` 下选择 `(0,0,0)`、邻近基态的 `(0,1,0)` 与 `(1,0,1)`、径向/角向高阶模态和一个低集中率舍弃模态，并在同一张图中绘制径向包络 `max_{|x|=r}|psi(x)|`。横轴为 `r/R`，虚线 `r/R=1` 是 `B_R` 边界；每条曲线按自身最大值归一化，从而可以直接比较节点结构、球内衰减和球外泄漏。
 
 主要诊断包括 `retained_modes`、`target_nodes_per_retained_modes`、`mock_distance_mean/max/p95`、极化矩阵秩与条件数、GPSWF Gram 矩阵条件数、系数范数、目标区域幅值和背景 95% 分位幅值。实验 5 还记录相对 Analytic Born 的远场与极化恢复后 `Qhat` 误差，以及 Full VIE 的体素数、未知量数、唯一入射方向数、右端项数和抽样线性残差。实验 6 另外记录九个分量的相对误差、逐区域平均张量误差、非对称分量差和张量 Frobenius 范数背景泄漏。
 

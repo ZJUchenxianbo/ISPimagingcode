@@ -7,14 +7,14 @@
   "maxwell_gpswf/output_pdf/article.bbl"
   "maxwell_gpswf/output_pdf/article.blg"
   (rewritten before read)
-["xdvipdfmx"] 1787895702.86321 "maxwell_gpswf/output_pdf/article.xdv" "maxwell_gpswf/output_pdf/article.pdf" "maxwell_gpswf/output_pdf/article" 1787895708.805 0
-  "maxwell_gpswf/output_pdf/article.xdv" 1787895702 124892 02676cd271006834e532f2d50d0cd18a "xelatex"
+["xdvipdfmx"] 1789094654.3714 "maxwell_gpswf/output_pdf/article.xdv" "maxwell_gpswf/output_pdf/article.pdf" "maxwell_gpswf/output_pdf/article" 1789094659.94794 0
+  "maxwell_gpswf/output_pdf/article.xdv" 1789094653 117264 da154250aabf792ada10e54096c17bae "xelatex"
   "output_pdf/article.xdv" 0 -1 0 ""
   (generated)
   "maxwell_gpswf/output_pdf/article.pdf"
   "output_pdf/article.pdf"
   (rewritten before read)
-["xelatex"] 1787895701.11921 "maxwell_gpswf/article.tex" "maxwell_gpswf/output_pdf/article.xdv" "article" 1787895708.8019 0
+["xelatex"] 1789094652.45715 "maxwell_gpswf/article.tex" "maxwell_gpswf/output_pdf/article.xdv" "article" 1789094659.94268 0
   "d:/texlive/2026/texmf-dist/fonts/map/fontname/texfonts.map" 1787731800 3524 cb3e574dea2d1052e39280babc910dc8 ""
   "d:/texlive/2026/texmf-dist/fonts/tfm/adobe/zapfding/pzdr.tfm" 1787734456 1528 7e12f4c0fcf5a072cebdcfbfc610f54c ""
   "d:/texlive/2026/texmf-dist/fonts/tfm/public/amsfonts/cmextra/cmbsy6.tfm" 1787730604 1124 14ccf5552bc7f77ca02a8a402bea8bfb ""
@@ -201,17 +201,17 @@
   "d:/texlive/2026/texmf-dist/web2c/texmf.cnf" 1787730525 43815 bcd8835056a2dfac260166a1c9541261 ""
   "d:/texlive/2026/texmf-var/web2c/xetex/xelatex.fmt" 1787734579 5965544 90a452b9a81bf667828f0dc11997a261 ""
   "d:/texlive/2026/texmf.cnf" 1787734476 713 e69b156964470283e0530f5060668171 ""
-  "maxwell_gpswf/article.tex" 1787895690 69054 b88a842f7af4bf63f75ef2bc85929535 ""
-  "maxwell_gpswf/output_pdf/article.aux" 1787895702 13329 f72279038d50c5ce7592ea04d167490b "xelatex"
+  "maxwell_gpswf/article.tex" 1789094631 65244 f72a02ffb90594982c0cb69bc40479b3 ""
+  "maxwell_gpswf/output_pdf/article.aux" 1789094653 12136 2e61db2c32403c94d8593527066e6842 "xelatex"
   "maxwell_gpswf/output_pdf/article.bbl" 0 -1 0 "bibtex maxwell_gpswf/output_pdf/article"
-  "maxwell_gpswf/output_pdf/article.out" 1787895702 3876 99d88030242d92911d528bcc7e2a0e3c "xelatex"
-  "maxwell_gpswf/output_pdf/article.toc" 1787895702 1895 a614fc3e93d20eb25af82faf23a318c3 "xelatex"
+  "maxwell_gpswf/output_pdf/article.out" 1789094653 3668 50a44b0439e3438f653c6e39ed0c84e3 "xelatex"
+  "maxwell_gpswf/output_pdf/article.toc" 1789094653 1513 947fe72b74010a2580f5ac54a1e5199d "xelatex"
   "outputs/exp1/exp1_dimension_individual_scale.png" 1787808175 551002 2249cf4a681965fca42aeaafc977fae5 ""
   "outputs/exp2/exp2_noise_individual_scale.png" 1787796825 230508 3580e436ceadd0c85f6a7038e47f6d55 ""
-  "outputs/exp3/exp3_frequency_dsm.png" 1787806947 643231 4d403930226b9d9fb45dcfca45d4fd34 ""
-  "outputs/exp3/exp3_frequency_farfield_dsm.png" 1787806948 591702 521f5c4b8e2ddeb5b4e9804fd2e37046 ""
   "outputs/exp3/exp3_frequency_individual_scale.png" 1787806947 596854 046e632f807a2bb2080b93b2befe275a ""
   "outputs/exp4/exp4_basis_individual_scale.png" 1787801526 851544 69acf4f97cb912571c896578b83c70b5 ""
+  "outputs/exp6/exp6_tensor_components_imag.png" 1789042612 211005 0db895a0b8943f31f83d961e4b9279cf ""
+  "outputs/exp6/exp6_tensor_components_real.png" 1789042611 231931 7da6b0ae6510961e6b4b089038a0a8e8 ""
   (generated)
   "maxwell_gpswf/output_pdf/article.aux"
   "maxwell_gpswf/output_pdf/article.log"

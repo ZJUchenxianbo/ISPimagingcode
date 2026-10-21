@@ -11,10 +11,6 @@
 \contentsline {subsection}{\numberline {8.3}Robustness with respect to far-field noise}{16}{subsection.8.3}%
 \contentsline {subsection}{\numberline {8.4}Wavenumber and resolution}{17}{subsection.8.4}%
 \contentsline {subsection}{\numberline {8.5}In comparison with Fourier basis and Bessel basis}{17}{subsection.8.5}%
-\contentsline {subsection}{\numberline {8.6}In comparison with DSM method}{18}{subsection.8.6}%
-\contentsline {subsubsection}{\numberline {8.6.1}DSM from far field data}{19}{subsubsection.8.6.1}%
-\contentsline {subsubsection}{\numberline {8.6.2}DSM from $\setbox \z@ \hbox {\mathsurround \z@ $\textstyle Q$}\mathaccent "0362{Q}$}{19}{subsubsection.8.6.2}%
-\contentsline {paragraph}{Spectral comparison with GPSWF.}{20}{section*.3}%
-\contentsline {paragraph}{Common numerical behavior.}{21}{section*.4}%
-\contentsline {section}{\numberline {9}Conclusion}{21}{section.9}%
+\contentsline {subsection}{\numberline {8.6}Piecewise reconstruction of all nine tensor components}{18}{subsection.8.6}%
+\contentsline {section}{\numberline {9}Conclusion}{20}{section.9}%
 \contentsline {section}{\numberline {A}Full Maxwell data and Born modeling error}{21}{appendix.A}%

@@ -109,6 +109,61 @@ def eval_radial_R(r: Array, ell: int, beta: Array) -> Array:
     return radial_normalization * (r**ell) * values
 
 
+def eval_bandlimited_radial_extension(
+    r: Array,
+    C: float,
+    ell: int,
+    beta: Array,
+    alpha: complex,
+    *,
+    quad_order: int = 180,
+) -> NDArray[np.complex128]:
+    """Evaluate the globally band-limited extension of one ball GPSWF mode.
+
+    The Jacobi expansion in :func:`eval_radial_R` represents the eigenfunction
+    on ``B_1`` and must not be extrapolated outside the ball.  For all
+    ``r >= 0`` the correct extension follows from the finite Fourier integral,
+
+    ``R_ext(r) = (4*pi*i**ell/alpha) * int_0^1 j_ell(C*r*s) R(s) s^2 ds``.
+
+    With the project Fourier convention this agrees with ``eval_radial_R`` on
+    ``0 <= r <= 1`` up to the numerical eigenpair error.
+    """
+    r = np.asarray(r, dtype=float)
+    if np.any(r < 0.0):
+        raise ValueError("r must be nonnegative")
+    if C <= 0.0:
+        raise ValueError("C must be positive")
+    if abs(complex(alpha)) <= 1e-14:
+        raise ValueError("alpha is too small for a stable band-limited extension")
+    if quad_order <= 0:
+        raise ValueError("quad_order must be positive")
+
+    s_nodes, s_weights = np.polynomial.legendre.leggauss(int(quad_order))
+    s = 0.5 * (s_nodes + 1.0)
+    ws = 0.5 * s_weights
+    radial_inside = eval_radial_R(s, ell, beta)
+    kernel = spherical_jn(ell, float(C) * np.outer(r.reshape(-1), s))
+    integral = kernel @ (ws * radial_inside * s * s)
+    extension = (4.0 * math.pi * (1j**ell) / complex(alpha)) * integral
+    return extension.reshape(r.shape)
+
+
+def gpswf_spatial_concentration(C: float, alpha: complex) -> float:
+    """Return the fraction of global modal energy contained in ``B_1``.
+
+    For an ``L^2(B_1)``-normalised eigenfunction and the Fourier convention
+    used here, Plancherel's identity gives
+
+    ``eta = C^3 * |alpha|^2 / (2*pi)^3``.
+
+    Values are not clipped so numerical normalisation errors remain visible.
+    """
+    if C <= 0.0:
+        raise ValueError("C must be positive")
+    return float(float(C) ** 3 * abs(complex(alpha)) ** 2 / (2.0 * math.pi) ** 3)
+
+
 # ---------------------------------------------------------------------------
 # Alpha eigenvalue estimation
 # ---------------------------------------------------------------------------

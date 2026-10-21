@@ -24,10 +24,12 @@ from common.quadrature import (
 )
 from common.phantom import (
     Block,
+    TensorBlock,
     TensorKind,
     block_fourier_profile,
     reference_tensor,
     tensor_basis,
+    tensor_block_fourier_coefficients,
     tensor_coefficients_from_matrix,
 )
 from common.polarimetric import build_polarimetric_matrix_from_directions
@@ -199,9 +201,6 @@ def _build_vie_contrast(shape_name: str, volume_nodes, tensor, **kwargs):
         blocks = two_spheres_cube_phantom()
     elif name == "dispersed":
         blocks = dispersed_blocks_phantom()
-    elif name == "three_blocks":
-        from common.phantom import three_block_phantom
-        blocks = three_block_phantom("born")
     elif name == "piecewise_full_tensor_blocks":
         if kwargs:
             unexpected = ", ".join(sorted(kwargs))
@@ -340,6 +339,64 @@ def analytic_block_born_farfield_dataset(
         obs_dirs=obs_dirs,
         farfield_data=farfield_data,
         data_source="analytic_block_born",
+        metadata={
+            "kind": kind,
+            "k": float(k),
+            "n_geometries": int(n_meas // n_p),
+            "physical_node_sign": -1,
+            "fourier_convention": "exp(-i C p.x)",
+            "farfield_normalization": "M_c",
+            "prefactor_removed": 1.0,
+        },
+    )
+
+
+def analytic_tensor_block_born_farfield_dataset(
+    blocks: list[TensorBlock],
+    target_p_nodes: np.ndarray,
+    kind: TensorKind = "full",
+    k: float = 15.0,
+    *,
+    incident_dirs: np.ndarray,
+    obs_dirs: np.ndarray,
+) -> FarfieldDataset:
+    """Analytical Born far field for blocks carrying distinct tensors."""
+    target_p_nodes = np.asarray(target_p_nodes, dtype=float)
+    incident_dirs = np.asarray(incident_dirs, dtype=float)
+    obs_dirs = np.asarray(obs_dirs, dtype=float)
+    if target_p_nodes.ndim != 2 or target_p_nodes.shape[1] != 3:
+        raise ValueError("target_p_nodes must have shape (n_nodes, 3)")
+    if incident_dirs.shape != obs_dirs.shape or incident_dirs.ndim != 2 or incident_dirs.shape[1] != 3:
+        raise ValueError("incident_dirs and obs_dirs must both have shape (n_meas, 3)")
+
+    n_p = target_p_nodes.shape[0]
+    n_meas = incident_dirs.shape[0]
+    if n_p <= 0 or n_meas % n_p != 0:
+        raise ValueError("number of direction pairs must be a multiple of target_p_nodes")
+
+    physical_nodes = paired_farfield_fourier_nodes(incident_dirs, obs_dirs)
+    actual_fourier_nodes = -physical_nodes
+    coefficients = tensor_block_fourier_coefficients(
+        actual_fourier_nodes, blocks, C=2.0 * float(k), kind=kind
+    )
+    basis = tensor_basis(kind)
+    farfield_data = np.zeros((n_meas, 6), dtype=np.complex128)
+    for measurement_index, (d, xhat) in enumerate(zip(incident_dirs, obs_dirs)):
+        projector = np.eye(3) - np.outer(xhat, xhat)
+        incident_polarizations = np.column_stack(orthonormal_basis_perp(d))
+        qhat = sum(
+            coefficients[measurement_index, r] * basis[r]
+            for r in range(len(basis))
+        )
+        farfield = projector @ qhat @ incident_polarizations
+        farfield_data[measurement_index] = farfield.reshape(-1, order="F")
+
+    return FarfieldDataset(
+        p_nodes=target_p_nodes,
+        incident_dirs=incident_dirs,
+        obs_dirs=obs_dirs,
+        farfield_data=farfield_data,
+        data_source="analytic_tensor_block_born",
         metadata={
             "kind": kind,
             "k": float(k),

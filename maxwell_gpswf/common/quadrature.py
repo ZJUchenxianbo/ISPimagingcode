@@ -469,6 +469,8 @@ def admissible_farfield_pairs_from_nodes(
     For ``|p| < 1``, choose ``s ⊥ p`` and set
     ``d = p + √(1-|p|²) s``, ``x̂ = -p + √(1-|p|²) s``.
     Then ``p = (d - x̂)/2`` exactly.
+    At the numerical origin (``|p| <= 1e-14``), use the three-axis design
+    ``d_j = xhat_j = e_{j mod 3}`` of Proposition 3.4 instead.
     """
     from common.utils import vector_norm
 
@@ -484,11 +486,12 @@ def admissible_farfield_pairs_from_nodes(
         rho = vector_norm(p)
         if rho >= 1.0 + 1e-12:
             raise ValueError("all p_nodes must satisfy |p| <= 1")
-        if rho > 1e-14:
-            u, v = orthonormal_basis_perp(p)
-        else:
-            u = np.array([1.0, 0.0, 0.0])
-            v = np.array([0.0, 1.0, 0.0])
+        if rho <= 1e-14:
+            axis = np.eye(3)[branch_index % 3]
+            incident[idx] = axis
+            obs[idx] = axis
+            continue
+        u, v = orthonormal_basis_perp(p)
         angle = 2.0 * math.pi * float(branch_index) / float(branch_count)
         s = math.cos(angle) * u + math.sin(angle) * v
         transverse_scale = math.sqrt(max(1.0 - rho * rho, 0.0))
@@ -547,7 +550,13 @@ def generate_data_nodes(
 def build_geometries_from_p(
     p: Array, J: int = 6
 ) -> list[tuple[Array, Array, Array]]:
-    """Construct deterministic Maxwell-admissible geometries for one p."""
+    """Construct equiangular geometries, with three axes at the origin.
+
+    Proposition 3.4 uses ``d_j = xhat_j = e_j`` at ``p=0``.  Cycle through
+    these axes for general J; J=6 measures each axis twice.  J>=3 is needed
+    to recover a full tensor at the origin.  The numerical zero tolerance is
+    1e-14; nonzero nodes above it retain the equiangular construction.
+    """
     from common.utils import vector_norm
 
     p = np.asarray(p, dtype=float)
@@ -557,11 +566,15 @@ def build_geometries_from_p(
     if J <= 0:
         raise ValueError("J must be positive")
 
-    if rho > 1e-14:
-        u, v = orthonormal_basis_perp(p)
-    else:
-        u = np.array([1.0, 0.0, 0.0])
-        v = np.array([0.0, 1.0, 0.0])
+    if rho <= 1e-14:
+        geometries: list[tuple[Array, Array, Array]] = []
+        for j in range(J):
+            d = np.eye(3)[j % 3]
+            e1, e2 = orthonormal_basis_perp(d)
+            geometries.append((d, d.copy(), np.column_stack([e1, e2])))
+        return geometries
+
+    u, v = orthonormal_basis_perp(p)
 
     transverse_scale = math.sqrt(max(1.0 - rho * rho, 0.0))
     geometries: list[tuple[Array, Array, Array]] = []

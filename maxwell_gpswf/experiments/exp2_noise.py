@@ -27,13 +27,15 @@ from common import (
     modal_matrix,
     plot_diagnostic_curves,
     quadrature_modal_coefficients,
-    reference_tensor,
     save_diagnostics_npz,
     solve_ball_gpswf,
-    tensor_coefficients_from_matrix,
     write_diagnostics_csv,
 )
-from common.phantom import Mode, three_block_phantom, truth_image_2d
+from common.phantom import (
+    Mode,
+    tensor_truth_image_2d,
+    three_admissible_full_tensor_blocks,
+)
 from forward.datasets import (
     farfield_dataset_to_qhat,
     forward_solver_diagnostic_summary,
@@ -78,14 +80,19 @@ def run_experiment(config: ExperimentConfig) -> Any:
     vie_nodes = -vie_physical
 
     ds = full_vie_farfield_dataset(
-        "three_blocks", vie_nodes, kind=kind, k=k, R=1.0,
+        "piecewise_full_tensor_blocks", vie_nodes, kind=kind, k=k, R=1.0,
         n_per_axis=n_per_axis, n_geometries=polarimetric_J,
         incident_dirs=vie_inc, obs_dirs=vie_obs)
 
     # -- Truth image (for vmin/vmax) --
-    blocks = three_block_phantom("born")
-    coeff0 = tensor_coefficients_from_matrix(reference_tensor(kind), kind)
-    truth, grid_points, disk_mask = truth_image_2d(grid_size, blocks, coeff0[component_index])
+    blocks = three_admissible_full_tensor_blocks()
+    truth, grid_points, disk_mask = tensor_truth_image_2d(
+        grid_size,
+        blocks,
+        kind=kind,
+        component_index=component_index,
+        display="component",
+    )
     vmin = float(np.nanmin(np.real(truth)))
     vmax = float(np.nanmax(np.real(truth)))
 
@@ -175,7 +182,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
                 "candidate_count": int(data_info["candidate_count"]),
                 "data_mode": "mock",
                 "data_source": "full_vie",
-                "shape": "three_blocks_gap_0.20",
+                "shape": "piecewise_full_tensor_blocks_gap_0.20",
                 **polarimetric_diagnostics,
                 **forward_diagnostics,
             },

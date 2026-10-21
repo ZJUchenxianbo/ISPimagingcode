@@ -34,16 +34,16 @@ from common.direct_sampling import direct_sampling_component_indicator
 from common.fourier import reconstruct_fourier_cube_from_data
 from common.gpswf import (
     collect_alpha_pairs_cached,
+    eval_bandlimited_radial_extension,
+    gpswf_spatial_concentration,
     modal_matrix,
     quadrature_modal_coefficients,
     solve_ball_gpswf,
 )
 from common.phantom import (
     Mode,
-    reference_tensor,
-    tensor_coefficients_from_matrix,
-    three_block_phantom,
-    truth_image_2d,
+    tensor_truth_image_2d,
+    three_admissible_full_tensor_blocks,
 )
 from common.quadrature import (
     ball_quadrature_nodes,
@@ -54,7 +54,7 @@ from common.spherical_bessel import reconstruct_ball_bessel_from_data
 from common.utils import make_table, vector_norm
 from forward.datasets import (
     FarfieldDataset,
-    analytic_block_born_farfield_dataset,
+    analytic_tensor_block_born_farfield_dataset,
     discrete_vie_born_farfield_dataset,
     farfield_dataset_to_qhat,
     full_vie_farfield_dataset,
@@ -219,7 +219,7 @@ def _build_dataset(
     setup: _MeasurementSetup,
     polarimetric_J: int,
 ) -> FarfieldDataset:
-    blocks = three_block_phantom("born")
+    blocks = three_admissible_full_tensor_blocks()
     common_kwargs = {
         "kind": "full",
         "k": float(k),
@@ -227,14 +227,14 @@ def _build_dataset(
         "obs_dirs": setup.obs_dirs,
     }
     if source == "analytic_born":
-        return analytic_block_born_farfield_dataset(
+        return analytic_tensor_block_born_farfield_dataset(
             blocks,
             setup.measurement_nodes,
             **common_kwargs,
         )
     if source == "vie_born":
         return discrete_vie_born_farfield_dataset(
-            "three_blocks",
+            "piecewise_full_tensor_blocks",
             setup.measurement_nodes,
             R=1.0,
             n_per_axis=setup.n_per_axis,
@@ -243,7 +243,7 @@ def _build_dataset(
         )
     if source == "full_vie":
         return full_vie_farfield_dataset(
-            "three_blocks",
+            "piecewise_full_tensor_blocks",
             setup.measurement_nodes,
             R=1.0,
             n_per_axis=setup.n_per_axis,
@@ -479,9 +479,14 @@ def _prepare_basis_context(
         max(int(basis_mode_min), int(bessel_mode_fraction * gpswf_count)),
     )
 
-    blocks = three_block_phantom("born")
-    coeff0 = tensor_coefficients_from_matrix(reference_tensor("full"), "full")
-    truth, _, disk_mask = truth_image_2d(grid_size, blocks, coeff0[0])
+    blocks = three_admissible_full_tensor_blocks()
+    truth, _, disk_mask = tensor_truth_image_2d(
+        grid_size,
+        blocks,
+        kind="full",
+        component_index=0,
+        display="component",
+    )
     xs = np.linspace(-1.0, 1.0, grid_size)
     X, Y = np.meshgrid(xs, xs)
     grid_points = np.column_stack([
@@ -575,7 +580,7 @@ def _case_common(
         "candidate_count": int(setup.data_info["candidate_count"]),
         "data_mode": "mock",
         "data_source": forward_row.spec.data_source,
-        "shape": "three_blocks_gap_0.20",
+        "shape": "piecewise_full_tensor_blocks_gap_0.20",
         "farfield_error_vs_analytic": float(forward_row.farfield_error_vs_analytic),
         "qhat_error_vs_analytic": float(forward_row.qhat_error_vs_analytic),
         "component_qhat_error_vs_analytic": float(
@@ -606,6 +611,319 @@ def _imshow(ax: Any, image: np.ndarray, title: str, vmin: float, vmax: float):
     return result
 
 
+def _multiplet_concentration_records(
+    context: _BasisContext,
+    C: float,
+) -> list[dict[str, Any]]:
+    """Collect one spatial-concentration record per complete ``(ell, n)`` block."""
+    grouped_indices: dict[tuple[int, int], list[int]] = {}
+    representatives: dict[tuple[int, int], Mode] = {}
+    for mode_index, mode in enumerate(context.modes):
+        key = (int(mode.ell), int(mode.n))
+        grouped_indices.setdefault(key, []).append(mode_index)
+        representatives.setdefault(key, mode)
+
+    records: list[dict[str, Any]] = []
+    for key, indices in grouped_indices.items():
+        mode = representatives[key]
+        retained_values = np.asarray(context.retained[indices], dtype=bool)
+        if np.any(retained_values) and not np.all(retained_values):
+            raise RuntimeError(f"partial GPSWF multiplet encountered for {key}")
+        records.append({
+            "ell": key[0],
+            "n": key[1],
+            "mode": mode,
+            "degeneracy": 2 * key[0] + 1,
+            "retained": bool(np.all(retained_values)),
+            "concentration": gpswf_spatial_concentration(C, mode.alpha),
+        })
+    return records
+
+
+def _plot_gpswf_spatial_concentration(
+    forward_rows: list[_ForwardRow],
+    context_cache: dict[float, _BasisContext],
+    output_path: Path,
+) -> None:
+    """Plot retained-mode density and exact modal energy fractions in ``B_R``."""
+    n_rows = len(forward_rows)
+    fig, axes = plt.subplots(
+        n_rows,
+        2,
+        figsize=(9.0, 3.2 * n_rows),
+        constrained_layout=True,
+    )
+    if n_rows == 1:
+        axes = axes[None, :]
+
+    plane_half_width = 1.8
+    radial_nodes = np.linspace(0.0, math.sqrt(2.0) * plane_half_width, 481)
+    plane_axis = np.linspace(-plane_half_width, plane_half_width, 321)
+    plane_x, plane_y = np.meshgrid(plane_axis, plane_axis)
+    plane_radius = np.sqrt(plane_x * plane_x + plane_y * plane_y)
+    density_images: list[np.ndarray] = []
+    row_records: list[list[dict[str, Any]]] = []
+
+    for forward_row in forward_rows:
+        k = float(forward_row.spec.k)
+        C = float(forward_row.setup.params["C"])
+        context = context_cache[k]
+        records = _multiplet_concentration_records(context, C)
+        retained_records = [record for record in records if record["retained"]]
+        if not retained_records:
+            raise RuntimeError(f"no retained GPSWF modes for k={k:g}")
+
+        radial_density = np.zeros_like(radial_nodes)
+        retained_mode_count = 0
+        for record in retained_records:
+            mode = record["mode"]
+            concentration = max(float(record["concentration"]), 0.0)
+            radial_extension = eval_bandlimited_radial_extension(
+                radial_nodes,
+                C,
+                int(mode.ell),
+                mode.beta,
+                mode.alpha,
+            )
+            # The B_1-normalised extension has global norm squared 1/eta.
+            # Multiplying by sqrt(eta) gives every global mode unit energy.
+            radial_global_unit = math.sqrt(concentration) * radial_extension
+            degeneracy = int(record["degeneracy"])
+            radial_density += (
+                degeneracy
+                * np.abs(radial_global_unit) ** 2
+                / (4.0 * math.pi)
+            )
+            retained_mode_count += degeneracy
+
+        radial_density /= max(retained_mode_count, 1)
+        plane_density = np.interp(
+            plane_radius.reshape(-1),
+            radial_nodes,
+            radial_density,
+        ).reshape(plane_radius.shape)
+        peak = max(float(np.max(plane_density)), 1e-300)
+        density_images.append(np.log10(np.maximum(plane_density / peak, 1e-6)))
+        row_records.append(records)
+
+    image_artist = None
+    for row_index, (forward_row, density_image, records) in enumerate(
+        zip(forward_rows, density_images, row_records)
+    ):
+        k = float(forward_row.spec.k)
+        image_artist = axes[row_index, 0].imshow(
+            density_image,
+            origin="lower",
+            extent=(-1.8, 1.8, -1.8, 1.8),
+            cmap="magma",
+            vmin=-6.0,
+            vmax=0.0,
+            interpolation="bilinear",
+        )
+        axes[row_index, 0].add_patch(
+            plt.Circle((0.0, 0.0), 1.0, fill=False, color="cyan", linewidth=1.4)
+        )
+        axes[row_index, 0].set_aspect("equal")
+        axes[row_index, 0].set_xlabel(r"$x_1/R$")
+        axes[row_index, 0].set_ylabel(r"$x_2/R$")
+
+        retained = [record for record in records if record["retained"]]
+        retained_weight = sum(int(record["degeneracy"]) for record in retained)
+        mean_concentration = sum(
+            int(record["degeneracy"]) * float(record["concentration"])
+            for record in retained
+        ) / max(retained_weight, 1)
+        min_concentration = min(float(record["concentration"]) for record in retained)
+        axes[row_index, 0].set_title(
+            rf"$k={k:g}$ retained density; "
+            rf"mean $E(B_R)={mean_concentration:.3f}$"
+        )
+
+        sorted_records = sorted(
+            records,
+            key=lambda record: float(record["concentration"]),
+            reverse=True,
+        )
+        ranks = np.arange(1, len(sorted_records) + 1)
+        concentration = np.asarray(
+            [float(record["concentration"]) for record in sorted_records]
+        )
+        retained_mask = np.asarray(
+            [bool(record["retained"]) for record in sorted_records]
+        )
+        axes[row_index, 1].plot(ranks, concentration, color="0.65", linewidth=1.0)
+        axes[row_index, 1].scatter(
+            ranks[retained_mask],
+            concentration[retained_mask],
+            s=25,
+            color="#0072B2",
+            label="retained",
+            zorder=3,
+        )
+        if np.any(~retained_mask):
+            axes[row_index, 1].scatter(
+                ranks[~retained_mask],
+                concentration[~retained_mask],
+                s=28,
+                marker="x",
+                color="#D55E00",
+                label="discarded",
+                zorder=3,
+            )
+        axes[row_index, 1].axhline(0.9, color="0.35", linestyle="--", linewidth=0.9)
+        axes[row_index, 1].set_xlim(0.5, len(sorted_records) + 0.5)
+        axes[row_index, 1].set_ylim(0.0, 1.05)
+        axes[row_index, 1].set_xlabel("multiplet rank")
+        axes[row_index, 1].set_ylabel(r"$E_{\ell n}(B_R)$")
+        axes[row_index, 1].set_title(
+            rf"spatial concentration; retained min $={min_concentration:.3f}$"
+        )
+        axes[row_index, 1].grid(alpha=0.25)
+        axes[row_index, 1].legend(fontsize=7, loc="lower left")
+
+    if image_artist is not None:
+        fig.colorbar(
+            image_artist,
+            ax=axes[:, 0],
+            fraction=0.025,
+            pad=0.02,
+            label=r"$\log_{10}(\rho/\rho_{\max})$",
+        )
+    fig.suptitle(
+        r"GPSWF spatial energy concentration inside $B_R$ (cyan boundary)",
+        fontsize=11,
+    )
+    fig.savefig(output_path, dpi=220)
+    plt.close(fig)
+
+
+def _select_representative_multiplets(
+    records: list[dict[str, Any]],
+) -> list[tuple[str, dict[str, Any]]]:
+    """Choose distinct retained multiplets with complementary structures."""
+    retained = [record for record in records if record["retained"]]
+    if not retained:
+        raise RuntimeError("no retained GPSWF multiplets are available")
+
+    proposals: list[tuple[str, dict[str, Any]]] = []
+    proposals.append(("fundamental", min(
+        retained, key=lambda record: (int(record["ell"]), int(record["n"]))
+    )))
+    retained_by_key = {
+        (int(record["ell"]), int(record["n"])): record
+        for record in retained
+    }
+    for nearby_key in ((0, 1), (1, 0)):
+        nearby_record = retained_by_key.get(nearby_key)
+        if nearby_record is not None:
+            proposals.append(("near fundamental", nearby_record))
+    radial = [record for record in retained if int(record["ell"]) == 0]
+    if radial:
+        proposals.append(("radial high-order", max(
+            radial, key=lambda record: int(record["n"])
+        )))
+    angular = [record for record in retained if int(record["n"]) == 0]
+    if angular:
+        proposals.append(("angular high-order", max(
+            angular, key=lambda record: int(record["ell"])
+        )))
+    discarded = [record for record in records if not record["retained"]]
+    if discarded:
+        proposals.append(("weak / discarded", min(
+            discarded, key=lambda record: float(record["concentration"])
+        )))
+    else:
+        proposals.append(("least concentrated retained", min(
+            retained, key=lambda record: float(record["concentration"])
+        )))
+
+    selected: list[tuple[str, dict[str, Any]]] = []
+    selected_keys: set[tuple[int, int]] = set()
+    for label, record in proposals:
+        key = (int(record["ell"]), int(record["n"]))
+        if key not in selected_keys:
+            selected.append((label, record))
+            selected_keys.add(key)
+
+    # Small quick-mode bases can make proposals coincide or omit a requested
+    # neighbour. Fill remaining slots with simple distinct retained modes.
+    for record in sorted(
+        retained,
+        key=lambda item: (int(item["ell"]) + 2 * int(item["n"]), int(item["ell"])),
+    ):
+        key = (int(record["ell"]), int(record["n"]))
+        if key in selected_keys:
+            continue
+        selected.append(("additional retained", record))
+        selected_keys.add(key)
+        if len(selected) == 6:
+            break
+    return selected[:6]
+
+
+def _plot_gpswf_representative_modes(
+    context: _BasisContext,
+    C: float,
+    k: float,
+    output_path: Path,
+) -> None:
+    """Plot unrescaled spherical maxima of representative eigenmodes."""
+    records = _multiplet_concentration_records(context, C)
+    selected = _select_representative_multiplets(records)
+    radial_nodes = np.linspace(0.0, 2.0, 801)
+    fig, ax = plt.subplots(figsize=(9.0, 5.4), constrained_layout=True)
+    colors = plt.get_cmap("tab10").colors
+
+    ax.axvspan(0.0, 1.0, color="#56B4E9", alpha=0.10, label=r"inside $B_R$")
+    ax.axvline(
+        1.0,
+        color="black",
+        linestyle="--",
+        linewidth=1.0,
+        label=r"boundary $r=R$",
+    )
+    for curve_index, (role, record) in enumerate(selected):
+        mode = record["mode"]
+        ell = int(record["ell"])
+        n = int(record["n"])
+        m = ell if ell > 0 else 0
+        radial_extension = eval_bandlimited_radial_extension(
+            radial_nodes,
+            C,
+            ell,
+            mode.beta,
+            mode.alpha,
+        )
+        # The selected representative uses m=ell.  For the L2(S^2)-normalised
+        # sectoral spherical harmonic, its exact maximum is attained at the
+        # equator.  Keep this factor because the curves now share the original
+        # L2(B_R) modal scale instead of being divided by separate peaks.
+        log_angular_maximum_squared = (
+            math.log(2 * ell + 1)
+            - math.log(4.0 * math.pi)
+            + math.lgamma(2 * ell + 1)
+            - 2.0 * ell * math.log(2.0)
+            - 2.0 * math.lgamma(ell + 1)
+        )
+        angular_maximum = math.exp(0.5 * log_angular_maximum_squared)
+        spherical_maximum = angular_maximum * np.abs(radial_extension)
+        ax.plot(
+            radial_nodes,
+            spherical_maximum,
+            linewidth=1.35,
+            color=colors[curve_index % len(colors)],
+            label=rf"$(\ell,n,m)=({ell},{n},{m})$",
+        )
+    ax.set_xlim(0.0, 2.0)
+    ax.set_ylim(bottom=0.0)
+    ax.set_xlabel(r"normalised radius $r/R$")
+    ax.set_ylabel(r"$\max_{|x|=r}|\widetilde\psi_{\ell n m}(x)|$")
+    ax.grid(alpha=0.25)
+    ax.legend(fontsize=8, loc="upper right")
+    fig.savefig(output_path, dpi=220)
+    plt.close(fig)
+
+
 def run_basis_comparison(
     config: ExperimentConfig,
     *,
@@ -616,6 +934,8 @@ def run_basis_comparison(
     noise_level: float = 0.2,
     shared_noise_for_equal_k: bool = False,
     include_dsm: bool = True,
+    gpswf_spatial_concentration_output: str | None = None,
+    gpswf_representative_modes_output: str | None = None,
 ) -> Any:
     """Run one basis comparison with explicit forward-source rows."""
     if not row_specs:
@@ -938,6 +1258,32 @@ def run_basis_comparison(
         config.out_dir / f"{prefix}_diagnostic_curves.png",
         title=f"Experiment {experiment_number} diagnostics",
     )
+    if gpswf_spatial_concentration_output is not None:
+        concentration_path = config.out_dir / gpswf_spatial_concentration_output
+        _plot_gpswf_spatial_concentration(
+            forward_rows,
+            context_cache,
+            concentration_path,
+        )
+        print(f"Saved {concentration_path}")
+    if gpswf_representative_modes_output is not None:
+        available_k = sorted(context_cache)
+        representative_k = (
+            12.0
+            if 12.0 in context_cache
+            else available_k[len(available_k) // 2]
+        )
+        representative_row = next(
+            row for row in forward_rows if float(row.spec.k) == representative_k
+        )
+        representative_path = config.out_dir / gpswf_representative_modes_output
+        _plot_gpswf_representative_modes(
+            context_cache[representative_k],
+            float(representative_row.setup.params["C"]),
+            representative_k,
+            representative_path,
+        )
+        print(f"Saved {representative_path}")
     print(f"Saved {config.out_dir / f'{output_stem}.png'}")
     return make_table([{"experiment": experiment_number, "status": "ok"}])
 
