@@ -1,0 +1,57 @@
+{
+  "migration": {
+    "rmse_m": 0.014720222587411676,
+    "maximum_error_m": 0.015185890911807665,
+    "bias_m": -0.014713441609782803,
+    "peak_to_valley_m": 0.002250504810994869,
+    "true_peak_to_valley_m": 0.0,
+    "crest_x_m": -1.6,
+    "trough_x_m": 0.36000000000000165,
+    "boundary_fraction": 0.0,
+    "constant_depth_rmse_m": 0.0
+  },
+  "coherent": {
+    "rmse_m": 0.004714664401396297,
+    "maximum_error_m": 0.005356479018339799,
+    "bias_m": 0.004698104647901823,
+    "peak_to_valley_m": 0.0015488718573311022,
+    "true_peak_to_valley_m": 0.0,
+    "crest_x_m": 1.0000000000000022,
+    "trough_x_m": 1.5200000000000027,
+    "boundary_fraction": 0.0,
+    "constant_depth_rmse_m": 0.0
+  },
+  "dsm": {
+    "rmse_m": 0.23558929046927662,
+    "maximum_error_m": 0.4000000000000008,
+    "bias_m": 0.11555846114578713,
+    "peak_to_valley_m": 0.6731437572042103,
+    "true_peak_to_valley_m": 0.0,
+    "crest_x_m": -1.4,
+    "trough_x_m": 1.0000000000000022,
+    "boundary_fraction": 0.04938271604938271,
+    "constant_depth_rmse_m": 0.0
+  },
+  "dsm_corrected": {
+    "rmse_m": 0.017718726048746605,
+    "maximum_error_m": 0.051357960145387294,
+    "bias_m": 0.005635803658371751,
+    "peak_to_valley_m": 0.05423602670381111,
+    "true_peak_to_valley_m": 0.0,
+    "crest_x_m": -0.0399999999999987,
+    "trough_x_m": -0.31999999999999895,
+    "boundary_fraction": 0.0,
+    "constant_depth_rmse_m": 0.0
+  },
+  "correction_only": {
+    "rmse_m": 0.2816910019143258,
+    "maximum_error_m": 0.4000000000000008,
+    "bias_m": -0.07219058904570942,
+    "peak_to_valley_m": 0.8000000000000007,
+    "true_peak_to_valley_m": 0.0,
+    "crest_x_m": -1.52,
+    "trough_x_m": -1.4,
+    "boundary_fraction": 0.24691358024691357,
+    "constant_depth_rmse_m": 0.0
+  }
+}

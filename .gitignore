@@ -29,3 +29,7 @@ Thumbs.db
 # 其它文件
 *.txt
 *.claude
+# 海冰子项目依赖与 Numba 编译缓存
+!ice_imaging_2d/requirements.txt
+*.nbc
+*.nbi

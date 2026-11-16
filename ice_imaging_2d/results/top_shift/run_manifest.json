@@ -1,0 +1,15 @@
+{
+  "elapsed_seconds": 85.31180223000001,
+  "python": "3.12.14",
+  "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+  "numpy": "2.3.5",
+  "scipy": "1.17.0",
+  "matplotlib": "3.10.8",
+  "numba": "0.68.1",
+  "cases": [
+    "sine"
+  ],
+  "workers": 1,
+  "dsm_computed": false,
+  "mesh_refinement_computed": false
+}

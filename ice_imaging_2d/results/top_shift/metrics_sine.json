@@ -1,0 +1,24 @@
+{
+  "migration": {
+    "rmse_m": 0.021560865616052634,
+    "maximum_error_m": 0.025391413021901954,
+    "bias_m": -0.021297745491483677,
+    "peak_to_valley_m": 0.15313767242788678,
+    "true_peak_to_valley_m": 0.16180339887498962,
+    "crest_x_m": 0.6000000000000011,
+    "trough_x_m": -0.6,
+    "boundary_fraction": 0.0,
+    "constant_depth_rmse_m": 0.05110458370179809
+  },
+  "coherent": {
+    "rmse_m": 0.001977909616220558,
+    "maximum_error_m": 0.00486663769929363,
+    "bias_m": 1.0881341110143935e-05,
+    "peak_to_valley_m": 0.16319167531578072,
+    "true_peak_to_valley_m": 0.16180339887498962,
+    "crest_x_m": 0.6000000000000011,
+    "trough_x_m": -0.6,
+    "boundary_fraction": 0.0,
+    "constant_depth_rmse_m": 0.05110458370179809
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "elapsed_seconds": 521.845644324,
+  "python": "3.12.14",
+  "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+  "numpy": "2.3.5",
+  "scipy": "1.17.0",
+  "matplotlib": "3.10.8",
+  "numba": "0.68.1",
+  "cases": [
+    "soft",
+    "flat",
+    "sine"
+  ],
+  "workers": 3,
+  "dsm_computed": true,
+  "mesh_refinement_computed": true,
+  "additional_completed_checks": [
+    "normal-incidence impedance correction on sine data",
+    "dedicated collocated reciprocity acquisition",
+    "noise and model sensitivity for both migration indicators",
+    "staggered curl diagnostic regenerated and pressure equality checked"
+  ]
+}

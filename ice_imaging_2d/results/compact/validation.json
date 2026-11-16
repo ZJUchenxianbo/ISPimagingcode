@@ -1,0 +1,28 @@
+{
+  "predicted_bottom_ms": 2.263333333333333,
+  "measured_bottom_ms": 2.269333333333334,
+  "predicted_top_ms": 3.0966666666666667,
+  "measured_top_ms": 3.1013333333333337,
+  "echo_separation_error_us": -1.3333333333336548,
+  "direct_wave_relative_l2_error": 0.03772776630351784,
+  "reciprocal_pairs": 0,
+  "maximum_reciprocity_error": null,
+  "arrival_check_pass": true,
+  "direct_wave_check_pass": true,
+  "mesh_refinement": {
+    "coarse_spacing_m": 0.01,
+    "fine_spacing_m": 0.005,
+    "first_echo_relative_l2_difference": 0.155419833516228,
+    "position_corrected_arrival_difference_us": 4.222222222221867,
+    "scope": "One flat-model near-zero-offset first ice-bottom echo."
+  },
+  "dedicated_reciprocity": {
+    "relative_l2_error": 1.0180639664625346e-09,
+    "passed": true,
+    "source_x_m": [
+      -0.6049999999999995,
+      0.5949999999999998
+    ],
+    "scope": "Dedicated two-shot flat-model reciprocal acquisition."
+  }
+}

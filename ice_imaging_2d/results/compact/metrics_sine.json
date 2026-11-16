@@ -1,0 +1,68 @@
+{
+  "migration": {
+    "rmse_m": 0.018892671157401522,
+    "maximum_error_m": 0.025510925412019825,
+    "bias_m": -0.018530428729353735,
+    "peak_to_valley_m": 0.19714978400014194,
+    "true_peak_to_valley_m": 0.20000000000000018,
+    "crest_x_m": 1.0000000000000022,
+    "trough_x_m": -0.9999999999999996,
+    "boundary_fraction": 0.0,
+    "constant_depth_rmse_m": 0.07690285416404155
+  },
+  "coherent": {
+    "rmse_m": 0.0030053990249274388,
+    "maximum_error_m": 0.00667919194305111,
+    "bias_m": 0.001854165887530256,
+    "peak_to_valley_m": 0.2015482801368056,
+    "true_peak_to_valley_m": 0.20000000000000018,
+    "crest_x_m": 1.0000000000000022,
+    "trough_x_m": -0.8399999999999994,
+    "boundary_fraction": 0.0,
+    "constant_depth_rmse_m": 0.07690285416404155
+  },
+  "dsm": {
+    "rmse_m": 0.3345681318187109,
+    "maximum_error_m": 0.49921147013144784,
+    "bias_m": 0.017827737928351402,
+    "peak_to_valley_m": 0.8000000000000007,
+    "true_peak_to_valley_m": 0.20000000000000018,
+    "crest_x_m": -1.52,
+    "trough_x_m": -1.4,
+    "boundary_fraction": 0.2716049382716049,
+    "constant_depth_rmse_m": 0.07690285416404155
+  },
+  "dsm_corrected": {
+    "rmse_m": 0.062346794639779955,
+    "maximum_error_m": 0.3155672074497984,
+    "bias_m": 0.02368617535676499,
+    "peak_to_valley_m": 0.5635332348110618,
+    "true_peak_to_valley_m": 0.20000000000000018,
+    "crest_x_m": 0.48000000000000176,
+    "trough_x_m": -1.3599999999999999,
+    "boundary_fraction": 0.012345679012345678,
+    "constant_depth_rmse_m": 0.07690285416404155
+  },
+  "dsm_impedance": {
+    "rmse_m": 0.09883800841887153,
+    "maximum_error_m": 0.492977648588826,
+    "bias_m": 0.035152275848858536,
+    "peak_to_valley_m": 0.7114653718849662,
+    "true_peak_to_valley_m": 0.20000000000000018,
+    "crest_x_m": -0.7599999999999993,
+    "trough_x_m": 0.5600000000000018,
+    "boundary_fraction": 0.012345679012345678,
+    "constant_depth_rmse_m": 0.07690285416404155
+  },
+  "correction_only": {
+    "rmse_m": 0.28724142283625037,
+    "maximum_error_m": 0.4992114701314485,
+    "bias_m": -0.07219058904570946,
+    "peak_to_valley_m": 0.8000000000000007,
+    "true_peak_to_valley_m": 0.20000000000000018,
+    "crest_x_m": -1.52,
+    "trough_x_m": -1.4,
+    "boundary_fraction": 0.24691358024691357,
+    "constant_depth_rmse_m": 0.07690285416404155
+  }
+}

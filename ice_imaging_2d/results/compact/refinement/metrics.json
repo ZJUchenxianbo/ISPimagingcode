@@ -1,0 +1,7 @@
+{
+  "coarse_spacing_m": 0.01,
+  "fine_spacing_m": 0.005,
+  "first_echo_relative_l2_difference": 0.155419833516228,
+  "position_corrected_arrival_difference_us": 4.222222222221867,
+  "scope": "One flat-model near-zero-offset first ice-bottom echo."
+}
