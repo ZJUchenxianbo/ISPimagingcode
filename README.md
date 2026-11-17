@@ -91,10 +91,10 @@ pyproj/
 # Maxwell 实验
 .venv/bin/python maxwell_gpswf/main.py --out-dir outputs
 
-# 海冰：只估计规模，不执行正演
+# 海冰：查看方案实现状态，不执行正演
 .venv/bin/python ice_imaging_2d/main.py --estimate
-# 海冰：双界面缩小实验
-.venv/bin/python ice_imaging_2d/main.py --quick --experiment joint --workers 1 --out-dir ice_outputs/quick
+# 海冰：原灵敏度对照的软件检查（非方案直接方法）
+.venv/bin/python ice_imaging_2d/main.py --mode sensitivity --quick --experiment joint --workers 1 --out-dir ice_outputs/quick
 ```
 
 ## 输出
@@ -102,3 +102,5 @@ pyproj/
 海冰实验默认输出写入 `ice_outputs/`，其他实验输出写入 `outputs/`。常见文件：`.png`（图像）、`.csv`（表格）、`.npz`（中间数组）。Maxwell 主图实验会额外输出 `figure*_diagnostics.csv`、`figure*_diagnostics_detail.npz` 和 `figure*_diagnostic_curves.png`，用于定位成像异常来自节点、模态、投影、数据、系数还是图像阶段。
 
 海冰子项目的依赖安装、配置、历史数据复用和物理假设见 [ice_imaging_2d/README.md](ice_imaging_2d/README.md)。新双界面实验默认保存 `metadata.json`、上下界面/厚度误差和灵敏度诊断；legacy 模式保留 `run_manifest.json`；随包 `results/` 保留原有结果，不作为默认输出位置。
+
+海冰方案主线目前完成Cauchy离散反传播算子，耦合背景核、补偿场和上界面指标尚未完成；原数值灵敏度/Gauss–Newton已隔离为显式对照，详见子项目README。
