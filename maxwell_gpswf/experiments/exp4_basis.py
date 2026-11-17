@@ -33,6 +33,8 @@ def run_experiment(config: ExperimentConfig) -> Any:
         noise_level=0.2,
         shared_noise_for_equal_k=False,
         include_dsm=False,
+        gpswf_spatial_concentration_output="exp4_gpswf_spatial_concentration.png",
+        gpswf_representative_modes_output="exp4_gpswf_representative_modes.png",
     )
 
 

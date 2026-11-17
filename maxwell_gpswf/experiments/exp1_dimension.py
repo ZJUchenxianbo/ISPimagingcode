@@ -7,7 +7,7 @@ Layout: 2 rows x 3 cols.
   Row 2: N = 71, 237, 496
 
 Data: Full VIE far-field, finite-direction mock measurement mode, k=15,
-far-field noise=0.2, and tensor contrast Q(x)=0.2 Q0 inside the cube.
+far-field noise=0.2, and tensor contrast Q(x)=Q1 inside the cube.
 Truncation: sort complete (ell, n) multiplets by |alpha| and use N as an
 upper bound without splitting the m degeneracy.
 
@@ -202,7 +202,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
     polarimetric_J = 6
     noise_level = 0.2
     cube_half_side = 0.4
-    contrast_scale = 0.2
+    contrast_scale = 1.0
 
     # GPSWF params for k=15 (figure1/figure3 pattern)
     ell_max = 12

@@ -1,0 +1,255 @@
+{
+  "experiment": 6,
+  "description": "piecewise non-reciprocal full-tensor reconstruction",
+  "quick": false,
+  "seed": 12345,
+  "tensor_kind": "full",
+  "coefficient_order": [
+    "Q11",
+    "Q12",
+    "Q13",
+    "Q21",
+    "Q22",
+    "Q23",
+    "Q31",
+    "Q32",
+    "Q33"
+  ],
+  "displayed_components": {
+    "real": [
+      "Q11",
+      "Q22",
+      "Q33"
+    ],
+    "imaginary": [
+      "Q12",
+      "Q21",
+      "Q23"
+    ],
+    "color_scale": "one scale per component, shared by truth and GPSWF"
+  },
+  "fourier_convention": "exp(-i C p.x)",
+  "k": 12.0,
+  "C": 24.0,
+  "noise_level": 0.2,
+  "polarimetric_J": 6,
+  "parameters": {
+    "K": 40,
+    "ell_max": 9,
+    "n_modes_per_ell": 5,
+    "n_radial": 10,
+    "n_angular_requested": 170,
+    "grid_size": 161,
+    "n_per_axis": 19,
+    "requested_measure_dirs": 770,
+    "parameter_source": "Experiment 4 k=12 settings"
+  },
+  "truncation": {
+    "epsilon": 0.2,
+    "N_cap": 283,
+    "N_cap_theory": 288,
+    "N_cap_discrete": 283,
+    "N_cap_hard": 512,
+    "requested_max_modes": 283,
+    "retained_modes": 283,
+    "retained_multiplets": 35,
+    "partial_multiplets": 0,
+    "eligible_multiplets": 49,
+    "alpha_plateau_rtol": 1e-08
+  },
+  "polarimetric": {
+    "polarimetric_J": 6,
+    "polarimetric_rank_min": 9,
+    "polarimetric_sigma_min_min": 0.10925360495634108,
+    "polarimetric_sigma_min_median": 0.5846870497816934,
+    "polarimetric_condition_median": 3.836513545452042,
+    "polarimetric_condition_max": 21.96514013452619,
+    "candidate_count": 24,
+    "actual_measure_dirs": 770
+  },
+  "mock_distance": {
+    "mock_distance_mean": 0.02468388339801719,
+    "mock_distance_max": 0.06856985582993344,
+    "mock_distance_p95": 0.0386674242755042
+  },
+  "forward": {
+    "vie_voxel_nodes": 3695,
+    "vie_unknowns": 11085,
+    "vie_unique_incident_directions": 770,
+    "vie_rhs_count": 1540,
+    "vie_residual_sample_count": 6,
+    "vie_linear_residual_sample_max": 1.9759327019025876e-16
+  },
+  "blocks": [
+    {
+      "center": [
+        -0.26,
+        0.25,
+        0.0
+      ],
+      "half_width": [
+        0.16,
+        0.16,
+        0.16
+      ],
+      "tensor": {
+        "real": [
+          [
+            0.2,
+            0.0,
+            -0.0
+          ],
+          [
+            -0.0,
+            0.12,
+            0.0
+          ],
+          [
+            0.0,
+            -0.0,
+            0.08
+          ]
+        ],
+        "imag": [
+          [
+            0.04,
+            0.048,
+            -0.026
+          ],
+          [
+            -0.032,
+            0.03,
+            0.026
+          ],
+          [
+            0.034,
+            -0.014,
+            0.025
+          ]
+        ]
+      },
+      "material_diagnostics": {
+        "coercivity_min_eigenvalue": 1.0629334634355676,
+        "passivity_min_eigenvalue": 0.02090589356921293,
+        "transpose_asymmetry": 0.15231546211727817,
+        "hermitian_asymmetry": 0.1158792474949678
+      }
+    },
+    {
+      "center": [
+        0.25,
+        0.25,
+        0.0
+      ],
+      "half_width": [
+        0.15,
+        0.15,
+        0.16
+      ],
+      "tensor": {
+        "real": [
+          [
+            0.09,
+            -0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.22,
+            0.0
+          ],
+          [
+            -0.0,
+            -0.0,
+            0.14
+          ]
+        ],
+        "imag": [
+          [
+            0.03,
+            -0.02,
+            0.025
+          ],
+          [
+            0.03,
+            0.045,
+            0.041
+          ],
+          [
+            -0.011,
+            -0.029,
+            0.035
+          ]
+        ]
+      },
+      "material_diagnostics": {
+        "coercivity_min_eigenvalue": 1.07869326730859,
+        "passivity_min_eigenvalue": 0.0250419226631648,
+        "transpose_asymmetry": 0.1318787321746763,
+        "hermitian_asymmetry": 0.13221195104830727
+      }
+    },
+    {
+      "center": [
+        0.0,
+        -0.25,
+        0.0
+      ],
+      "half_width": [
+        0.18,
+        0.14,
+        0.16
+      ],
+      "tensor": {
+        "real": [
+          [
+            0.14,
+            0.0,
+            0.0
+          ],
+          [
+            -0.0,
+            0.07,
+            -0.0
+          ],
+          [
+            -0.0,
+            0.0,
+            0.19
+          ]
+        ],
+        "imag": [
+          [
+            0.035,
+            0.021,
+            0.033
+          ],
+          [
+            -0.009,
+            0.025,
+            -0.018
+          ],
+          [
+            -0.023,
+            0.026,
+            0.05
+          ]
+        ]
+      },
+      "material_diagnostics": {
+        "coercivity_min_eigenvalue": 1.0627056116657085,
+        "passivity_min_eigenvalue": 0.022101094265946853,
+        "transpose_asymmetry": 0.10928860873851401,
+        "hermitian_asymmetry": 0.13422369388450014
+      }
+    }
+  ],
+  "outputs": [
+    "exp6_tensor_components_real.png",
+    "exp6_tensor_components_imag.png",
+    "exp6_tensor_norm.png",
+    "exp6_tensor_diagnostics.csv",
+    "exp6_tensor_diagnostics_detail.npz",
+    "metadata.json"
+  ]
+}

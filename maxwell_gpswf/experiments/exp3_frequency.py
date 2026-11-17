@@ -35,14 +35,16 @@ from common import (
     modal_matrix,
     plot_diagnostic_curves,
     quadrature_modal_coefficients,
-    reference_tensor,
     save_diagnostics_npz,
     select_complete_gpswf_multiplets,
     solve_ball_gpswf,
-    tensor_coefficients_from_matrix,
     write_diagnostics_csv,
 )
-from common.phantom import Mode, three_block_phantom, truth_image_2d
+from common.phantom import (
+    Mode,
+    tensor_truth_image_2d,
+    three_admissible_full_tensor_blocks,
+)
 from forward.datasets import (
     farfield_data_with_relative_noise,
     farfield_dataset_to_qhat,
@@ -141,8 +143,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
     rng = np.random.default_rng(config.seed + 300)
 
     # Truth image (same phantom for all k, computed per k for consistency)
-    blocks = three_block_phantom("born")
-    coeff0 = tensor_coefficients_from_matrix(reference_tensor(kind), kind)
+    blocks = three_admissible_full_tensor_blocks()
 
     n_rows = len(k_rows); n_cols = 3
     fig, axes = plt.subplots(n_rows, n_cols,
@@ -182,7 +183,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
             )
             measurement_nodes = -physical_nodes
             ds = full_vie_farfield_dataset(
-                "three_blocks",
+                "piecewise_full_tensor_blocks",
                 measurement_nodes,
                 kind=kind,
                 k=k,
@@ -255,7 +256,13 @@ def run_experiment(config: ExperimentConfig) -> Any:
             ])
             image_matrix = modal_matrix(grid_points, modes, fourier_side=False)
 
-            truth, _, disk_mask = truth_image_2d(grid_size, blocks, coeff0[component_index])
+            truth, _, disk_mask = tensor_truth_image_2d(
+                grid_size,
+                blocks,
+                kind=kind,
+                component_index=component_index,
+                display="component",
+            )
             vmin = float(np.nanmin(np.real(truth)))
             vmax = float(np.nanmax(np.real(truth)))
 
@@ -293,7 +300,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
                     "candidate_count": int(data_info["candidate_count"]),
                     "data_mode": "mock",
                     "data_source": "full_vie",
-                    "shape": "three_blocks_gap_0.20",
+                    "shape": "piecewise_full_tensor_blocks_gap_0.20",
                     "C_mock_distance_mean": float(C * np.mean(mock_distances)),
                     "C_mock_distance_p95": float(C * np.percentile(mock_distances, 95)),
                     "C_mock_distance_max": float(C * np.max(mock_distances)),
@@ -351,7 +358,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
                 "p_nodes": int(ds.p_nodes.shape[0]),
                 "data_mode": "mock",
                 "data_source": "full_vie",
-                "shape": "three_blocks_gap_0.20",
+                "shape": "piecewise_full_tensor_blocks_gap_0.20",
                 "data_norm": float(dsm_meta["data_norm"]),
                 "data_max_abs": float(dsm_meta["data_max_abs"]),
                 "dsm_nodes": int(dsm_meta["dsm_nodes"]),
@@ -407,7 +414,7 @@ def run_experiment(config: ExperimentConfig) -> Any:
                 "p_nodes": int(ds.p_nodes.shape[0]),
                 "data_mode": "mock",
                 "data_source": "full_vie",
-                "shape": "three_blocks_gap_0.20",
+                "shape": "piecewise_full_tensor_blocks_gap_0.20",
                 **farfield_dsm_meta,
                 "image_max_abs": float(np.max(np.abs(farfield_dsm_image))),
                 "target_mean_abs": float(np.mean(np.abs(farfield_dsm_image[target_mask]))),
