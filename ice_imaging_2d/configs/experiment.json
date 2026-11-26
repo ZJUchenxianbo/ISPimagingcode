@@ -1,0 +1,30 @@
+{
+  "forward": {
+    "geometry": {"width_m": 10.0, "water_depth_m": 5.5, "pml_x_m": 0.8, "pml_z_m": 0.8, "top": "0.0"},
+    "materials": {"water_speed": 1500.0, "water_density": 1025.0, "ice_density": 920.0, "ice_p_speed": 3600.0, "ice_s_speed": 1800.0, "air_speed": 343.0, "air_density": 1.225},
+    "acquisition": {
+      "sources": {"x_min": -1.8, "x_max": 1.8, "count": 121, "z": -3.0},
+      "receivers": {"x_min": -2.385, "x_max": 2.385, "count": 160, "z": -3.0}
+    },
+    "frequency": {"carrier_hz": 15000.0, "min_hz": 500.0, "max_hz": 35000.0, "duration_s": 0.0045, "dt_s": 0.000004, "sigma_per_s": 1066.6666666666667, "samples": null},
+    "pulse": {"kind": "gaussian", "sigma_s": 0.000045, "center_s": 0.00027, "amplitude": 1.0},
+    "processing": {"band_low": 10000.0, "band_high": 20000.0},
+    "solver": {"backend": "gpu", "air": "zero-traction", "native": false, "mesh_scale": 1.0, "water_panel_m": null, "ice_elements_per_wavelength": 3.0, "gpu_devices": [0], "workers_per_device": 1, "gpu_library_dir": null, "cuda_arch": null}
+  },
+  "roughness": {"definition": "vertical_peak_to_valley", "height_m": 0.2, "horizontal_period_m": 4.0},
+  "cases": {
+    "flat": {"kind": "flat", "mean_thickness_m": 1.5},
+    "sine": {"kind": "sinusoidal", "mean_thickness_m": 1.5}
+  },
+  "imaging": {
+    "mean_bottom": -1.5,
+    "image_halfwidth": 1.6,
+    "image_x_step": 0.02,
+    "image_z_min": -1.9,
+    "image_z_max": -1.1,
+    "image_z_step": 0.01,
+    "first_window_halfwidth": 0.00032,
+    "maximum_offset": 0.8,
+    "window_factors": [0.8, 1.0, 1.2]
+  }
+}

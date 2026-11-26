@@ -4,6 +4,10 @@ import numpy as np
 
 
 def extract_ridge(image, z):
+    image, z = np.asarray(image), np.asarray(z)
+    if (image.ndim != 2 or image.shape[0] != len(z) or not np.isfinite(image).all()
+            or not len(z) or np.any(np.max(image, axis=0) <= 0)):
+        raise ValueError('Cannot extract a boundary from invalid or unilluminated indicator columns')
     index = np.argmax(image, axis=0)
     ridge = z[index].copy()
     # Subpixel quadratic peak interpolation, no horizontal smoothing or truth.

@@ -33,3 +33,7 @@ Thumbs.db
 !ice_imaging_2d/requirements.txt
 *.nbc
 *.nbi
+
+# Local scientific outputs
+/ice_outputs/
+**/.gpu-build.lock
